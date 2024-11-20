@@ -16,6 +16,16 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
 export const typeInferenceRule = `
   @prefix rdfs: <${RDFS("").value}> .
   @prefix schema: <${Schema("").value}> .
+
+  # Make subClassOf transitive
+  {
+    ?class1 rdfs:subClassOf ?class2 .
+    ?class2 rdfs:subClassOf ?class3 .
+  } => {
+    ?class1 rdfs:subClassOf ?class3 .
+  }.
+
+  # Propagate type through subclass hierarchy
   {
     ?instance a ?class .
     ?class rdfs:subClassOf ?superclass .
