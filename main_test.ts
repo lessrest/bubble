@@ -15,11 +15,11 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   });
 
   await t.step("should identify Tom as a Cat", () => {
-    assertTriple(quads[0], "Tom", RDF.ns("type").value, "Cat");
+    assertTriple(quads[0], "Tom", RDF("type").value, "Cat");
   });
 
   await t.step("should identify Jerry as a Mouse", () => {
-    assertTriple(quads[1], "Jerry", RDF.ns("type").value, "Mouse");
+    assertTriple(quads[1], "Jerry", RDF("type").value, "Mouse");
   });
 
   await t.step("should establish Jerry is smarter than Tom", () => {
