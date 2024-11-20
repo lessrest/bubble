@@ -1,3 +1,4 @@
+import { assertEquals } from "@std/assert";
 import { Quad } from "@rdfjs/types";
 import N3 from "n3";
 import { Readable } from "node:stream";
