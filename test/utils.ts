@@ -18,21 +18,22 @@ export async function parseRDF(input: string): Promise<Quad[]> {
   return quads;
 }
 
+function writeN3(quads: Quad[]): Promise<string> {
+  const writer = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
+  quads.forEach(quad => writer.addQuad(quad));
+  return new Promise<string>((resolve, reject) => {
+    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
+  });
+}
+
 export async function applyRules(data: Quad[], rules: string): Promise<N3.Store> {
   const store = new N3.Store();
   store.addQuads(data);
   
   console.log("\nInitial quads:");
-  for (const quad of store) {
-    console.log(quad);
-  }
+  console.log(await writeN3(data));
   
-  const writer = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
-  data.forEach(quad => writer.addQuad(quad));
-  
-  const n3Data = await new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
-  });
+  const n3Data = await writeN3(data);
 
   const result = await n3reasoner(n3Data, rules);
   
@@ -41,9 +42,7 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   store.addQuads(resultQuads);
 
   console.log("\nFinal quads after applying rules:");
-  for (const quad of store) {
-    console.log(quad);
-  }
+  console.log(await writeN3(store.getQuads()));
   
   return store;
 }

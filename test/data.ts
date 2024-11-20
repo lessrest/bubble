@@ -1,4 +1,4 @@
-import { Schema, RDFS } from "./namespace.ts";
+import { Schema, RDFS, RDF } from "./namespace.ts";
 
 export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   PREFIX rdfs: <${RDFS("").value}>
@@ -14,10 +14,10 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
     schema:knows schema:Jerry .`;
 
 export const typeInferenceRule = `
+  @prefix rdf: <${RDF("").value}> .
   @prefix rdfs: <${RDFS("").value}> .
-  @prefix schema: <${Schema("").value}> .
 
-  # Make subClassOf transitive
+  # transitive subclassing
   {
     ?class1 rdfs:subClassOf ?class2 .
     ?class2 rdfs:subClassOf ?class3 .
@@ -25,13 +25,13 @@ export const typeInferenceRule = `
     ?class1 rdfs:subClassOf ?class3 .
   }.
 
-  # Propagate type through subclass hierarchy
   {
     ?instance a ?class .
     ?class rdfs:subClassOf ?superclass .
   } => {
-    ?instance a ?superclass .
+    ?instance rdf:type ?superclass .
   }.
+
 `;
 
 export const transitiveRule = `
