@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import N3 from "n3";
 import { parseRDF, applyRules, assertTriple, assertTriples } from "./test/utils.ts";
-import { tomAndJerry, transitiveRule } from "./test/data.ts";
+import { tomAndJerry, transitiveRule, typeInferenceRule } from "./test/data.ts";
 import { RDF, Schema } from "./test/namespace.ts";
 
 Deno.test("Basic Tom and Jerry RDF", async (t) => {
