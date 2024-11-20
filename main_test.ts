@@ -51,12 +51,16 @@ async function applyRules(data: Quad[], rules: string): Promise<N3.Store> {
   data.forEach(quad => writer.addQuad(quad));
   
   const n3Data = await new Promise<string>((resolve, reject) => {
-    writer.end((error, result) => error ? reject(error) : resolve(result));
+    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
   });
 
   // Use Eye reasoner
-  const eye = await createReasoner();
-  const result = await eye.reason(n3Data + "\n" + rules);
+  const eye = await createReasoner({
+    data: n3Data,
+    rules: rules,
+    format: 'n3'
+  });
+  const result = await eye.execute();
   
   // Parse results back into store
   const parser = new N3.Parser({ format: 'text/n3' });
