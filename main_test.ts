@@ -4,7 +4,8 @@ import { Quad } from "@rdfjs/types";
 import { Readable } from "node:stream";
 
 // Add Store for inference
-const { Store, StreamParser } = N3;
+const { Store, StreamParser, DataFactory } = N3;
+const { namedNode } = DataFactory;
 
 const RDF = {
   type: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
@@ -97,9 +98,9 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     const spikeIsDog = store.getQuads(
-      store.createTerm(RDF.cartoons + "Spike"),
-      store.createTerm(RDF.type),
-      store.createTerm(RDF.cartoons + "Dog"),
+      namedNode(RDF.cartoons + "Spike"),
+      namedNode(RDF.type),
+      namedNode(RDF.cartoons + "Dog"),
       null
     );
     assertEquals(spikeIsDog.length, 1);
@@ -107,9 +108,9 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
 
   await t.step("should infer Spike is smarter than Tom through transitivity", () => {
     const spikeIsSmarterThanTom = store.getQuads(
-      store.createTerm(RDF.cartoons + "Spike"),
-      store.createTerm(RDF.cartoons + "smarterThan"),
-      store.createTerm(RDF.cartoons + "Tom"),
+      namedNode(RDF.cartoons + "Spike"),
+      namedNode(RDF.cartoons + "smarterThan"),
+      namedNode(RDF.cartoons + "Tom"),
       null
     );
     assertEquals(spikeIsSmarterThanTom.length, 1, 
