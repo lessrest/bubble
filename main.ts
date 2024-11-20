@@ -1,8 +1,19 @@
-export function add(a: number, b: number): number {
-  return a + b;
+import * as RDF from "@rdfjs/data-model";
+
+export function createTriple(subject: string, predicate: string, object: string) {
+  const triple = RDF.quad(
+    RDF.namedNode(subject),
+    RDF.namedNode(predicate),
+    RDF.literal(object)
+  );
+  return triple;
 }
 
-// Learn more at https://docs.deno.com/runtime/manual/examples/module_metadata#concepts
 if (import.meta.main) {
-  console.log("Add 2 + 3 =", add(2, 3));
+  const triple = createTriple(
+    "http://example.org/cartoons#Tom",
+    "http://example.org/cartoons#chases",
+    "Jerry"
+  );
+  console.log("Created triple:", triple.toString());
 }
