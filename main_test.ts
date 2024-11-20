@@ -26,6 +26,23 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   });
 });
 
+Deno.test("RDF without transitive rules", async (t) => {
+  const quads = await parseRDF(tomAndJerry);
+  const store = new N3.Store();
+  store.addQuads(quads);
+  
+  await t.step("should not have transitive inference without rules", () => {
+    const spikeIsSmarterThanTom = store.getQuads(
+      namedNode(RDF.cartoons + "Spike"),
+      namedNode(RDF.cartoons + "smarterThan"),
+      namedNode(RDF.cartoons + "Tom"),
+      null
+    );
+    assertEquals(spikeIsSmarterThanTom.length, 0,
+      "Should not infer that Spike is smarter than Tom without applying rules");
+  });
+});
+
 Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, transitiveRule);
