@@ -14,7 +14,8 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
     schema:knows schema:Jerry .`;
 
 export const typeInferenceRule = `
-  @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+  @prefix rdfs: <${RDFS("").value}> .
+  @prefix schema: <${Schema("").value}> .
   {
     ?instance a ?class .
     ?class rdfs:subClassOf ?superclass .
