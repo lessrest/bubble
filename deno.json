@@ -3,8 +3,11 @@
     "dev": "deno run --watch main.ts"
   },
   "imports": {
+    "@rdfjs/namespace": "npm:@rdfjs/namespace@^2.0.1",
+    "@rdfjs/types": "npm:@rdfjs/types@^1.1.2",
     "@std/assert": "jsr:@std/assert@1",
-    "ldo": "npm:@ldo/ldo@0.0.1-alpha.9",
-    "@rdfjs/dataset": "npm:@rdfjs/dataset@2.0.1"
+    "eyereasoner": "npm:eyereasoner@^17.0.2",
+    "n3": "npm:n3@^1.23.0",
+    "rdflib": "npm:rdflib@^2.2.35"
   }
 }
