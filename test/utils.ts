@@ -22,23 +22,15 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   const store = new N3.Store();
   store.addQuads(data);
   
-  const writer = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
-  data.forEach(quad => writer.addQuad(quad));
-  
-  const n3Data = await new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
-  });
-
-  const result = await n3reasoner(n3Data, rules);
-  
+  // Parse the rules into a separate store
   const parser = new N3.Parser({ format: 'text/n3' });
-  const resultQuads = parser.parse(result) as Quad[];
-  store.addQuads(resultQuads);
-  
-  // print the store as n3
-  const output = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
-  resultQuads.forEach((quad: Quad) => output.addQuad(quad));
-  console.log(output.end());
+  const rulesQuads = parser.parse(rules);
+  const rulesStore = new N3.Store(rulesQuads);
+
+  // Create a reasoner and apply the rules
+  const reasoner = new N3.Reasoner(store);
+  reasoner.reason(rulesStore);
+
   return store;
 }
 
