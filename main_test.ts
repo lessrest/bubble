@@ -26,6 +26,23 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   });
 });
 
+Deno.test("Character and Pet Classifications", async (t) => {
+  const quads = await parseRDF(tomAndJerry);
+  const store = new N3.Store();
+  store.addQuads(quads);
+  
+  await t.step("should classify all characters as both Characters and Pets", () => {
+    assertTriples(store, [
+      [Schema("Tom"), RDF("type"), Schema("Character")],
+      [Schema("Tom"), RDF("type"), Schema("Pet")],
+      [Schema("Jerry"), RDF("type"), Schema("Character")],
+      [Schema("Jerry"), RDF("type"), Schema("Pet")],
+      [Schema("Spike"), RDF("type"), Schema("Character")],
+      [Schema("Spike"), RDF("type"), Schema("Pet")]
+    ]);
+  });
+});
+
 Deno.test("RDF without transitive rules", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = new N3.Store();
