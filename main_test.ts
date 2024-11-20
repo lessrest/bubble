@@ -64,23 +64,14 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   const store = await applyRules(quads, transitiveRule);
   
   await t.step("should have basic triples", () => {
-    const spikeIsDog = store.getQuads(
-      Schema("Spike"),
-      RDF("type"),
-      Schema("Dog"),
-      null
-    );
-    assertEquals(spikeIsDog.length, 1);
+    assertTriples(store, [
+      [Schema("Spike"), RDF("type"), Schema("Dog")]
+    ]);
   });
 
   await t.step("should infer Spike is smarter than Tom through transitivity", () => {
-    const spikeIsSmarterThanTom = store.getQuads(
-      Schema("Spike"),
-      Schema("knows"),
-      Schema("Tom"),
-      null
-    );
-    assertEquals(spikeIsSmarterThanTom.length, 1, 
-      "Expected to infer that Spike knows Tom through transitivity");
+    assertTriples(store, [
+      [Schema("Spike"), Schema("knows"), Schema("Tom")]
+    ]);
   });
 });
