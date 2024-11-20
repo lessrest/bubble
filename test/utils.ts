@@ -35,7 +35,9 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   
   const n3Data = await writeN3(data);
 
-  const result = await n3reasoner(n3Data, rules);
+  const result = await n3reasoner(n3Data, rules, {
+    output: 'deductive_closure'
+  });
   
   const parser = new N3.Parser({ format: 'text/n3' });
   const resultQuads = parser.parse(result) as Quad[];
