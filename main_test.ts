@@ -11,31 +11,19 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
     assertEquals(quads.length, 11);
   });
 
+  const store = new N3.Store();
+  store.addQuads(quads);
+
   await t.step("should identify Tom as a Cat", () => {
-    const tomIsCat = quads.some(quad => 
-      quad.subject.value === Schema("Tom").value &&
-      quad.predicate.value === RDF("type").value &&
-      quad.object.value === Schema("Cat").value
-    );
-    assertEquals(tomIsCat, true);
+    assertTriple(store, "Tom", RDF("type").value, "Cat");
   });
 
   await t.step("should identify Jerry as a Mouse", () => {
-    const jerryIsMouse = quads.some(quad =>
-      quad.subject.value === Schema("Jerry").value &&
-      quad.predicate.value === RDF("type").value &&
-      quad.object.value === Schema("Mouse").value
-    );
-    assertEquals(jerryIsMouse, true);
+    assertTriple(store, "Jerry", RDF("type").value, "Mouse");
   });
 
   await t.step("should establish Jerry is smarter than Tom", () => {
-    const jerryKnowsTom = quads.some(quad =>
-      quad.subject.value === Schema("Jerry").value &&
-      quad.predicate.value === Schema("knows").value &&
-      quad.object.value === Schema("Tom").value
-    );
-    assertEquals(jerryKnowsTom, true);
+    assertTriple(store, "Jerry", "knows", "Tom");
   });
 });
 

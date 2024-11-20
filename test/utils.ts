@@ -3,7 +3,8 @@ import { Quad } from "@rdfjs/types";
 import N3 from "n3";
 import { Readable } from "node:stream";
 import { n3reasoner } from "eyereasoner";
-import { Schema } from "./namespace.ts";
+import { Schema, RDF } from "./namespace.ts";
+import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
   const parser = new N3.StreamParser();
@@ -35,4 +36,15 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   store.addQuads(resultQuads);
   
   return store;
+}
+
+export function assertTriple(store: Store, subject: string, predicate: string, object: string) {
+  const matches = store.getQuads(
+    Schema(subject),
+    predicate.startsWith("http://") ? namedNode(predicate) : Schema(predicate),
+    object.startsWith("http://") ? namedNode(object) : Schema(object),
+    null
+  );
+  assertEquals(matches.length, 1, 
+    `Expected triple: ${subject} ${predicate} ${object}`);
 }
