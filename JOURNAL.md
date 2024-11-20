@@ -20,3 +20,10 @@ The example domain models characters from Tom & Jerry cartoons, showing:
 - Inference of derived facts through reasoning rules
 
 All tests are passing, with clean output after removing debug logging.
+
+Added a Deno web server that:
+- Serves the Tom & Jerry dataset as Turtle-formatted RDF
+- Uses N3.Writer for RDF serialization
+- Runs on http://localhost:8000 with endpoints:
+  - / - Welcome message
+  - /data - The RDF dataset in Turtle format
