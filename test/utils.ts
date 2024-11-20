@@ -32,9 +32,13 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   const result = await n3reasoner(n3Data, rules);
   
   const parser = new N3.Parser({ format: 'text/n3' });
-  const resultQuads = parser.parse(result);
+  const resultQuads = parser.parse(result) as Quad[];
   store.addQuads(resultQuads);
   
+  // print the store as n3
+  const output = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
+  resultQuads.forEach((quad: Quad) => output.addQuad(quad));
+  console.log(output.end());
   return store;
 }
 
