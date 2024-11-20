@@ -1,9 +1,9 @@
 import { assertEquals } from "@std/assert";
-import { Quad } from "@rdfjs/types";
+import { Quad, Term } from "@rdfjs/types";
 import N3 from "n3";
 import { Readable } from "node:stream";
 import { n3reasoner } from "eyereasoner";
-import { Schema, RDF } from "./namespace.ts";
+import { Schema } from "./namespace.ts";
 import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
@@ -38,13 +38,13 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   return store;
 }
 
-export function assertTriple(store: Store, subject: any, predicate: any, object: any) {
+export function assertTriple(store: Store, subject: Term, predicate: Term, object: Term) {
   const matches = store.getQuads(subject, predicate, object, null);
   assertEquals(matches.length, 1, 
     `Expected triple: <${subject.value}> <${predicate.value}> <${object.value}>`);
 }
 
-export function assertTriples(store: Store, triples: [any, any, any][]) {
+export function assertTriples(store: Store, triples: [Term, Term, Term][]) {
   triples.forEach(([subject, predicate, object]) => {
     assertTriple(store, subject, predicate, object);
   });
