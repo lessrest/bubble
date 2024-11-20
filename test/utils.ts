@@ -38,13 +38,8 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   return store;
 }
 
-export function assertTriple(store: Store, subject: string, predicate: string, object: string) {
-  const matches = store.getQuads(
-    Schema(subject),
-    predicate.startsWith("http://") ? namedNode(predicate) : Schema(predicate),
-    object.startsWith("http://") ? namedNode(object) : Schema(object),
-    null
-  );
+export function assertTriple(store: Store, subject: any, predicate: any, object: any) {
+  const matches = store.getQuads(subject, predicate, object, null);
   assertEquals(matches.length, 1, 
-    `Expected triple: ${subject} ${predicate} ${object}`);
+    `Expected triple: <${subject.value}> <${predicate.value}> <${object.value}>`);
 }
