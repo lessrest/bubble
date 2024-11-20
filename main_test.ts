@@ -12,12 +12,11 @@ const RDF = {
 };
 
 const tomAndJerry = `PREFIX c: <${RDF.cartoons}>
-  # Tom is a cat
-  c:Tom a c:Cat.
-  c:Jerry a c:Mouse;
-    c:smarterThan c:Tom.
-  c:Spike a c:Dog;
-    c:smarterThan c:Jerry.`;
+  c:Tom a c:Cat .
+  c:Jerry a c:Mouse ;
+    c:smarterThan c:Tom .
+  c:Spike a c:Dog ;
+    c:smarterThan c:Jerry .`;
 
 const transitiveRule = `
   @prefix c: <${RDF.cartoons}> .
@@ -43,14 +42,15 @@ async function parseRDF(input: string): Promise<Quad[]> {
 
 async function applyRules(data: Quad[], rules: string): Promise<N3.Store> {
   const store = new Store();
-  const parser = new N3.Parser();
+  const parser = new N3.Parser({ format: 'text/n3' });
   
   // Add data
   store.addQuads(data);
   
-  // Parse and add rules
+  // Parse rules and apply reasoning
   const ruleQuads = parser.parse(rules);
-  store.addQuads(ruleQuads);
+  const reasoner = new N3.Reasoner(store);
+  await reasoner.reason(ruleQuads);
   
   return store;
 }
@@ -65,7 +65,7 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   
   await t.step("should parse correct number of triples", () => {
-    assertEquals(quads.length, 3);
+    assertEquals(quads.length, 5);
   });
 
   await t.step("should identify Tom as a Cat", () => {
