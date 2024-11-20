@@ -30,21 +30,13 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   const store = new N3.Store();
   store.addQuads(data);
   
-  console.log("\nInitial quads:");
-  console.log(await writeN3(data));
-  
   const n3Data = await writeN3(data);
-
-  // Combine input data and rules into a single N3 string
   const combinedInput = n3Data + '\n' + rules;
   const result = await n3reasoner(combinedInput, undefined);
   
   const parser = new N3.Parser({ format: 'text/n3' });
   const resultQuads = parser.parse(result) as Quad[];
   store.addQuads(resultQuads);
-
-  console.log("\nFinal quads after applying rules:");
-  console.log(await writeN3(store.getQuads()));
   
   return store;
 }
