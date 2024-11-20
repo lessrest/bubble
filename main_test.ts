@@ -2,25 +2,40 @@ import { assertEquals } from "@std/assert";
 import N3 from "n3";
 import { parseRDF, applyRules, assertTriple } from "./test/utils.ts";
 import { tomAndJerry, transitiveRule } from "./test/data.ts";
-import { RDF, Example } from "./test/namespace.ts";
+import { RDF, Schema } from "./test/namespace.ts";
 
 Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   
   await t.step("should parse correct number of triples", () => {
-    assertEquals(quads.length, 5);
+    assertEquals(quads.length, 9);
   });
 
   await t.step("should identify Tom as a Cat", () => {
-    assertTriple(quads[0], "Tom", RDF`type`.value, "Cat");
+    const tomIsCat = quads.some(quad => 
+      quad.subject.value === Schema("Tom").value &&
+      quad.predicate.value === RDF("type").value &&
+      quad.object.value === Schema("Cat").value
+    );
+    assertEquals(tomIsCat, true);
   });
 
   await t.step("should identify Jerry as a Mouse", () => {
-    assertTriple(quads[1], "Jerry", RDF`type`.value, "Mouse");
+    const jerryIsMouse = quads.some(quad =>
+      quad.subject.value === Schema("Jerry").value &&
+      quad.predicate.value === RDF("type").value &&
+      quad.object.value === Schema("Mouse").value
+    );
+    assertEquals(jerryIsMouse, true);
   });
 
   await t.step("should establish Jerry is smarter than Tom", () => {
-    assertTriple(quads[2], "Jerry", "smarterThan", "Tom");
+    const jerryKnowsTom = quads.some(quad =>
+      quad.subject.value === Schema("Jerry").value &&
+      quad.predicate.value === Schema("knows").value &&
+      quad.object.value === Schema("Tom").value
+    );
+    assertEquals(jerryKnowsTom, true);
   });
 });
 
@@ -31,13 +46,13 @@ Deno.test("RDF without transitive rules", async (t) => {
   
   await t.step("should not have transitive inference without rules", () => {
     const spikeIsSmarterThanTom = store.getQuads(
-      Example`Spike`,
-      Example`smarterThan`,
-      Example`Tom`,
+      Schema("Spike"),
+      Schema("knows"),
+      Schema("Tom"),
       null
     );
     assertEquals(spikeIsSmarterThanTom.length, 0,
-      "Should not infer that Spike is smarter than Tom without applying rules");
+      "Should not infer that Spike knows Tom without applying rules");
   });
 });
 
@@ -47,9 +62,9 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     const spikeIsDog = store.getQuads(
-      Example`Spike`,
-      RDF`type`,
-      Example`Dog`,
+      Schema("Spike"),
+      RDF("type"),
+      Schema("Dog"),
       null
     );
     assertEquals(spikeIsDog.length, 1);
@@ -57,12 +72,12 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
 
   await t.step("should infer Spike is smarter than Tom through transitivity", () => {
     const spikeIsSmarterThanTom = store.getQuads(
-      Example`Spike`,
-      Example`smarterThan`,
-      Example`Tom`,
+      Schema("Spike"),
+      Schema("knows"),
+      Schema("Tom"),
       null
     );
     assertEquals(spikeIsSmarterThanTom.length, 1, 
-      "Expected to infer that Spike is smarter than Tom through transitivity");
+      "Expected to infer that Spike knows Tom through transitivity");
   });
 });
