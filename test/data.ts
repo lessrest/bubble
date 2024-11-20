@@ -1,6 +1,6 @@
-import { RDF } from "./namespace.ts";
+import { Example } from "./namespace.ts";
 
-export const tomAndJerry = `PREFIX c: <${RDF.cartoons("").value}>
+export const tomAndJerry = `PREFIX c: <${Example("").value}>
   c:Tom a c:Cat .
   c:Jerry a c:Mouse ;
     c:smarterThan c:Tom .
@@ -8,7 +8,7 @@ export const tomAndJerry = `PREFIX c: <${RDF.cartoons("").value}>
     c:smarterThan c:Jerry .`;
 
 export const transitiveRule = `
-  @prefix c: <${RDF.cartoons}> .
+  @prefix c: <${Example("").value}> .
   {
     ?x c:smarterThan ?y.
     ?y c:smarterThan ?z.

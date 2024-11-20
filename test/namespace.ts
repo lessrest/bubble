@@ -5,7 +5,6 @@ export function namespace(baseIRI: string) {
   return (term: string) => namedNode(baseIRI + term);
 }
 
-export const RDF = {
-  ns: namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
-  cartoons: namespace("http://example.org/cartoons#")
-};
+export const RDF = namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+export const Schema = namespace("http://www.w3.org/2000/01/rdf-schema#");
+export const Example = namespace("http://example.org/cartoons#");
