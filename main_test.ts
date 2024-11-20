@@ -8,7 +8,7 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   
   await t.step("should parse correct number of triples", () => {
-    assertEquals(quads.length, 9);
+    assertEquals(quads.length, 11);
   });
 
   await t.step("should identify Tom as a Cat", () => {
