@@ -1,4 +1,4 @@
-import { Schema, RDFS, RDF } from "./namespace.ts";
+import { Schema, RDFS } from "./namespace.ts";
 
 export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   PREFIX rdfs: <${RDFS("").value}>
@@ -13,33 +13,10 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   schema:Spike a schema:Dog ;
     schema:knows schema:Jerry .`;
 
-export const typeInferenceRule = `
-  @prefix rdf: <${RDF("").value}> .
-  @prefix rdfs: <${RDFS("").value}> .
+export const typeInferenceRule = await Deno.readTextFile(
+  new URL("./rules/type-inference.n3", import.meta.url)
+);
 
-  # transitive subclassing
-  {
-    ?class1 rdfs:subClassOf ?class2 .
-    ?class2 rdfs:subClassOf ?class3 .
-  } => {
-    ?class1 rdfs:subClassOf ?class3 .
-  }.
-
-  {
-    ?instance a ?class .
-    ?class rdfs:subClassOf ?superclass .
-  } => {
-    ?instance rdf:type ?superclass .
-  }.
-
-`;
-
-export const transitiveRule = `
-  @prefix schema: <${Schema("").value}> .
-  {
-    ?x schema:knows ?y.
-    ?y schema:knows ?z.
-  } => {
-    ?x schema:knows ?z.
-  }.
-`;
+export const transitiveRule = await Deno.readTextFile(
+  new URL("./rules/transitive.n3", import.meta.url)
+);
