@@ -3,7 +3,7 @@ import { Quad } from "@rdfjs/types";
 import N3 from "n3";
 import { Readable } from "node:stream";
 import { n3reasoner } from "eyereasoner";
-import { RDF } from "./data.ts";
+import { RDF } from "./namespace.ts";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
   const parser = new N3.StreamParser();

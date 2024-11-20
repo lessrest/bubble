@@ -1,7 +1,8 @@
 import { assertEquals } from "@std/assert";
 import N3 from "n3";
 import { parseRDF, applyRules, assertTriple } from "./test/utils.ts";
-import { RDF, tomAndJerry, transitiveRule } from "./test/data.ts";
+import { tomAndJerry, transitiveRule } from "./test/data.ts";
+import { RDF } from "./test/namespace.ts";
 
 const { DataFactory } = N3;
 const { namedNode } = DataFactory;
