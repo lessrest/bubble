@@ -40,17 +40,28 @@ async function parseRDF(input: string): Promise<Quad[]> {
   return quads;
 }
 
+import { createReasoner } from "eyereasoner";
+
 async function applyRules(data: Quad[], rules: string): Promise<N3.Store> {
   const store = new Store();
-  const parser = new N3.Parser({ format: 'text/n3' });
-  
-  // Add data
   store.addQuads(data);
   
-  // Parse rules and apply reasoning
-  const ruleQuads = parser.parse(rules);
-  const reasoner = new N3.Reasoner(store);
-  await reasoner.reason(ruleQuads);
+  // Convert store to N3 string
+  const writer = new N3.Writer({ format: 'text/n3', prefixes: { c: RDF.cartoons } });
+  data.forEach(quad => writer.addQuad(quad));
+  
+  const n3Data = await new Promise<string>((resolve, reject) => {
+    writer.end((error, result) => error ? reject(error) : resolve(result));
+  });
+
+  // Use Eye reasoner
+  const eye = await createReasoner();
+  const result = await eye.reason(n3Data + "\n" + rules);
+  
+  // Parse results back into store
+  const parser = new N3.Parser({ format: 'text/n3' });
+  const resultQuads = parser.parse(result);
+  store.addQuads(resultQuads);
   
   return store;
 }
