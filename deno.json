@@ -4,7 +4,7 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",
-    "@rdfjs/data-model": "npm:@rdfjs/data-model@2.0.1",
-    "@rdfjs/types": "npm:@rdfjs/types@1.1.0"
+    "ldo": "npm:@ldo/ldo@0.0.1-alpha.9",
+    "@rdfjs/dataset": "npm:@rdfjs/dataset@2.0.1"
   }
 }

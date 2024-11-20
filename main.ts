@@ -1,19 +1,28 @@
-import * as RDF from "@rdfjs/data-model";
+import { createDataset } from "@rdfjs/dataset";
+import { LdoDataset } from "ldo";
 
 export function createTriple(subject: string, predicate: string, object: string) {
-  const triple = RDF.quad(
-    RDF.namedNode(subject),
-    RDF.namedNode(predicate),
-    RDF.literal(object)
+  const dataset = createDataset();
+  const ldoDataset = new LdoDataset(dataset);
+  
+  ldoDataset.addQuad(
+    subject,
+    predicate,
+    object
   );
-  return triple;
+  
+  return ldoDataset;
 }
 
 if (import.meta.main) {
-  const triple = createTriple(
+  const dataset = createTriple(
     "http://example.org/cartoons#Tom",
     "http://example.org/cartoons#chases",
     "Jerry"
   );
-  console.log("Created triple:", triple.toString());
+  
+  // Print all quads in the dataset
+  for (const quad of dataset.dataset) {
+    console.log("Created triple:", quad.toString());
+  }
 }
