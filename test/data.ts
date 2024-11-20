@@ -1,6 +1,7 @@
-import { Schema } from "./namespace.ts";
+import { Schema, RDFS } from "./namespace.ts";
 
 export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
+  PREFIX rdfs: <${RDFS("").value}>
   schema:Pet rdfs:subClassOf schema:Character .
   schema:Cat rdfs:subClassOf schema:Pet .
   schema:Mouse rdfs:subClassOf schema:Pet .
