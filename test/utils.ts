@@ -38,7 +38,7 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
 }
 
 export function assertTriple(quad: Quad, subject: string, predicate: string, object: string) {
-  assertEquals(quad.subject.value, RDF.cartoons + subject);
-  assertEquals(quad.predicate.value, predicate.startsWith("http") ? predicate : RDF.cartoons + predicate);
-  assertEquals(quad.object.value, RDF.cartoons + object);
+  assertEquals(quad.subject.value, RDF.cartoons(subject).value);
+  assertEquals(quad.predicate.value, predicate.startsWith("http") ? predicate : RDF.cartoons(predicate).value);
+  assertEquals(quad.object.value, RDF.cartoons(object).value);
 }

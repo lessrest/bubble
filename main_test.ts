@@ -33,9 +33,9 @@ Deno.test("RDF without transitive rules", async (t) => {
   
   await t.step("should not have transitive inference without rules", () => {
     const spikeIsSmarterThanTom = store.getQuads(
-      namedNode(RDF.cartoons + "Spike"),
-      namedNode(RDF.cartoons + "smarterThan"),
-      namedNode(RDF.cartoons + "Tom"),
+      RDF.cartoons("Spike"),
+      RDF.cartoons("smarterThan"),
+      RDF.cartoons("Tom"),
       null
     );
     assertEquals(spikeIsSmarterThanTom.length, 0,
@@ -49,9 +49,9 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     const spikeIsDog = store.getQuads(
-      namedNode(RDF.cartoons + "Spike"),
-      namedNode(RDF.type),
-      namedNode(RDF.cartoons + "Dog"),
+      RDF.cartoons("Spike"),
+      RDF.ns("type"),
+      RDF.cartoons("Dog"),
       null
     );
     assertEquals(spikeIsDog.length, 1);

@@ -1,9 +1,11 @@
+import namespace from "@rdfjs/namespace";
+
 export const RDF = {
-  type: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-  cartoons: "http://example.org/cartoons#"
+  ns: namespace("http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
+  cartoons: namespace("http://example.org/cartoons#")
 };
 
-export const tomAndJerry = `PREFIX c: <${RDF.cartoons}>
+export const tomAndJerry = `PREFIX c: <${RDF.cartoons("").value}>
   c:Tom a c:Cat .
   c:Jerry a c:Mouse ;
     c:smarterThan c:Tom .
