@@ -43,3 +43,9 @@ export function assertTriple(store: Store, subject: any, predicate: any, object:
   assertEquals(matches.length, 1, 
     `Expected triple: <${subject.value}> <${predicate.value}> <${object.value}>`);
 }
+
+export function assertTriples(store: Store, triples: [any, any, any][]) {
+  triples.forEach(([subject, predicate, object]) => {
+    assertTriple(store, subject, predicate, object);
+  });
+}

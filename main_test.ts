@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import N3 from "n3";
-import { parseRDF, applyRules, assertTriple } from "./test/utils.ts";
+import { parseRDF, applyRules, assertTriple, assertTriples } from "./test/utils.ts";
 import { tomAndJerry, transitiveRule } from "./test/data.ts";
 import { RDF, Schema } from "./test/namespace.ts";
 
@@ -14,12 +14,11 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const store = new N3.Store();
   store.addQuads(quads);
 
-  await t.step("should identify Tom as a Cat", () => {
-    assertTriple(store, Schema("Tom"), RDF("type"), Schema("Cat"));
-  });
-
-  await t.step("should identify Jerry as a Mouse", () => {
-    assertTriple(store, Schema("Jerry"), RDF("type"), Schema("Mouse"));
+  await t.step("should identify Tom and Jerry correctly", () => {
+    assertTriples(store, [
+      [Schema("Tom"), RDF("type"), Schema("Cat")],
+      [Schema("Jerry"), RDF("type"), Schema("Mouse")]
+    ]);
   });
 
   await t.step("should establish Jerry is smarter than Tom", () => {
