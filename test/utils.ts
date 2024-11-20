@@ -22,6 +22,11 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   const store = new N3.Store();
   store.addQuads(data);
   
+  console.log("\nInitial quads:");
+  for (const quad of store) {
+    console.log(quad);
+  }
+  
   const writer = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
   data.forEach(quad => writer.addQuad(quad));
   
@@ -34,6 +39,11 @@ export async function applyRules(data: Quad[], rules: string): Promise<N3.Store>
   const parser = new N3.Parser({ format: 'text/n3' });
   const resultQuads = parser.parse(result) as Quad[];
   store.addQuads(resultQuads);
+
+  console.log("\nFinal quads after applying rules:");
+  for (const quad of store) {
+    console.log(quad);
+  }
   
   return store;
 }
