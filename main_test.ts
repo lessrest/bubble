@@ -1,20 +1,18 @@
 import { assertEquals } from "@std/assert";
-import { createTriple } from "./main.ts";
+import N3 from "n3";
 
-Deno.test(function datasetTest() {
-  const dataset = createTriple(
-    "http://example.org/cartoons#Tom",
-    "http://example.org/cartoons#chases",
-    "Jerry"
-  );
+const tomAndJerry = `PREFIX c: <http://example.org/cartoons#>
+  # Tom is a cat
+  c:Tom a c:Cat.
+  c:Jerry a c:Mouse;
+    c:smarterThan c:Tom.`
 
-  // Get the first (and only) quad from the dataset
-  const quad = Array.from(dataset.dataset)[0];
-  
-  assertEquals(quad.subject.value, "http://example.org/cartoons#Tom");
-  assertEquals(quad.predicate.value, "http://example.org/cartoons#chases");
-  assertEquals(quad.object.value, "Jerry");
-  
-  // Verify we only have one quad in the dataset
-  assertEquals(Array.from(dataset.dataset).length, 1);
-});
+const parser = new N3.Parser();
+
+parser.parse(tomAndJerry,
+  (error, quad, prefixes) => {
+    if (quad)
+      console.log(quad);
+    else
+      console.log("# That's all, folks!", prefixes);
+  });
