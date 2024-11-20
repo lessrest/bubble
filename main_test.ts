@@ -1,76 +1,10 @@
 import { assertEquals } from "@std/assert";
 import N3 from "n3";
-import { Quad } from "@rdfjs/types";
-import { Readable } from "node:stream";
+import { parseRDF, applyRules, assertTriple } from "./test/utils.ts";
+import { RDF, tomAndJerry, transitiveRule } from "./test/data.ts";
 
-// Add Store for inference
-const { Store, StreamParser, DataFactory } = N3;
+const { DataFactory } = N3;
 const { namedNode } = DataFactory;
-
-const RDF = {
-  type: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-  cartoons: "http://example.org/cartoons#"
-};
-
-const tomAndJerry = `PREFIX c: <${RDF.cartoons}>
-  c:Tom a c:Cat .
-  c:Jerry a c:Mouse ;
-    c:smarterThan c:Tom .
-  c:Spike a c:Dog ;
-    c:smarterThan c:Jerry .`;
-
-const transitiveRule = `
-  @prefix c: <${RDF.cartoons}> .
-  {
-    ?x c:smarterThan ?y.
-    ?y c:smarterThan ?z.
-  } => {
-    ?x c:smarterThan ?z.
-  }.
-`;
-
-async function parseRDF(input: string): Promise<Quad[]> {
-  const parser = new StreamParser();
-  const stream = Readable.from([input]);
-  const quads: Quad[] = [];
-  
-  for await (const quad of stream.pipe(parser)) {
-    quads.push(quad);
-  }
-  
-  return quads;
-}
-
-import { n3reasoner } from "eyereasoner";
-
-async function applyRules(data: Quad[], rules: string): Promise<N3.Store> {
-  const store = new Store();
-  store.addQuads(data);
-  
-  // Convert store to N3 string
-  const writer = new N3.Writer({ format: 'text/n3', prefixes: { c: RDF.cartoons } });
-  data.forEach(quad => writer.addQuad(quad));
-  
-  const n3Data = await new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
-  });
-
-  // Use Eye reasoner
-  const result = await n3reasoner(n3Data, rules);
-  
-  // Parse results back into store
-  const parser = new N3.Parser({ format: 'text/n3' });
-  const resultQuads = parser.parse(result);
-  store.addQuads(resultQuads);
-  
-  return store;
-}
-
-function assertTriple(quad: Quad, subject: string, predicate: string, object: string) {
-  assertEquals(quad.subject.value, RDF.cartoons + subject);
-  assertEquals(quad.predicate.value, predicate.startsWith("http") ? predicate : RDF.cartoons + predicate);
-  assertEquals(quad.object.value, RDF.cartoons + object);
-}
 
 Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const quads = await parseRDF(tomAndJerry);
