@@ -65,7 +65,7 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     assertTriples(store, [
-      [Schema.Jim, RDF.type, Schema.Seal]
+      [Schema.Jim, RDF.type, Schema.Owl]
     ]);
   });
 
