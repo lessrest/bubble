@@ -12,6 +12,31 @@ Deno.test("Server Routes", async (t) => {
     assertEquals(await res.text(), "Not Found");
   });
 
+  await t.step("GET to empty inbox returns 200", async () => {
+    const req = new Request("http://localhost:8000/users/alice/inbox", {
+      method: "GET",
+    });
+    const res = await handler(req);
+
+    assertEquals(res.status, 200);
+    assertEquals(res.headers.get("Content-Type"), "application/turtle");
+
+    const body = await res.text();
+    const result = await parseRDF(body);
+    const store = new N3.Store();
+    await store.addQuads(result);
+
+    await assertQuery(
+      store,
+      `
+      { ?collection a as:Collection. 
+        ?collection rdfs:label "Inbox" .
+      }
+    `,
+      "a collection labeled 'Inbox'",
+    );
+  });
+
   await t.step("POST note to inbox", async () => {
     const req = new Request("http://localhost:8000/users/alice/inbox", {
       method: "POST",
@@ -31,7 +56,7 @@ Deno.test("Server Routes", async (t) => {
     assertEquals(await res.text(), "Activity accepted");
   });
 
-  await t.step("GET to inbox returns 200", async () => {
+  await t.step("GET inbox after POST shows new item", async () => {
     const req = new Request("http://localhost:8000/users/alice/inbox", {
       method: "GET",
     });
