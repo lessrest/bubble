@@ -205,6 +205,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
                 http:method "POST" ;
                 http:body ?object.
         ?collection a ap:Collection.
+        ?object a ap:Note.
       } => {
         ?response a http:Response;
           http:respondsTo ?request;
@@ -223,9 +224,8 @@ Deno.test("Rules-based Request Handler", async (t) => {
       body: `
         @prefix as: <http://www.w3.org/ns/activitystreams#>.
         @prefix ex: <http://example.org/>.
-        @base <http://example.org/>.
 
-        :body a as:Note;
+        <body> a as:Note;
           as:content "Hello Alice!".
       `,
     });

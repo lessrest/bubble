@@ -173,12 +173,33 @@ export async function requestToStore(request: Request): Promise<Store> {
     DataFactory.literal(request.method),
   );
 
-  // Add body
+  // // Add body
+  // store.addQuad(
+  //   requestNode,
+  //   DataFactory.namedNode("http://www.w3.org/2011/http#body"),
+  //   DataFactory.literal(await request.text()),
+  // );
+
+  // Add content type
   store.addQuad(
     requestNode,
-    DataFactory.namedNode("http://www.w3.org/2011/http#body"),
-    DataFactory.literal(await request.text()),
+    DataFactory.namedNode("http://www.w3.org/2011/http#contentType"),
+    DataFactory.literal(request.headers.get("Content-Type") ?? ""),
   );
+
+  // Check if content type is Turtle
+  if (request.headers.get("Content-Type")?.includes("turtle")) {
+    const source = await request.text();
+    const parser = new N3.Parser({ baseIRI: request.url });
+    const quads = parser.parse(source);
+    store.addQuads(quads);
+
+    store.addQuad(
+      requestNode,
+      DataFactory.namedNode("http://www.w3.org/2011/http#body"),
+      DataFactory.namedNode("http://example.org/body"),
+    );
+  }
 
   return store;
 }
