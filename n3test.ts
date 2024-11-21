@@ -14,15 +14,15 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const store = new N3.Store();
   store.addQuads(quads);
 
-  await t.step("should identify Tom and Jerry correctly", () => {
+  await t.step("should identify Alice and Bobby correctly", () => {
     assertTriples(store, [
-      [Schema.Tom, RDF.type, Schema.Cat],
-      [Schema.Jerry, RDF.type, Schema.Mouse]
+      [Schema.Alice, RDF.type, Schema.Bird],
+      [Schema.Bobby, RDF.type, Schema.Fish]
     ]);
   });
 
-  await t.step("should establish Jerry is smarter than Tom", () => {
-    assertTriple(store, Schema.Jerry, Schema.knows, Schema.Tom);
+  await t.step("should establish Bobby knows Alice", () => {
+    assertTriple(store, Schema.Bobby, Schema.knows, Schema.Alice);
   });
 });
 
@@ -48,14 +48,14 @@ Deno.test("RDF without transitive rules", async (t) => {
   store.addQuads(quads);
   
   await t.step("should not have transitive inference without rules", () => {
-    const spikeIsSmarterThanTom = store.getQuads(
-      Schema.Spike,
+    const carolKnowsAlice = store.getQuads(
+      Schema.Carol,
       Schema.knows,
-      Schema.Tom,
+      Schema.Alice,
       null
     );
-    assertEquals(spikeIsSmarterThanTom.length, 0,
-      "Should not infer that Spike knows Tom without applying rules");
+    assertEquals(carolKnowsAlice.length, 0,
+      "Should not infer that Carol knows Alice without applying rules");
   });
 });
 
@@ -65,13 +65,13 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     assertTriples(store, [
-      [Schema.Spike, RDF.type, Schema.Dog]
+      [Schema.Carol, RDF.type, Schema.Seal]
     ]);
   });
 
-  await t.step("should infer Spike is smarter than Tom through transitivity", () => {
+  await t.step("should infer Carol knows Alice through transitivity", () => {
     assertTriples(store, [
-      [Schema.Spike, Schema.knows, Schema.Tom]
+      [Schema.Carol, Schema.knows, Schema.Alice]
     ]);
   });
 });
