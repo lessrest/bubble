@@ -139,7 +139,10 @@ ${await writeN3(
   );
 }
 
-export async function requestToStore(request: Request, requestIri: string): Promise<Store> {
+export async function requestToStore(
+  request: Request,
+  requestIri: string,
+): Promise<Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
 
@@ -248,7 +251,7 @@ export async function handleWithRules(
 
   // Find request node
   const requestQuads = resultStore.getQuads(
-    null,
+    DataFactory.namedNode(requestIri),
     DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
     DataFactory.namedNode("http://www.w3.org/2011/http#Request"),
     null,
@@ -269,7 +272,7 @@ export async function handleWithRules(
   if (responseQuads.length === 0) {
     console.log("No response derived");
     console.log(await writeN3(resultStore.getQuads()));
-    return new Response("No response derived", { status: 404 });
+    return new Response("Not Found", { status: 404 });
   }
 
   // Get status code for the response
@@ -299,5 +302,20 @@ export async function handleWithRules(
     ? null
     : (bodyQuads.length > 0 ? bodyQuads[0].object.value : "");
 
-  return new Response(body, { status: statusCode });
+  // Content-Type
+  const contentTypeQuads = resultStore.getQuads(
+    responseQuads[0].subject,
+    DataFactory.namedNode("http://www.w3.org/2011/http#contentType"),
+    null,
+    null,
+  );
+
+  const contentType = contentTypeQuads.length > 0
+    ? contentTypeQuads[0].object.value
+    : "text/plain";
+
+  return new Response(body, {
+    status: statusCode,
+    headers: { "Content-Type": contentType },
+  });
 }
