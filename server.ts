@@ -11,12 +11,27 @@ const groundFacts = `
   </users/alice/inbox> a ap:Collection.
 `;
 
+// Sample data for Tom & Jerry dataset
+const tomAndJerryData = `
+@prefix schema: <http://schema.org/>.
+@prefix ex: <http://example.org/>.
+
+ex:Tom a schema:Character;
+  schema:name "Tom";
+  schema:description "A house cat who constantly chases Jerry".
+
+ex:Jerry a schema:Character;
+  schema:name "Jerry";
+  schema:description "A clever mouse who outwits Tom".
+`;
+
 // Rules for handling requests
 const rules = `
   @prefix http: <http://www.w3.org/2011/http#>.
   @prefix ap: <http://www.w3.org/ns/activitystreams#>.
   @prefix string: <http://www.w3.org/2000/10/swap/string#>.
-  @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
+  @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
+  @prefix log: <http://www.w3.org/2000/10/swap/log#>.
   
   # Handle root path
   {
@@ -25,7 +40,32 @@ const rules = `
     ?response a http:Response;
       http:respondsTo ?request;
       http:responseCode 200;
-      http:body "ActivityPub Test Server - Try POST to /users/alice/inbox" .
+      http:body "RDF Test Server - Try /data for the Tom & Jerry dataset" .
+  }.
+
+  # Handle /data path
+  {
+    ?request http:path "/data" .
+  } => {
+    ?response a http:Response;
+      http:respondsTo ?request;
+      http:responseCode 200;
+      http:contentType "text/turtle";
+      http:body """${tomAndJerryData}""" .
+  }.
+
+  # Handle 404 for unknown paths
+  {
+    ?request http:path ?path .
+    # Only match if no other response exists
+    ?request log:notIncludes { 
+      ?response http:respondsTo ?request 
+    } .
+  } => {
+    ?response a http:Response;
+      http:respondsTo ?request;
+      http:responseCode 404;
+      http:body "Not Found" .
   }.
 
   # Handle inbox GET
