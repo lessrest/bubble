@@ -56,4 +56,27 @@ Deno.test("HTTP Request to RDF", async (t) => {
       );
     },
   );
+
+  await t.step(
+    "can split path using string:concatenation in reverse",
+    async (step) => {
+      await assertQuery(
+        store,
+        `
+    @prefix http: <http://www.w3.org/2011/http#> .
+    @prefix string: <http://www.w3.org/2000/10/swap/string#> .
+    
+    {
+      ?request a http:Request;
+        http:path ?path .
+      
+      # If we know the full path is "/api/users/123"
+      # And we know the prefix is "/api/"
+      # Then string:concatenation can find the suffix
+      ("/api/" ?suffix) string:concatenation "/api/users/123" .
+    }`,
+        step.name,
+      );
+    },
+  );
 });
