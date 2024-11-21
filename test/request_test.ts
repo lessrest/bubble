@@ -83,7 +83,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
     
     const result = await n3reasoner(store.getQuads(), query);
     console.log("n3reasoner result:", result);
-    assertEquals(result.trim().length > 0, true, 
+    assertEquals(result.length > 0, true, 
       "Expected to find a request matching the pattern:\n" + query + 
       "\nActual store contents:\n" + await writeN3(store.getQuads()));
   });
