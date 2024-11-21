@@ -12,14 +12,11 @@ export function handler(req: Request, store: Store): Promise<Response> {
 }
 
 if (import.meta.main) {
-  const store = await withGroundFacts(
-    await Deno.readTextFile("./config.ttl"),
-  );
+  const store = await withGroundFacts(await Deno.readTextFile("./config.ttl"));
 
   const controller = new AbortController();
-  const server = Deno.serve(
-    { port: 8000, signal: controller.signal },
-    (req) => handler(req, store),
+  const server = Deno.serve({ port: 8000, signal: controller.signal }, (req) =>
+    handler(req, store)
   );
 
   Deno.addSignalListener("SIGINT", () => {
