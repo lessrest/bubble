@@ -7,11 +7,11 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   schema:Fish rdfs:subClassOf schema:Pet .
   schema:Seal rdfs:subClassOf schema:Pet .
   
-  schema:Eve a schema:Bird .
-  schema:Bob a schema:Fish ;
-    schema:knows schema:Eve .
-  schema:Jim a schema:Seal ;
-    schema:knows schema:Bob .`;
+  schema:Pet a schema:Bird .
+  schema:Pal a schema:Fish ;
+    schema:knows schema:Pet .
+  schema:Pip a schema:Seal ;
+    schema:knows schema:Pal .`;
 
 export const typeInferenceRule = await Deno.readTextFile(
   new URL("./rules/type-inference.n3", import.meta.url)
