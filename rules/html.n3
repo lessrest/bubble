@@ -6,6 +6,31 @@
 @prefix schema: <http://schema.org/> .
 @prefix string: <http://www.w3.org/2000/10/swap/string#> .
 
+
+{
+   ?type a html:HTMLElementType ;
+       html:tagName ?tagName .
+   ?element a ?type .
+}
+=> 
+{
+   ?element a html:element ;
+       html:tagName ?tagName .
+} .
+html:paragraph a html:HTMLElementType ;
+   html:tagName "p" .
+html:body a html:HTMLElementType ;
+   html:tagName "body" .
+html:head a html:HTMLElementType ;
+   html:tagName "head" .
+html:title a html:HTMLElementType ;
+   html:tagName "title" .
+html:meta a html:HTMLElementType ;
+   html:tagName "meta" .
+html:html a html:HTMLElementType ;
+   html:tagName "html" .
+
+
 # Server root shows HTML homepage
 {
    ?site schema:name ?name ;
@@ -14,54 +39,38 @@
 => 
 {
    ?site html:representation [
-       a html:element ;
-       html:tagName "html" ;
-       html:children ( 
-         [
-           a html:element ;
-           html:tagName "head" ;
-           html:children ( 
-             [
-               a html:element ;
-               html:tagName "title" ;
+       a html:html ;
+       html:children ( [
+           a html:head ;
+           html:children ( [
+               a html:title ;
                html:children ( [
                    a html:text ;
                    html:content ?name 
-               ] )
-             ]
-             [
-               a html:element ;
-               html:tagName "meta" ;
+               ] ) 
+           ] [
+               a html:meta ;
                html:attributes [
-                 html:name "charset" ;
-                 html:value "utf-8"
-               ]
-             ]
-             [
-               a html:element ;
-               html:tagName "meta" ;
+                   html:name "charset" ;
+                   html:value "utf-8" 
+               ] 
+           ] [
+               a html:meta ;
                html:attributes [
-                 html:name "viewport" ;
-                 html:value "width=device-width, initial-scale=1"
-               ]
-             ]
-           )
-         ]
-         [
-           a html:element ;
-           html:tagName "body" ;
-           html:children (
-             [
-               a html:element ;
-               html:tagName "p" ;
+                   html:name "viewport" ;
+                   html:value "width=device-width, initial-scale=1" 
+               ] 
+           ] ) 
+       ] [
+           a html:body ;
+           html:children ( [
+               a html:paragraph ;
                html:children ( [
                    a html:text ;
-                   html:content ?desc
-               ] )
-             ]
-           )
-         ]
-       )
+                   html:content ?desc 
+               ] ) 
+           ] ) 
+       ] ) 
    ] .
 } .
 
