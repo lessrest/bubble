@@ -79,26 +79,23 @@ export async function assertQuery(t: Deno.TestContext, store: Store, query: stri
 
 export async function assertN3Query(store: Store, query: string, expectedMessage?: string) {
   const result = await n3reasoner(await writeN3(store.getQuads()), query);
-  
-  // Query to find success messages
-  const messageQuery = `
-    @prefix test: <http://example.org/test#> .
-    {
-      ?x a test:Success;
-         test:message ?message.
-    } => {
-      ?x test:foundMessage ?message.
-    }.
-  `;
-  
-  const messages = await n3reasoner(result, messageQuery);
-  
-  assertEquals(messages.length > 0, true,
+  const resultStore = new Store();
+  const parser = new N3.Parser({ format: 'text/n3' });
+  const resultQuads = parser.parse(result);
+  resultStore.addQuads(resultQuads);
+
+  const successQuads = resultStore.getQuads(
+    null,
+    DataFactory.namedNode('http://example.org/test#message'),
+    null,
+    null
+  );
+
+  assertEquals(successQuads.length > 0, true,
     `N3 query failed to match expected pattern.\nActual graph contents:\n${await writeN3(store.getQuads())}`);
 
   console.log("\nTest successes:");
-  const messageRegex = /test:foundMessage "([^"]+)"/g;
-  for (const match of messages.matchAll(messageRegex)) {
-    console.log(`✓ ${match[1]}`);
+  for (const quad of successQuads) {
+    console.log(`✓ ${quad.object.value}`);
   }
 }
