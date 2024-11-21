@@ -190,47 +190,44 @@ Deno.test("Rules-based Request Handler", async (t) => {
       @prefix ex: <http://example.org/>.
       
       ex:alice a ap:Person;
-        ap:inbox </users/alice/inbox>.
+        ap:inbox </cap/alice-inbox-root>.
+
+      </cap/alice-inbox-root> a ap:Collection.
     `;
 
     const rules = `
       @prefix http: <http://www.w3.org/2011/http#>.
       @prefix ap: <http://www.w3.org/ns/activitystreams#>.
-      @prefix ex: <http://example.org/>.
       @base <http://example.org/>.
       
       {
-        ?request http:href ?inbox ;
+        ?request http:href ?collection ;
                 http:method "POST" ;
                 http:body ?object.
-        ?actor ap:inbox ?inbox.
+        ?collection a ap:Collection.
       } => {
         ?response a http:Response;
           http:respondsTo ?request;
           http:responseCode 201;
           http:body "Activity accepted".
 
-        ?activity a ap:Create;
-          ap:object ?object.
-
-        ?inbox ap:items ?object.
+        ?collection ap:items ?object.
       }.
     `;
 
-    const req = new Request("http://example.org/users/alice/inbox", {
+    const req = new Request("http://example.org/cap/alice-inbox-root", {
       method: "POST",
       headers: {
-        "Content-Type": "application/activity+json",
+        "Content-Type": "application/turtle",
       },
-      body: JSON.stringify({
-        "@context": "https://www.w3.org/ns/activitystreams",
-        "type": "Create",
-        "actor": "https://other.example/bob",
-        "object": {
-          "type": "Note",
-          "content": "Hello Alice!",
-        },
-      }),
+      body: `
+        @prefix as: <http://www.w3.org/ns/activitystreams#>.
+        @prefix ex: <http://example.org/>.
+        @base <http://example.org/>.
+
+        :body a as:Note;
+          as:content "Hello Alice!".
+      `,
     });
 
     const res = await handleWithRules(req, rules, withGroundFacts(facts));
