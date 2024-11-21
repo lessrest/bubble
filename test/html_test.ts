@@ -35,7 +35,7 @@ Deno.test("HTML Endpoints", async (t) => {
     );
   });
 
-  await t.step("renders HTML from outerHTML property", () => {
+  await t.step("renders HTML from outerHTML property", async () => {
     const store = new N3.Store();
     const doc = DataFactory.blankNode();
 
@@ -47,7 +47,7 @@ Deno.test("HTML Endpoints", async (t) => {
       ),
     );
 
-    const html_output = renderHTML(store, doc);
+    const html_output = await renderHTML(store, doc);
     assertEquals(
       html_output,
       `<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>`,

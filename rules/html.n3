@@ -8,15 +8,33 @@
 
 # Server root shows HTML homepage
 {
-   ?request http:path "/" .
    ?site schema:name ?name ;
-       schema:description ?desc .
-   ( """<!doctype html>
-<title>%s</title>
-<meta charset=\"utf-8\">
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-<p>%s</p>
-""" ?name ?desc ) string:format ?html .
+       schema:description ?desc ;
+}
+=> 
+{
+   ?site html:representation [
+       a html:element ;
+       html:tagName "html" ;
+       html:children ( [
+           a html:element ;
+           html:tagName "head" ;
+           html:children ( [
+               a html:element ;
+               html:tagName "title" ;
+               html:children ( [
+                   a html:text ;
+                   html:content ?name 
+               ] ) 
+           ] ) 
+       ] ) 
+   ] .
+} .
+
+# Server root shows HTML homepage
+{
+   ?request http:path "/" .
+   ?site html:representation ?output .
 }
 => 
 {
@@ -24,8 +42,5 @@
        http:respondsTo ?request ;
        http:responseCode 200 ;
        http:contentType "text/html" ;
-       http:body [
-           a html:page ;
-           html:outerHTML ?html 
-       ] .
+       http:body ?output .
 } .
