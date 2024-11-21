@@ -8,10 +8,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
   await t.step("converts URL path to RDF request", async (step) => {
     await assertQuery(
       store,
-      `
-    @prefix http: <http://www.w3.org/2011/http#> .
-    
-    {
+      `{
       ?request a http:Request;
         http:path "/api/users/123" .
     }`,

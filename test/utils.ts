@@ -81,6 +81,9 @@ function getStandardPrefixes(): string {
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix schema: <http://schema.org/> .
+@prefix http: <http://www.w3.org/2011/http#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
 `;
 }
 
@@ -90,6 +93,7 @@ export async function assertQuery(
   message: string,
 ): Promise<void> {
   const fullQuery = `
+      ${getStandardPrefixes()}
       @prefix test: <http://example.org/test#> .
       
       ${query}
