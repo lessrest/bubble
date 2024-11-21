@@ -55,6 +55,9 @@ export async function handleWithRules(
   }
 
   let body = "";
+  const bodyStore = new N3.Store();
+  let hasN3Content = false;
+  let hasLiteralContent = false;
 
   const bodyQuads = resultStore.getQuads(
     response,
@@ -64,16 +67,16 @@ export async function handleWithRules(
   );
 
   if (bodyQuads.length > 0) {
-    const bodyStore = new N3.Store();
-
     for (const bodyQuad of bodyQuads) {
       if (bodyQuad.object.termType === "Quad") {
         bodyStore.addQuad(bodyQuad.object);
+        hasN3Content = true;
       } else if (bodyQuad.object.termType === "Literal") {
-        // For literals, concatenate their values
-        console.log(`Adding literal: ${bodyQuad.object.value}`);
-        body = (body ?? "") + bodyQuad.object.value;
-        console.log(`Body is now: ${body}`);
+        if (hasN3Content) {
+          throw new Error("Cannot mix N3 and literal content in response body");
+        }
+        body = bodyQuad.object.value;
+        hasLiteralContent = true;
       } else if (
         bodyQuad.object.termType === "BlankNode" ||
         bodyQuad.object.termType === "NamedNode"
@@ -89,11 +92,15 @@ export async function handleWithRules(
         ).length > 0;
 
         if (isHtmlPage) {
-          // console.log(
-          //   `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
-          // );
+          if (hasN3Content) {
+            throw new Error("Cannot mix N3 and HTML content in response body");
+          }
           body = await renderHTML(resultStore, bodyQuad.object);
+          hasLiteralContent = true;
         } else {
+          if (hasLiteralContent) {
+            throw new Error("Cannot mix N3 and literal content in response body");
+          }
           const graphId = bodyQuad.object.termType === "BlankNode"
             ? `_:${bodyQuad.object.value}`
             : bodyQuad.object.value;
@@ -106,19 +113,16 @@ export async function handleWithRules(
           for (const quad of subgraph) {
             bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
           }
+          hasN3Content = true;
         }
       } else {
-        console.log(
-          await writeN3(resultQuads),
-        );
         throw new Error(`Unsupported body type: ${bodyQuad.object.termType}`);
       }
     }
 
     // If we collected any quads, serialize them
-    if (bodyStore.size > 0) {
-      console.log(`Adding body: ${await writeN3(bodyStore.getQuads())}`);
-      body = (body ?? "") + await writeN3(bodyStore.getQuads());
+    if (hasN3Content) {
+      body = await writeN3(bodyStore.getQuads());
     }
   }
 
