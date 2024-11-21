@@ -60,3 +60,27 @@ Added a Deno web server that:
 - Runs on http://localhost:8000 with endpoints:
   - / - Welcome message
   - /data - The RDF dataset in Turtle format
+# Development Journal
+
+## 2024-11-21: N3 Rules-Based Request Handler
+
+Successfully implemented and tested a rules-based HTTP request handler that uses N3 reasoning to determine responses. The handler can:
+
+- Match request paths using N3 rules
+- Use string operations in rules to do pattern matching
+- Return appropriate status codes and response bodies
+- Fall back to 404 for unmatched paths
+
+This is a significant milestone as it demonstrates using semantic web technologies (N3 rules and reasoning) to handle web requests in a declarative way. The implementation allows routing logic to be expressed as semantic rules rather than imperative code.
+
+Example rule:
+```n3
+{
+  ?request http:path "/hello".
+} => {
+  [] http:responseCode 200;
+     http:body "Hello, World!".
+}.
+```
+
+All tests are passing, showing the system works reliably for basic routing patterns.
