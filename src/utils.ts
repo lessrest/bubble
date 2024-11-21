@@ -285,12 +285,23 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
         (node.children ?? []).map(child => renderHTML(store, child))
       ).then(parts => parts.join(""));
 
+      // Get attributes if any exist
+      const attributes = store.getObjects(subject, HTML.attributes, null)[0];
+      let attrString = "";
+      if (attributes) {
+        const name = store.getObjects(attributes, HTML.name, null)[0]?.value;
+        const value = store.getObjects(attributes, HTML.value, null)[0]?.value;
+        if (name && value) {
+          attrString = ` ${name}="${value}"`;
+        }
+      }
+
       // Special case for document
       if (node.tagName === "html") {
         return `<!doctype html>\n${innerHTML}`;
       }
 
-      return `<${node.tagName}>${innerHTML}</${node.tagName}>`;
+      return `<${node.tagName}${attrString}>${innerHTML}</${node.tagName}>`;
     }
 
     case "text":
