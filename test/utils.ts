@@ -18,7 +18,7 @@ export async function parseRDF(input: string): Promise<Quad[]> {
   return quads;
 }
 
-function writeN3(quads: Quad[]): Promise<string> {
+export function writeN3(quads: Quad[]): Promise<string> {
   const writer = new N3.Writer({ format: 'text/n3', prefixes: { schema: Schema("").value } });
   quads.forEach(quad => writer.addQuad(quad));
   return new Promise<string>((resolve, reject) => {
