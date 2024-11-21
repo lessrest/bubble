@@ -65,13 +65,14 @@ Deno.test("HTTP Request to RDF", async (t) => {
         `
     @prefix http: <http://www.w3.org/2011/http#> .
     @prefix string: <http://www.w3.org/2000/10/swap/string#> .
+    @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
     
     {
       ?request a http:Request;
         http:path ?path .
       
       # Split the path on "/" character
-      (?path "/") string:stringSplit ("" "api" "users" "123") .
+      (?path "/") e:stringSplit ("api" "users" "123") .
     }`,
         step.name,
       );

@@ -107,7 +107,13 @@ export async function assertN3Query(
   query: string,
   expectedMessage: string,
 ): Promise<void> {
-  const result = await n3reasoner(await writeN3(store.getQuads()), query);
+  const result = await n3reasoner(
+    await writeN3(store.getQuads()) + "\n" + query,
+    undefined,
+    {
+      output: "deductive_closure",
+    },
+  );
   const resultStore = new N3.Store();
   const parser = new N3.Parser({ format: "text/n3" });
   const resultQuads = parser.parse(result);
@@ -130,4 +136,6 @@ ${await writeN3(
       store.getQuads(),
     )}`,
   );
+
+  console.log(await writeN3(resultStore.getQuads()));
 }
