@@ -53,21 +53,7 @@ const rules = `
       http:contentType "text/turtle";
       http:body """${tomAndJerryData}""" .
   }.
-
-  # Handle 404 for unknown paths
-  {
-    ?request http:path ?path .
-    # Only match if no other response exists
-    ?request log:notIncludes { 
-      ?response http:respondsTo ?request 
-    } .
-  } => {
-    ?response a http:Response;
-      http:respondsTo ?request;
-      http:responseCode 404;
-      http:body "Not Found" .
-  }.
-
+  
   # Handle inbox GET
   {
     ?request http:href ?collection;
