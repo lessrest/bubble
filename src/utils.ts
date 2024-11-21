@@ -222,6 +222,9 @@ const HTML = {
   children: DataFactory.namedNode("http://www.w3.org/1999/xhtml#children"),
   content: DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"),
   outerHTML: DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
+  attributes: DataFactory.namedNode("http://www.w3.org/1999/xhtml#attributes"),
+  name: DataFactory.namedNode("http://www.w3.org/1999/xhtml#name"),
+  value: DataFactory.namedNode("http://www.w3.org/1999/xhtml#value"),
 };
 
 interface HTMLNode {
