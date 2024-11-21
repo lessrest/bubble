@@ -223,7 +223,8 @@ export async function handleWithRules(
     null
   );
 
-  const body = bodyQuads.length > 0 ? bodyQuads[0].object.value : "";
+  // Don't include body for 204 No Content responses
+  const body = statusCode === 204 ? null : (bodyQuads.length > 0 ? bodyQuads[0].object.value : "");
   
   return new Response(body, { status: statusCode });
 }
