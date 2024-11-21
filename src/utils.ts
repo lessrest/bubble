@@ -232,14 +232,11 @@ export async function handleWithRules(
 
   // Apply the rules
   const n3Input = await writeN3(store.getQuads()) + "\n" + rules;
-  console.log("N3 input before reasoning:", n3Input);
   const result = await n3reasoner(
     n3Input,
     undefined,
     { output: "deductive_closure" },
   );
-
-  console.log("N3 result:", result);
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();
@@ -270,8 +267,6 @@ export async function handleWithRules(
   );
 
   if (responseQuads.length === 0) {
-    console.log("No response derived");
-    console.log(await writeN3(resultStore.getQuads()));
     return new Response("Not Found", { status: 404 });
   }
 
