@@ -22,6 +22,46 @@ deno task test
 deno task serve
 ```
 
+## Feature Progress
+
+✅ = Implemented
+🚧 = In Progress
+⏳ = Planned
+
+### Core Framework
+- ✅ HTTP Request to RDF conversion
+- ✅ N3 rule-based request handling
+- ✅ Declarative routing with N3 patterns
+- ✅ Session-based request contexts
+- ✅ RDF content negotiation
+- ✅ Modular rule loading
+
+### ActivityPub Support
+- ✅ Basic Person and Collection types
+- ✅ Inbox GET/POST handling
+- ✅ Note creation and storage
+- 🚧 Activity validation
+- 🚧 Outbox implementation
+- ⏳ Activity distribution
+- ⏳ Actor discovery
+- ⏳ Following relationships
+
+### Semantic Features
+- ✅ RDFS reasoning
+- ✅ Type inference
+- 🚧 Property paths
+- ⏳ Shape validation
+- ⏳ Named graphs
+- ⏳ Blank node skolemization
+
+### Testing & Development
+- ✅ Comprehensive test suite
+- ✅ RDF assertion helpers
+- ✅ N3 query helpers
+- 🚧 Request mocking
+- ⏳ Graph visualization
+- ⏳ Rule debugging tools
+
 When you start the server, it exposes a simple ActivityPub inbox implementation at `http://localhost:8000/users/alice/inbox`. The configuration is split into two files:
 
 1. `ground-facts.ttl` - Defines the basic ActivityPub structure:
