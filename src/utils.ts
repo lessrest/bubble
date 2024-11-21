@@ -6,17 +6,8 @@ import { Schema } from "./namespace.ts";
 import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
-  const parser = new N3.StreamParser();
-  const quads: Quad[] = [];
-
-  for await (const chunk of input) {
-    const quad = await parser.parse(chunk);
-    if (quad) {
-      quads.push(quad);
-    }
-  }
-
-  return quads;
+  const parser = new N3.Parser();
+  return parser.parse(input);
 }
 
 export function writeN3(quads: Quad[]): Promise<string> {
