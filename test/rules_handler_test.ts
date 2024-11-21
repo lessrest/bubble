@@ -133,4 +133,55 @@ Deno.test("Rules-based Request Handler", async (t) => {
     assertEquals(res.status, 204);
     assertEquals(await res.text(), "");
   });
+
+  await t.step("can use ground facts in rules", async () => {
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      
+      {
+        ?request http:path "/nobody".
+      } => {
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 204.
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/nobody");
+    const res = await handleWithRules(req, rules);
+    
+    assertEquals(res.status, 204);
+    assertEquals(await res.text(), "");
+  });
+
+  await t.step("can use ground facts in rules", async () => {
+    // Create a store with some ground facts
+    const groundStore = new N3.Store();
+    groundStore.addQuad(
+      DataFactory.namedNode('http://example.org/config'),
+      DataFactory.namedNode('http://example.org/greeting'),
+      DataFactory.literal('Hola!')
+    );
+
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      @prefix ex: <http://example.org/>.
+      
+      {
+        ?request http:path "/greet".
+        ?config ex:greeting ?msg.
+      } => {
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 200;
+          http:body ?msg.
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/greet");
+    const res = await handleWithRules(req, rules, groundStore);
+    
+    assertEquals(res.status, 200);
+    assertEquals(await res.text(), "Hola!");
+  });
 });

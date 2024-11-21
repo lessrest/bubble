@@ -159,10 +159,16 @@ export function requestToStore(request: Request): Store {
 
 export async function handleWithRules(
   request: Request,
-  rules: string
+  rules: string,
+  groundFacts?: Store
 ): Promise<Response> {
   // Convert request to RDF store
   const store = requestToStore(request);
+  
+  // Add ground facts if provided
+  if (groundFacts) {
+    store.addQuads(groundFacts.getQuads());
+  }
   
   // Apply the rules
   const result = await n3reasoner(
