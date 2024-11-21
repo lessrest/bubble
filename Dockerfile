@@ -34,10 +34,10 @@ WORKDIR /app
 
 # Cache dependencies
 COPY deno.json deno.lock ./
-RUN deno cache --lock=deno.lock main.ts
 
 # Copy application files
 COPY . .
+RUN deno cache --lock=deno.lock server.ts
 
 # Expose default port
 EXPOSE 8000
