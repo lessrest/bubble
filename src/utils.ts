@@ -177,11 +177,23 @@ export async function handleWithRules(
   const resultQuads = parser.parse(result);
   resultStore.addQuads(resultQuads);
 
-  // Look for response triples
+  // Find request node
+  const requestQuads = resultStore.getQuads(
+    null,
+    DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
+    DataFactory.namedNode('http://www.w3.org/2011/http#Request'),
+    null
+  );
+
+  if (requestQuads.length === 0) {
+    return new Response("Request not found in result", { status: 500 });
+  }
+
+  // Look for response that responds to this request
   const responseQuads = resultStore.getQuads(
     null,
-    DataFactory.namedNode("http://www.w3.org/2011/http#responseCode"),
-    null,
+    DataFactory.namedNode("http://www.w3.org/2011/http#respondsTo"),
+    requestQuads[0].subject,
     null
   );
 
@@ -189,7 +201,21 @@ export async function handleWithRules(
     return new Response("No response derived", { status: 404 });
   }
 
-  const statusCode = parseInt(responseQuads[0].object.value);
+  // Get status code for the response
+  const statusQuads = resultStore.getQuads(
+    responseQuads[0].subject,
+    DataFactory.namedNode("http://www.w3.org/2011/http#responseCode"),
+    null,
+    null
+  );
+
+  if (statusQuads.length === 0) {
+    return new Response("Response missing status code", { status: 500 });
+  }
+
+  const statusCode = parseInt(statusQuads[0].object.value);
+
+  // Get response body
   const bodyQuads = resultStore.getQuads(
     responseQuads[0].subject,
     DataFactory.namedNode("http://www.w3.org/2011/http#body"),
