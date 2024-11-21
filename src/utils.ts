@@ -80,6 +80,7 @@ function getStandardPrefixes(): string {
 @prefix http: <http://www.w3.org/2011/http#> .
 @prefix string: <http://www.w3.org/2000/10/swap/string#> .
 @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
+@prefix as: <http://www.w3.org/ns/activitystreams#> .
 `;
 }
 
@@ -147,10 +148,9 @@ function generateSessionUrn(): string {
 export async function requestToStore(request: Request): Promise<Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
-  const sessionUrn = generateSessionUrn();
 
   // Create a blank node for the request
-  const requestNode = DataFactory.blankNode();
+  const requestNode = DataFactory.namedNode(generateSessionUrn());
 
   // Add basic request triples
   store.addQuad(
@@ -197,15 +197,14 @@ export async function requestToStore(request: Request): Promise<Store> {
   // Check if content type is Turtle
   if (request.headers.get("Content-Type")?.includes("turtle")) {
     const source = await request.text();
-    const parser = new N3.Parser({ baseIRI: sessionUrn });
+    const parser = new N3.Parser({ baseIRI: requestNode.value });
     const quads = parser.parse(source);
     store.addQuads(quads);
 
-    // Use session-scoped body node
     store.addQuad(
       requestNode,
       DataFactory.namedNode("http://www.w3.org/2011/http#body"),
-      DataFactory.namedNode(`${sessionUrn}/body`),
+      DataFactory.namedNode(requestNode.value + "#body"),
     );
   }
 
@@ -223,6 +222,7 @@ export async function handleWithRules(
   request: Request,
   rules: string,
   groundFacts?: Store,
+  resultStore?: Store,
 ): Promise<Response> {
   // Convert request to RDF store
   const store = await requestToStore(request);
@@ -240,7 +240,10 @@ export async function handleWithRules(
   );
 
   // Parse the results
-  const resultStore = new N3.Store();
+  if (!resultStore) {
+    resultStore = new N3.Store();
+  }
+
   const parser = new N3.Parser({ format: "text/n3" });
   const resultQuads = parser.parse(result);
   resultStore.addQuads(resultQuads);

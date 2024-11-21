@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
-import { handleWithRules, withGroundFacts } from "../src/utils.ts";
+import { assertQuery, handleWithRules, withGroundFacts } from "../src/utils.ts";
 import N3, { DataFactory } from "n3";
+import { writeN3 } from "../src/utils.ts";
 
 Deno.test("Rules-based Request Handler", async (t) => {
   await t.step("handles basic routing rule", async () => {
@@ -202,8 +203,8 @@ Deno.test("Rules-based Request Handler", async (t) => {
       
       {
         ?request http:href ?collection ;
-                http:method "POST" ;
-                http:body ?object.
+                http:method "POST" .
+        
         ?collection a ap:Collection.
         ?object a ap:Note.
       } => {
@@ -225,14 +226,22 @@ Deno.test("Rules-based Request Handler", async (t) => {
         @prefix as: <http://www.w3.org/ns/activitystreams#>.
         @prefix ex: <http://example.org/>.
 
-        <body> a as:Note;
+        <#body> a as:Note;
           as:content "Hello Alice!".
       `,
     });
 
-    const res = await handleWithRules(req, rules, withGroundFacts(facts));
+    const store = await withGroundFacts(facts);
+    const resultStore = new N3.Store();
+    const res = await handleWithRules(req, rules, store, resultStore);
 
     assertEquals(res.status, 201);
     assertEquals(await res.text(), "Activity accepted");
+
+    await assertQuery(
+      resultStore,
+      `{ <http://example.org/cap/alice-inbox-root> as:items ?object. }`,
+      "the object was added to the collection",
+    );
   });
 });
