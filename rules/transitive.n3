@@ -1,7 +1,0 @@
-@prefix schema: <http://schema.org/> .
-{
-  ?x schema:knows ?y.
-  ?y schema:knows ?z.
-} => {
-  ?x schema:knows ?z.
-}.
