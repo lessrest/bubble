@@ -1,0 +1,7 @@
+@base <http://localhost:8000/>.
+@prefix ap: <http://www.w3.org/ns/activitystreams#>.
+
+</users/alice> a ap:Person;
+  ap:inbox </users/alice/inbox>.
+
+</users/alice/inbox> a ap:Collection.
