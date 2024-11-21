@@ -11,8 +11,15 @@ A semantic web framework that uses N3 rules to handle HTTP requests and implemen
 
 ## Quick Start
 
+This repository includes a GitHub Dev Container configuration that automatically sets up:
+- Deno
+- SWI-Prolog 
+- EYE Reasoner
+
+Just open in GitHub Codespaces or VS Code with Dev Containers to get started immediately!
+
 ```bash
-# Install dependencies
+# Install dependencies (not needed with Dev Container)
 deno task cache
 
 # Run the tests

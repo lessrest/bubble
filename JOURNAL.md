@@ -1,5 +1,13 @@
 # Project Journal
 
+## November 21, 2024 - Added Dev Container Support
+
+Added GitHub Dev Container support to streamline development setup:
+- Automatically installs Deno, SWI-Prolog, and EYE Reasoner
+- Configures all necessary environment variables
+- Enables immediate development with `deno task test` or `deno task serve`
+- No manual installation or configuration required
+
 ## November 21, 2024 - Major Progress on RDF Web Framework
 
 We've made significant strides in building a semantic web framework that uses N3 rules for HTTP request handling. Here's what we've accomplished:
