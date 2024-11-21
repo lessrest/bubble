@@ -44,10 +44,7 @@ const rules = `
       http:respondsTo ?request;
       http:responseCode 200;
       http:contentType "application/turtle";
-      http:body ?n3 .
-
-    # Return a dummy response for now
-    "N/A" ?dummy ?n3 .
+      http:body "n/a" .
   }.
 
   # Handle inbox POST

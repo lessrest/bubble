@@ -1,7 +1,7 @@
 {
   "tasks": {
     "dev": "deno run --watch main.ts",
-    "test": "deno test --allow-read n3test.ts",
+    "test": "deno test --allow-read .",
     "serve": "deno run --watch --allow-net --allow-env --allow-read server.ts",
     "test:server": "deno test --allow-read test/server_test.ts",
     "test:rules": "deno test --allow-read test/rules_handler_test.ts"
