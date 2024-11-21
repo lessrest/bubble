@@ -27,6 +27,27 @@ const rules = `
       http:body "ActivityPub Test Server - Try POST to /users/alice/inbox" .
   }.
 
+  # Handle inbox GET
+  {
+    ?request http:path ?path;
+            http:method "GET" .
+    
+    ?collection a ap:Collection;
+              http:path ?path .
+  } => {
+    ?response a http:Response;
+      http:respondsTo ?request;
+      http:responseCode 200;
+      http:contentType "text/turtle";
+      http:body ?n3 .
+
+    # Get all items in the collection
+    ?collection ap:items ?items .
+    
+    # Convert to N3 string
+    (?collection ?items) log:n3String ?n3 .
+  }.
+
   # Handle inbox POST
   {
     ?request http:path ?path;
