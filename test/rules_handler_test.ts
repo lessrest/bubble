@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { handleWithRules } from "../src/utils.ts";
+import N3, { DataFactory } from "n3";
 
 Deno.test("Rules-based Request Handler", async (t) => {
   await t.step("handles basic routing rule", async () => {
@@ -158,9 +159,9 @@ Deno.test("Rules-based Request Handler", async (t) => {
     // Create a store with some ground facts
     const groundStore = new N3.Store();
     groundStore.addQuad(
-      DataFactory.namedNode('http://example.org/config'),
-      DataFactory.namedNode('http://example.org/greeting'),
-      DataFactory.literal('Hola!')
+      DataFactory.namedNode("http://example.org/config"),
+      DataFactory.namedNode("http://example.org/greeting"), 
+      DataFactory.literal("Hola!")
     );
 
     const rules = `
