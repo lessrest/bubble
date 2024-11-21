@@ -1,10 +1,10 @@
-import N3, { DataFactory } from "n3";
-import { Store } from "n3";
+import N3, { Store } from "n3";
 import { Quad } from "@rdfjs/types";
 import { renderHTML } from "./html.ts";
 import { CommandLineReasoner } from "./reasoning.ts";
 import { writeN3 } from "./utils.ts";
 import { requestToStore } from "./requestToStore.ts";
+import { findSubject, getResponseData } from "./rdfUtils.ts";
 
 export async function handleWithRules(
   request: Request,
@@ -35,53 +35,22 @@ export async function handleWithRules(
   const resultQuads = parser.parse(result) as Quad[];
   resultStore.addQuads(resultQuads);
 
-  // Find request node
-  const requestQuads = resultStore.getQuads(
-    DataFactory.namedNode(requestIri),
-    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
-    DataFactory.namedNode("http://www.w3.org/2011/http#Request"),
-    null,
-  );
-
-  if (requestQuads.length === 0) {
+  const requestNode = findSubject(resultStore, "http://www.w3.org/2011/http#Request");
+  if (!requestNode) {
     return new Response("Request not found in result", { status: 500 });
   }
 
-  // Look for response that responds to this request
-  const responseQuads = resultStore.getQuads(
-    null,
-    DataFactory.namedNode("http://www.w3.org/2011/http#respondsTo"),
-    requestQuads[0].subject,
-    null,
-  );
-
-  if (responseQuads.length === 0) {
+  const { response, statusCode, body: initialBody, contentType } = getResponseData(resultStore, requestNode);
+  
+  if (!response) {
     return new Response("Not Found", { status: 404 });
   }
 
-  // Get status code for the response
-  const statusQuads = resultStore.getQuads(
-    responseQuads[0].subject,
-    DataFactory.namedNode("http://www.w3.org/2011/http#responseCode"),
-    null,
-    null,
-  );
-
-  if (statusQuads.length === 0) {
+  if (!statusCode) {
     return new Response("Response missing status code", { status: 500 });
   }
 
-  const statusCode = parseInt(statusQuads[0].object.value);
-
-  // Get response body
-  const bodyQuads = resultStore.getQuads(
-    responseQuads[0].subject,
-    DataFactory.namedNode("http://www.w3.org/2011/http#body"),
-    null,
-    null,
-  );
-
-  let body: string | null = null;
+  let body = initialBody;
 
   if (bodyQuads.length > 0) {
     const bodyStore = new N3.Store();

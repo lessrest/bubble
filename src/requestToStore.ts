@@ -1,5 +1,5 @@
-import N3, { DataFactory } from "n3";
-import { Store } from "n3";
+import N3, { Store } from "n3";
+import { HTTP, RDF } from "./namespace.ts";
 
 export async function requestToStore(
   request: Request,
@@ -11,38 +11,14 @@ export async function requestToStore(
   const requestNode = DataFactory.namedNode(requestIri);
 
   // Add basic request triples
+  store.addQuad(requestNode, RDF("type"), HTTP("Request"));
+  store.addQuad(requestNode, HTTP("path"), N3.DataFactory.literal(url.pathname));
+  store.addQuad(requestNode, HTTP("href"), N3.DataFactory.namedNode(url.href));
+  store.addQuad(requestNode, HTTP("method"), N3.DataFactory.literal(request.method));
   store.addQuad(
     requestNode,
-    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
-    DataFactory.namedNode("http://www.w3.org/2011/http#Request"),
-  );
-
-  // Add path
-  store.addQuad(
-    requestNode,
-    DataFactory.namedNode("http://www.w3.org/2011/http#path"),
-    DataFactory.literal(url.pathname),
-  );
-
-  // Add href
-  store.addQuad(
-    requestNode,
-    DataFactory.namedNode("http://www.w3.org/2011/http#href"),
-    DataFactory.namedNode(url.href),
-  );
-
-  // Add method
-  store.addQuad(
-    requestNode,
-    DataFactory.namedNode("http://www.w3.org/2011/http#method"),
-    DataFactory.literal(request.method),
-  );
-
-  // Add content type
-  store.addQuad(
-    requestNode,
-    DataFactory.namedNode("http://www.w3.org/2011/http#contentType"),
-    DataFactory.literal(request.headers.get("Content-Type") ?? ""),
+    HTTP("contentType"),
+    N3.DataFactory.literal(request.headers.get("Content-Type") ?? "")
   );
 
   // Check if content type is Turtle
