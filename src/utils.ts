@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { Quad, Term } from "@rdfjs/types";
 import N3, { DataFactory } from "n3";
 import { n3reasoner } from "eyereasoner";
-import { Schema } from "./namespace.ts";
+import { ACTIVITY_STREAMS, EXAMPLE, HTTP, Schema } from "./namespace.ts";
 import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
@@ -13,7 +13,12 @@ export async function parseRDF(input: string): Promise<Quad[]> {
 export function writeN3(quads: Quad[]): Promise<string> {
   const writer = new N3.Writer({
     format: "text/n3",
-    prefixes: { schema: Schema("").value },
+    prefixes: {
+      schema: Schema("").value,
+      http: HTTP("").value,
+      ex: EXAMPLE("").value,
+      as: ACTIVITY_STREAMS("").value,
+    },
   });
 
   for (const quad of quads) {
@@ -133,32 +138,46 @@ ${await writeN3(
   );
 }
 
-export function requestToStore(request: Request): Store {
+export async function requestToStore(request: Request): Promise<Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
-  
+
   // Create a blank node for the request
   const requestNode = DataFactory.blankNode();
-  
+
   // Add basic request triples
   store.addQuad(
     requestNode,
-    DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
-    DataFactory.namedNode('http://www.w3.org/2011/http#Request')
+    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+    DataFactory.namedNode("http://www.w3.org/2011/http#Request"),
   );
-  
+
   // Add path
   store.addQuad(
     requestNode,
-    DataFactory.namedNode('http://www.w3.org/2011/http#path'),
-    DataFactory.literal(url.pathname)
+    DataFactory.namedNode("http://www.w3.org/2011/http#path"),
+    DataFactory.literal(url.pathname),
+  );
+
+  // Add href
+  store.addQuad(
+    requestNode,
+    DataFactory.namedNode("http://www.w3.org/2011/http#href"),
+    DataFactory.namedNode(url.href),
   );
 
   // Add method
   store.addQuad(
     requestNode,
-    DataFactory.namedNode('http://www.w3.org/2011/http#method'),
-    DataFactory.literal(request.method)
+    DataFactory.namedNode("http://www.w3.org/2011/http#method"),
+    DataFactory.literal(request.method),
+  );
+
+  // Add body
+  store.addQuad(
+    requestNode,
+    DataFactory.namedNode("http://www.w3.org/2011/http#body"),
+    DataFactory.literal(await request.text()),
   );
 
   return store;
@@ -174,21 +193,21 @@ export function withGroundFacts(facts: string): Store {
 export async function handleWithRules(
   request: Request,
   rules: string,
-  groundFacts?: Store
+  groundFacts?: Store,
 ): Promise<Response> {
   // Convert request to RDF store
-  const store = requestToStore(request);
-  
+  const store = await requestToStore(request);
+
   // Add ground facts if provided
   if (groundFacts) {
     store.addQuads(groundFacts.getQuads());
   }
-  
+
   // Apply the rules
   const result = await n3reasoner(
     await writeN3(store.getQuads()) + "\n" + rules,
     undefined,
-    { output: "deductive_closure" }
+    { output: "deductive_closure" },
   );
 
   // Parse the results
@@ -200,9 +219,9 @@ export async function handleWithRules(
   // Find request node
   const requestQuads = resultStore.getQuads(
     null,
-    DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
-    DataFactory.namedNode('http://www.w3.org/2011/http#Request'),
-    null
+    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+    DataFactory.namedNode("http://www.w3.org/2011/http#Request"),
+    null,
   );
 
   if (requestQuads.length === 0) {
@@ -214,10 +233,11 @@ export async function handleWithRules(
     null,
     DataFactory.namedNode("http://www.w3.org/2011/http#respondsTo"),
     requestQuads[0].subject,
-    null
+    null,
   );
 
   if (responseQuads.length === 0) {
+    console.log(await writeN3(resultStore.getQuads()));
     return new Response("No response derived", { status: 404 });
   }
 
@@ -226,7 +246,7 @@ export async function handleWithRules(
     responseQuads[0].subject,
     DataFactory.namedNode("http://www.w3.org/2011/http#responseCode"),
     null,
-    null
+    null,
   );
 
   if (statusQuads.length === 0) {
@@ -240,11 +260,13 @@ export async function handleWithRules(
     responseQuads[0].subject,
     DataFactory.namedNode("http://www.w3.org/2011/http#body"),
     null,
-    null
+    null,
   );
 
   // Don't include body for 204 No Content responses
-  const body = statusCode === 204 ? null : (bodyQuads.length > 0 ? bodyQuads[0].object.value : "");
-  
+  const body = statusCode === 204
+    ? null
+    : (bodyQuads.length > 0 ? bodyQuads[0].object.value : "");
+
   return new Response(body, { status: statusCode });
 }

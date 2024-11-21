@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { parseRDF } from "./src/utils.ts";
 import { tomAndJerry } from "./test/data.ts";
 import N3 from "n3";
@@ -47,6 +46,5 @@ async function handleDataRequest(): Promise<Response> {
 }
 
 if (import.meta.main) {
-  console.log("Server running at http://localhost:8000");
-  await serve(handler, { port: 8000 });
+  await Deno.serve({ port: 8000 }, handler);
 }

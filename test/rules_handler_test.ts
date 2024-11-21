@@ -20,7 +20,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/hello");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "Hello, World!");
   });
@@ -41,7 +41,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/wrong-path");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 404);
   });
 
@@ -63,7 +63,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/api/users");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "API Request");
   });
@@ -89,7 +89,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/multi");
     const res = await handleWithRules(req, rules);
-    
+
     // Should use the first matching response
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "First response");
@@ -110,7 +110,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/incomplete");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 500);
     assertEquals(await res.text(), "Response missing status code");
   });
@@ -130,7 +130,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/nobody");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 204);
     assertEquals(await res.text(), "");
   });
@@ -150,7 +150,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/nobody");
     const res = await handleWithRules(req, rules);
-    
+
     assertEquals(res.status, 204);
     assertEquals(await res.text(), "");
   });
@@ -178,13 +178,14 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const req = new Request("http://localhost:8000/greet");
     const res = await handleWithRules(req, rules, withGroundFacts(facts));
-    
+
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "Hola!");
   });
 
   await t.step("handles ActivityPub inbox POST", async () => {
     const facts = `
+      @base <http://example.org/>.
       @prefix ap: <http://www.w3.org/ns/activitystreams#>.
       @prefix ex: <http://example.org/>.
       
@@ -196,22 +197,30 @@ Deno.test("Rules-based Request Handler", async (t) => {
       @prefix http: <http://www.w3.org/2011/http#>.
       @prefix ap: <http://www.w3.org/ns/activitystreams#>.
       @prefix ex: <http://example.org/>.
+      @base <http://example.org/>.
       
       {
-        ?request http:path "/users/alice/inbox";
-                http:method "POST".
+        ?request http:href ?inbox ;
+                http:method "POST" ;
+                http:body ?object.
+        ?actor ap:inbox ?inbox.
       } => {
         ?response a http:Response;
           http:respondsTo ?request;
           http:responseCode 201;
           http:body "Activity accepted".
+
+        ?activity a ap:Create;
+          ap:object ?object.
+
+        ?inbox ap:items ?object.
       }.
     `;
 
-    const req = new Request("http://localhost:8000/users/alice/inbox", {
+    const req = new Request("http://example.org/users/alice/inbox", {
       method: "POST",
       headers: {
-        "Content-Type": "application/activity+json"
+        "Content-Type": "application/activity+json",
       },
       body: JSON.stringify({
         "@context": "https://www.w3.org/ns/activitystreams",
@@ -219,13 +228,13 @@ Deno.test("Rules-based Request Handler", async (t) => {
         "actor": "https://other.example/bob",
         "object": {
           "type": "Note",
-          "content": "Hello Alice!"
-        }
-      })
+          "content": "Hello Alice!",
+        },
+      }),
     });
 
     const res = await handleWithRules(req, rules, withGroundFacts(facts));
-    
+
     assertEquals(res.status, 201);
     assertEquals(await res.text(), "Activity accepted");
   });
