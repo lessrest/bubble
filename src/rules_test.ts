@@ -244,9 +244,9 @@ Deno.test("handles ActivityPub inbox POST", async (t) => {
   assertEquals(res.status, 201);
   assertEquals(await res.text(), "Activity accepted");
 
-  // await assertQuery(
-  //   store,
-  //   `{ <http://example.org/cap/alice-inbox-root> as:items ?object. }`,
-  //   "the object was added to the collection",
-  // );
+  await assertQuery(
+    store,
+    `{ <http://example.org/cap/alice-inbox-root> as:items ?object. }`,
+    "the object was added to the collection",
+  );
 });
