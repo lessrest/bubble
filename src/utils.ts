@@ -214,7 +214,8 @@ export function withGroundFacts(facts: string): Store {
   return store;
 }
 
-export function renderHTML(store: Store, subject: Term): string {
+export async function renderHTML(store: Store, subject: Term): Promise<string> {
+  console.log("quads", await writeN3(store.getQuads()));
   const outerHTML = store.getObjects(
     subject,
     DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
@@ -327,7 +328,7 @@ export async function handleWithRules(
           DataFactory.namedNode(
             "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
           ),
-          DataFactory.namedNode("http://www.w3.org/1999/xhtml#page"),
+          DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
           null,
         ).length > 0;
 
@@ -335,7 +336,7 @@ export async function handleWithRules(
           // console.log(
           //   `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
           // );
-          body = renderHTML(resultStore, bodyQuad.object);
+          body = await renderHTML(resultStore, bodyQuad.object);
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"
             ? `_:${bodyQuad.object.value}`
