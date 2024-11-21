@@ -8,6 +8,8 @@
    schema:description "A semantic social node built with N3 rules and ActivityPub" ;
    schema:url <http://localhost:8000/> ;
    schema:author </about#me> .
+
+# Person
 </about#me> a schema:Person ;
    schema:name "N3 Server" ;
    schema:url </about> .
