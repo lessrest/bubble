@@ -246,12 +246,9 @@ export async function handleWithRules(
   }
 
   // Apply the rules
+  const reasoner = new WebAssemblyReasoner();
   const n3Input = await writeN3(store.getQuads()) + "\n" + rules;
-  const result = await n3reasoner(
-    n3Input,
-    undefined,
-    { output: "deductive_closure" },
-  );
+  const result = await reasoner.reason(n3Input, "", { output: "deductive_closure" });
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();
