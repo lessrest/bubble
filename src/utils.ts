@@ -295,13 +295,18 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
         const name = store.getObjects(attributes, HTML.name, null)[0]?.value;
         const value = store.getObjects(attributes, HTML.value, null)[0]?.value;
         if (name && value) {
-          attrString = ` ${name}="${value}"`;
+          // For meta tags, name/content are the standard attributes
+          if (node.tagName === "meta" && name === "viewport") {
+            attrString = ` name="${name}" content="${value}"`;
+          } else {
+            attrString = ` ${name}="${value}"`;
+          }
         }
       }
 
       // Special case for document
       if (node.tagName === "html") {
-        return `<!doctype html>\n${innerHTML}`;
+        return `<!doctype html>\n<html>${innerHTML}</html>`;
       }
 
       return `<${node.tagName}${attrString}>${innerHTML}</${node.tagName}>`;
