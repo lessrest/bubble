@@ -8,7 +8,7 @@ const htmlRules = await Deno.readTextFile("./rules/html.n3");
 const rules = [inboxRules, htmlRules];
 
 export function handler(req: Request, store: Store): Promise<Response> {
-  return handleWithRules(req, rules, store, store);
+  return handleWithRules(req, rules, store);
 }
 
 if (import.meta.main) {

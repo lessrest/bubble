@@ -8,3 +8,6 @@ export const EXAMPLE = namespace("http://example.org/");
 export const ACTIVITY_STREAMS = namespace(
   "http://www.w3.org/ns/activitystreams#",
 );
+export const HTML = namespace("http://www.w3.org/1999/xhtml#");
+export const SWAP = namespace("http://www.w3.org/2000/10/swap/var#");
+export const LOCAL = namespace("http://localhost:8000/");

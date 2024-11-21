@@ -1,45 +1,52 @@
-@prefix http: <http://www.w3.org/2011/http#>.
-@prefix ap: <http://www.w3.org/ns/activitystreams#>.
+@prefix ap: <http://www.w3.org/ns/activitystreams#> .
+@prefix http: <http://www.w3.org/2011/http#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
 # Handle inbox GET
 {
-  ?request http:href ?collection;
-          http:method "GET" .
-  
-  ?collection a ap:Collection.
-} => {
-  ?response a http:Response;
-    http:respondsTo ?request;
-    http:responseCode 200;
-    http:contentType "application/turtle";
-    http:body { ?collection a ap:Collection } .
-}.
-
+   ?request http:href ?collection ;
+       http:method "GET" .
+   ?collection a ap:Collection .
+}
+=> 
 {
-  ?request http:href ?collection;
-    http:method "GET" .
-  
-  ?response a http:Response ;
-    http:respondsTo ?request .
-
-  ?collection ap:items ?item .
-} => {
-  ?response http:body { ?collection ap:items ?item } .
-}.
+   ?response a http:Response ;
+       http:respondsTo ?request ;
+       http:responseCode 200 ;
+       http:contentType "application/turtle" ;
+       http:body 
+       {
+           ?collection a ap:Collection 
+       } .
+} .
+{
+   ?request http:href ?collection ;
+       http:method "GET" .
+   ?response a http:Response ;
+       http:respondsTo ?request .
+   ?collection ap:items ?item .
+}
+=> 
+{
+   ?response http:body 
+   {
+       ?collection ap:items ?item 
+   } .
+} .
 
 # Handle inbox POST
 {
-  ?request http:href ?collection;
-          http:method "POST" ;
-          http:body ?object .
-  
-  ?collection a ap:Collection .    
-  ?object a ap:Note .
-} => {
-  ?response a http:Response;
-    http:respondsTo ?request;
-    http:responseCode 201;
-    http:body "Activity accepted" .
-
-  ?collection ap:items ?object .
-}.
+   ?request http:href ?collection ;
+       http:method "POST" ;
+       http:body ?object .
+   ?collection a ap:Collection .
+   ?object a ap:Note .
+}
+=> 
+{
+   ?response a http:Response ;
+       http:respondsTo ?request ;
+       http:responseCode 201 ;
+       http:body "Activity accepted" .
+   ?collection ap:items ?object .
+} .

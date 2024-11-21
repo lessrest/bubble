@@ -40,6 +40,7 @@ export function getResponseData(store: Store, requestNode: Term): {
   statusCode: number | null;
   body: string | null;
   contentType: string;
+  asserts: Term | null;
 } {
   console.log(`... Getting response data for ${requestNode.value}`);
   const responses = findSubjects(store, HTTP("respondsTo").value, requestNode);
@@ -52,6 +53,7 @@ export function getResponseData(store: Store, requestNode: Term): {
       statusCode: null,
       body: null,
       contentType: "text/plain",
+      asserts: null,
     };
   }
 
@@ -68,5 +70,6 @@ export function getResponseData(store: Store, requestNode: Term): {
   );
   const contentType = contentTypeObj ? contentTypeObj.value : "text/plain";
 
-  return { response: responses[0], statusCode, body, contentType };
+  const asserts = findObject(store, responses[0], HTTP("asserts").value);
+  return { response: responses[0], statusCode, body, contentType, asserts };
 }

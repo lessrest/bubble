@@ -14,36 +14,40 @@ export async function processResponseBody(
   response: Term,
 ): Promise<ResponseBody> {
   const bodyQuads = store.getQuads(response, HTTP("body"), null, null);
-  
+
   if (bodyQuads.length === 0) {
     return { content: "", contentType: "text/plain" };
   }
 
   const bodyStore = new N3.Store();
-  
+
   // Try to find literal or HTML content first
   for (const bodyQuad of bodyQuads) {
     if (bodyQuad.object.termType === "Literal") {
       return {
         content: bodyQuad.object.value,
-        contentType: "text/plain"
+        contentType: "text/plain",
       };
     }
 
-    if (bodyQuad.object.termType === "BlankNode" || 
-        bodyQuad.object.termType === "NamedNode") {
+    if (
+      bodyQuad.object.termType === "BlankNode" ||
+      bodyQuad.object.termType === "NamedNode"
+    ) {
       // Check if this is an HTML page
       const isHtmlPage = store.getQuads(
         bodyQuad.object,
-        DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+        DataFactory.namedNode(
+          "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+        ),
         DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
-        null
+        null,
       ).length > 0;
 
       if (isHtmlPage) {
         return {
           content: await renderHTML(store, bodyQuad.object),
-          contentType: "text/html"
+          contentType: "text/html",
         };
       }
 
@@ -62,7 +66,7 @@ export async function processResponseBody(
   if (bodyStore.size > 0) {
     return {
       content: await writeN3(bodyStore.getQuads()),
-      contentType: "text/turtle"
+      contentType: "text/turtle",
     };
   }
 
@@ -74,9 +78,9 @@ export function getContentType(store: Store, response: Term): string {
     response,
     HTTP("contentType"),
     null,
-    null
+    null,
   );
-  
+
   return contentTypeQuads.length > 0
     ? contentTypeQuads[0].object.value
     : "text/plain";

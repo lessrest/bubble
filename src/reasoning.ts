@@ -27,15 +27,14 @@ export class CommandLineReasoner implements Reasoner {
     inputs: string[],
     options?: ReasonerOptions,
   ): Promise<string> {
-    // Write inputs to temporary files
-    const inputFiles = await Promise.all(
-      inputs.map(() => Deno.makeTempFile({ suffix: ".n3" })),
-    );
     const queryFile = await Deno.makeTempFile({ suffix: ".n3" });
 
-    await Promise.all(
-      inputs.map((input, i) => Deno.writeTextFile(inputFiles[i], input)),
-    );
+    const inputFiles = await Promise.all(inputs.map(async (input) => {
+      const file = await Deno.makeTempFile({ suffix: ".n3" });
+      await Deno.writeTextFile(file, input);
+      return file;
+    }));
+
     if (options?.query) {
       await Deno.writeTextFile(queryFile, options.query);
     }
@@ -55,13 +54,18 @@ export class CommandLineReasoner implements Reasoner {
           // "main",
           // "--",
           "--pass",
-          "--no-numerals",
-          "--no-qnames",
+          //          "--no-bnode-relabeling",
+          // "--no-numerals",
+          // "--no-qnames",
           "--no-qvars",
-          "--no-ucall",
+          // "--no-ucall",
           // "--rdf-list-output",
           "--quiet",
           "--nope",
+          "--quantify",
+          `foo`,
+          "--debug",
+          //"--no-bnode-relabeling",
           ...inputFiles,
           ...(options?.query ? ["--query", queryFile] : []),
         ],
@@ -76,11 +80,14 @@ export class CommandLineReasoner implements Reasoner {
       }
 
       const result = new TextDecoder().decode(stdout);
-      //console.log("RESULT", result);
+      console.log("*** RESULT ***");
+      console.log(result);
       return result;
     } finally {
-      // Cleanup temp files
-      await Promise.all(inputFiles.map((file) => Deno.remove(file)));
+      // don't clean up
+      console.log("*** NOT CLEANING UP ***");
+      console.log(inputFiles);
+      console.log(queryFile);
     }
   }
 }

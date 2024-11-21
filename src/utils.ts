@@ -2,11 +2,22 @@ import { assertEquals } from "@std/assert";
 import { Quad, Term } from "@rdfjs/types";
 import N3, { DataFactory } from "n3";
 import { CommandLineReasoner } from "./reasoning.ts";
-import { ACTIVITY_STREAMS, EXAMPLE, HTTP, RDF, Schema } from "./namespace.ts";
+import {
+  ACTIVITY_STREAMS,
+  EXAMPLE,
+  HTML,
+  HTTP,
+  LOCAL,
+  RDF,
+  Schema,
+  SWAP,
+} from "./namespace.ts";
 import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
-  const parser = new N3.Parser();
+  console.log("*** PARSING ***");
+  console.log(input);
+  const parser = new N3.Parser({ format: "application/trig" });
   return parser.parse(input);
 }
 
@@ -18,6 +29,10 @@ export function writeN3(quads: Quad[]): Promise<string> {
       http: HTTP("").value,
       ex: EXAMPLE("").value,
       as: ACTIVITY_STREAMS("").value,
+      rdf: RDF("").value,
+      html: HTML("").value,
+      swap: SWAP("").value,
+      local: LOCAL("").value,
     },
   });
 
@@ -31,8 +46,6 @@ export function writeN3(quads: Quad[]): Promise<string> {
     );
   });
 }
-
-export { applyRules } from "./rules.ts";
 
 export function assertTriple(
   store: Store,
@@ -66,6 +79,7 @@ function getStandardPrefixes(): string {
 @prefix string: <http://www.w3.org/2000/10/swap/string#> .
 @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
 @prefix as: <http://www.w3.org/ns/activitystreams#> .
+@prefix local: <http://localhost:8000/> .
 `;
 }
 
@@ -124,7 +138,7 @@ ${await writeN3(
 
 export function withGroundFacts(facts: string): Store {
   const store = new N3.Store();
-  const parser = new N3.Parser();
+  const parser = new N3.Parser({ format: "application/trig" });
   store.addQuads(parser.parse(facts));
   return store;
 }

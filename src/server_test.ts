@@ -62,43 +62,43 @@ Deno.test("Server Routes", async (t) => {
     assertEquals(res.status, 201);
     assertEquals(await res.text(), "Activity accepted");
   });
+});
 
-  // await t.step("GET inbox after POST shows new item", async () => {
-  //   const req = new Request("http://localhost:8000/users/alice/inbox", {
-  //     method: "POST",
-  //     headers: {
-  //       "Content-Type": "application/turtle",
-  //     },
-  //     body: `
-  //       @prefix as: <http://www.w3.org/ns/activitystreams#>.
+Deno.test("GET inbox after POST shows new item", async (t) => {
+  const req = new Request("http://localhost:8000/users/alice/inbox", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/turtle",
+    },
+    body: `
+        @prefix as: <http://www.w3.org/ns/activitystreams#>.
 
-  //       <#body> a as:Note;
-  //         as:content "Hello Alice!".
-  //     `,
-  //   });
-  //   const store = await emptyStore();
-  //   const res = await handler(req, store);
+        <#body> a as:Note;
+          as:content "Hello Alice!".
+      `,
+  });
+  const store = await emptyStore();
+  const res = await handler(req, store);
 
-  //   assertEquals(res.status, 201);
+  assertEquals(res.status, 201);
 
-  //   const req2 = new Request("http://localhost:8000/users/alice/inbox", {
-  //     method: "GET",
-  //   });
-  //   const res2 = await handler(req2, store);
+  const req2 = new Request("http://localhost:8000/users/alice/inbox", {
+    method: "GET",
+  });
+  const res2 = await handler(req2, store);
 
-  //   assertEquals(res2.status, 200);
-  //   const body = await res2.text();
-  //   const result = await parseRDF(body);
-  //   await store.addQuads(result);
+  assertEquals(res2.status, 200);
+  const body = await res2.text();
+  const result = await parseRDF(body);
+  await store.addQuads(result);
 
-  //   await assertQuery(
-  //     store,
-  //     `
+  // await assertQuery(
+  //   store,
+  //   `
   //     { ?collection a as:Collection.
   //       ?collection as:items ?item .
   //     }
   //   `,
-  //     "a collection with an item",
-  //   );
-  // });
+  //   "a collection with an item",
+  // );
 });
