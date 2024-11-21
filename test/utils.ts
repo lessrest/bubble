@@ -63,6 +63,18 @@ function getStandardPrefixes(): string {
 
 export async function assertN3Query(store: Store, query: string) {
   const result = await n3reasoner(await writeN3(store.getQuads()), query);
-  assertEquals(result.length > 0, true, 
+  const parser = new N3.Parser({ format: 'text/n3' });
+  const resultQuads = parser.parse(result);
+  
+  const successQuads = resultQuads.filter(quad => 
+    quad.predicate.value === 'http://example.org/test#message'
+  );
+
+  assertEquals(successQuads.length > 0, true,
     `N3 query failed to match expected pattern.\nActual graph contents:\n${await writeN3(store.getQuads())}`);
+
+  console.log("\nTest successes:");
+  for (const quad of successQuads) {
+    console.log(`✓ ${quad.object.value}`);
+  }
 }
