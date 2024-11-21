@@ -161,6 +161,42 @@ The framework handles all the RDF conversion:
 
 This declarative approach lets us focus on the logic of what should happen rather than how to implement it. The rules engine handles matching patterns and generating the appropriate responses.
 
+## Example: HTML Pages in RDF
+
+The framework includes a way to represent HTML pages in RDF/Turtle format. This allows us to generate HTML responses using N3 rules and semantic data:
+
+```turtle
+# Define an HTML page
+[] a html:page;
+   html:title "Welcome";
+   html:body [
+     a html:p;
+     html:content "Hello World!"
+   ].
+```
+
+The framework automatically converts this RDF representation into proper HTML:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Welcome</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    <p>Hello World!</p>
+  </body>
+</html>
+```
+
+This approach allows us to:
+- Generate HTML pages from RDF data
+- Use semantic rules to determine page content
+- Keep HTML generation declarative
+- Mix HTML with other RDF responses
+
 HTTP requests are represented as RDF:
 
 ```turtle
