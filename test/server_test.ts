@@ -22,6 +22,7 @@ Deno.test("Server Routes", async (t) => {
     assertEquals(res.headers.get("Content-Type"), "application/turtle");
 
     const body = await res.text();
+    console.log("BODY", body);
     const result = await parseRDF(body);
     const store = new N3.Store();
     await store.addQuads(result);
@@ -29,11 +30,10 @@ Deno.test("Server Routes", async (t) => {
     await assertQuery(
       store,
       `
-      { ?collection a as:Collection;
-          as:items ?item .
+      { ?collection a as:Collection .        
       }
     `,
-      "collection has an item",
+      "collection exists",
     );
   });
 
@@ -74,10 +74,10 @@ Deno.test("Server Routes", async (t) => {
       store,
       `
       { ?collection a as:Collection. 
-        ?collection rdfs:label "Inbox" .
+        ?collection as:items ?item .
       }
     `,
-      "a collection labeled 'Inbox'",
+      "a collection with an item",
     );
   });
 });

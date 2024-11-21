@@ -298,28 +298,41 @@ export async function handleWithRules(
   let body: string | null = null;
 
   if (bodyQuads.length > 0) {
-    // if the body object is a Quad, convert it to N3 string
-    if (bodyQuads[0].object.termType === "Quad") {
-      body = await writeN3([bodyQuads[0].object]);
-    } else if (bodyQuads[0].object.termType === "Literal") {
-      body = bodyQuads[0].object.value;
-    } else if (bodyQuads[0].object.termType === "BlankNode") {
-      const subgraph = resultStore.getQuads(
-        null,
-        null,
-        null,
-        `_:${bodyQuads[0].object.value}`,
-      ) as Quad[];
-      const bodyStore = new N3.Store();
-      for (const quad of subgraph) {
-        bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
+    const bodyStore = new N3.Store();
+
+    for (const bodyQuad of bodyQuads) {
+      if (bodyQuad.object.termType === "Quad") {
+        bodyStore.addQuad(bodyQuad.object);
+      } else if (bodyQuad.object.termType === "Literal") {
+        // For literals, concatenate their values
+        body = (body ?? "") + bodyQuad.object.value;
+      } else if (
+        bodyQuad.object.termType === "BlankNode" ||
+        bodyQuad.object.termType === "NamedNode"
+      ) {
+        const graphId = bodyQuad.object.termType === "BlankNode"
+          ? `_:${bodyQuad.object.value}`
+          : bodyQuad.object.value;
+        const subgraph = resultStore.getQuads(
+          null,
+          null,
+          null,
+          graphId,
+        ) as Quad[];
+        for (const quad of subgraph) {
+          bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
+        }
+      } else {
+        console.log(
+          await writeN3(resultQuads),
+        );
+        throw new Error(`Unsupported body type: ${bodyQuad.object.termType}`);
       }
-      body = await writeN3(bodyStore.getQuads());
-    } else {
-      console.log(
-        await writeN3(resultQuads),
-      );
-      throw new Error(`Unsupported body type: ${bodyQuads[0].object.termType}`);
+    }
+
+    // If we collected any quads, serialize them
+    if (bodyStore.size > 0) {
+      body = (body ?? "") + await writeN3(bodyStore.getQuads());
     }
   }
 

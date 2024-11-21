@@ -45,10 +45,19 @@ const rules = `
       http:respondsTo ?request;
       http:responseCode 200;
       http:contentType "application/turtle";
-      http:body {
-        ?collection a ap:Collection .
-        ?collection rdfs:label "Inbox" .
-      } .
+      http:body { ?collection a ap:Collection } .
+  }.
+
+  {
+    ?request http:href ?collection;
+      http:method "GET" .
+    
+    ?response a http:Response ;
+      http:respondsTo ?request .
+
+    ?collection ap:items ?item .
+  } => {
+    ?response http:body { ?collection ap:items ?item } .
   }.
 
   # Handle inbox POST
