@@ -270,7 +270,6 @@ export function renderHTML(store: Store, subject: Term): string {
 
   return `<!DOCTYPE html>\n${renderElement(htmlElement)}`;
 }
-}
 
 export async function handleWithRules(
   request: Request,
