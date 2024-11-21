@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import N3 from "n3";
-import { parseRDF, applyRules, assertTriple, assertTriples } from "./test/utils.ts";
+import { parseRDF, applyRules, assertTriple, assertTriples, assertTurtleGraph } from "./test/utils.ts";
 import { tomAndJerry, transitiveRule, typeInferenceRule } from "./test/data.ts";
 import { RDF, Schema } from "./test/namespace.ts";
 
