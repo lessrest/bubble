@@ -202,7 +202,7 @@ export { renderHTML };
 
 export async function handleWithRules(
   request: Request,
-  rules: string,
+  rules: string[],
   groundFacts?: Store,
   resultStore?: Store,
 ): Promise<Response> {
@@ -220,7 +220,7 @@ export async function handleWithRules(
   // Apply the rules
   const reasoner = new CommandLineReasoner();
   const n3Input = await writeN3(store.getQuads());
-  const result = await reasoner.reason([n3Input, rules]);
+  const result = await reasoner.reason([n3Input, ...rules]);
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();
