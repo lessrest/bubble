@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { CommandLineReasoner, WebAssemblyReasoner } from "../src/reasoning.ts";
+import { CommandLineReasoner, WebAssemblyReasoner } from "./reasoning.ts";
 
 const TEST_DATA = `
 @prefix : <http://example.org/>.
