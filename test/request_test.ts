@@ -31,7 +31,7 @@ function requestToStore(request: Request): N3.Store {
 Deno.test("HTTP Request to RDF", async (t) => {
   await t.step("converts URL path to RDF list", async () => {
     const request = new Request("http://example.com/api/users/123");
-    const store = await requestToStore(request);
+    const store = requestToStore(request);
     
     // Query to check if there exists a request with the expected URI
     const query = `
