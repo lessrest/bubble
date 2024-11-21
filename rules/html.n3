@@ -1,0 +1,54 @@
+@prefix http: <http://www.w3.org/2011/http#>.
+@prefix html: <http://www.w3.org/1999/xhtml#>.
+@prefix schema: <http://schema.org/>.
+@prefix string: <http://www.w3.org/2000/10/swap/string#>.
+
+# Server root shows HTML homepage
+{
+  ?request http:path "/" .
+  ?site schema:name ?name;
+        schema:description ?desc.
+} => {
+  ?response a http:Response;
+    http:respondsTo ?request;
+    http:responseCode 200;
+    http:contentType "text/html";
+    http:body """
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>""" ?name """</title>
+          <script src="https://unpkg.com/htmx.org@1.9.9"></script>
+        </head>
+        <body>
+          <h1>""" ?name """</h1>
+          <p>""" ?desc """</p>
+          <div id="users">
+            <h2>Users</h2>
+            <div hx-get="/users" hx-trigger="load">Loading...</div>
+          </div>
+        </body>
+      </html>
+    """.
+}.
+
+# Users list as HTML fragment
+{
+  ?request http:path "/users" .
+  ?user a schema:Person;
+        schema:name ?name.
+} => {
+  ?response a http:Response;
+    http:respondsTo ?request;
+    http:responseCode 200;
+    http:contentType "text/html";
+    http:body """
+      <div class="user">
+        <h3>""" ?name """</h3>
+        <button hx-get="/users/""" ?name """/profile" hx-target="next div">
+          View Profile
+        </button>
+        <div class="profile"></div>
+      </div>
+    """.
+}.

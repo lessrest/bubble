@@ -1,7 +1,22 @@
 @base <http://localhost:8000/>.
 @prefix ap: <http://www.w3.org/ns/activitystreams#>.
+@prefix schema: <http://schema.org/>.
 
+# Server Identity
+</> a schema:WebSite;
+    schema:name "N3 ActivityPub Node";
+    schema:description "A semantic social node built with N3 rules";
+    schema:url <http://localhost:8000/>;
+    schema:author </about#me>.
+
+</about#me> a schema:Person;
+    schema:name "N3 Server";
+    schema:url </about>.
+
+# User Profile
 </users/alice> a ap:Person;
-  ap:inbox </users/alice/inbox>.
+    ap:inbox </users/alice/inbox>;
+    schema:name "Alice";
+    schema:description "An example user".
 
 </users/alice/inbox> a ap:Collection.

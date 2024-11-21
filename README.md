@@ -33,6 +33,8 @@ deno task serve
 - Comprehensive test suite with RDF assertions
 
 ### Coming Soon 🚧
+- Server Identity & Profile
+- HTML/HTMX Interface
 - Activity validation
 - Outbox implementation
 - Federation support
