@@ -1,9 +1,9 @@
-import { assertQuery } from "../src/utils.ts";
-import { requestToStore } from "../src/request.ts";
+import { assertQuery } from "./utils.ts";
+import { requestToStore } from "./requestToStore.ts";
 
 Deno.test("HTTP Request to RDF", async (t) => {
   const request = new Request("http://example.com/api/users/123");
-  const store = requestToStore(request);
+  const store = await requestToStore(request, "urn:request:123");
 
   await t.step("converts URL path to RDF request", async (step) => {
     await assertQuery(

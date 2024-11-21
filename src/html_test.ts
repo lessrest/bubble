@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
-import { handleWithRules, withGroundFacts } from "./utils.ts";
+import { withGroundFacts } from "./utils.ts";
+import { handleWithRules } from "./handleWithRules.ts";
 import { renderHTML } from "./html.ts";
 import N3 from "n3";
 const { DataFactory } = N3;

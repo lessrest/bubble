@@ -1,6 +1,6 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import { handler } from "../server.ts";
-import { assertQuery, parseRDF } from "../src/utils.ts";
+import { assertQuery, parseRDF } from "./utils.ts";
 import N3 from "n3";
 
 Deno.test("Server Routes", async (t) => {

@@ -1,4 +1,5 @@
-import { handleWithRules, withGroundFacts } from "./src/utils.ts";
+import { withGroundFacts } from "./src/utils.ts";
+import { handleWithRules } from "./src/handleWithRules.ts";
 
 const store = await withGroundFacts(
   await Deno.readTextFile("./config.ttl"),

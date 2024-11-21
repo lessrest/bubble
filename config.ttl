@@ -19,4 +19,6 @@
    ap:inbox </users/alice/inbox> ;
    schema:name "Alice" ;
    schema:description "An example user" .
+
+# Inbox
 </users/alice/inbox> a ap:Collection .
