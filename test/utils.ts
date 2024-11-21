@@ -61,21 +61,20 @@ function getStandardPrefixes(): string {
 `;
 }
 
-export async function assertHttpRequest(store: Store, path: string, message: string) {
-  const query = `
-    @prefix test: <http://example.org/test#> .
-    @prefix http: <http://www.w3.org/2011/http#> .
+export async function assertQuery(t: Deno.TestContext, store: Store, query: string, message: string) {
+  await t.step(message, async () => {
+    const fullQuery = `
+      @prefix test: <http://example.org/test#> .
+      
+      ${query}
+      => {
+        [] a test:Success;
+          test:message "${message}" .
+      }.
+    `;
     
-    {
-      ?request a http:Request;
-        http:requestURI "${path}" .
-    } => {
-      [] a test:Success;
-        test:message "${message}" .
-    }.
-  `;
-  
-  await assertN3Query(store, query);
+    await assertN3Query(store, fullQuery);
+  });
 }
 
 export async function assertN3Query(store: Store, query: string, expectedMessage?: string) {
