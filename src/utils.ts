@@ -214,6 +214,40 @@ export function withGroundFacts(facts: string): Store {
   return store;
 }
 
+export function renderHTML(store: Store, subject: Term): string {
+  // Get HTML properties
+  const title = store.getObjects(subject, DataFactory.namedNode("http://www.w3.org/1999/xhtml#title"), null)[0]?.value || "";
+  const bodyQuads = store.getQuads(subject, DataFactory.namedNode("http://www.w3.org/1999/xhtml#body"), null, null);
+  
+  let bodyContent = "";
+  for (const bodyQuad of bodyQuads) {
+    if (bodyQuad.object.termType === "BlankNode") {
+      // Handle body elements
+      const element = bodyQuad.object;
+      const type = store.getObjects(element, DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), null)[0];
+      const content = store.getObjects(element, DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"), null)[0]?.value || "";
+      
+      if (type?.value === "http://www.w3.org/1999/xhtml#p") {
+        bodyContent += `<p>${content}</p>\n`;
+      }
+      // Add more element types as needed
+    }
+  }
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <title>${title}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    <h1>${title}</h1>
+    ${bodyContent}
+  </body>
+</html>`;
+}
+
 export async function handleWithRules(
   request: Request,
   rules: string,
@@ -310,17 +344,29 @@ export async function handleWithRules(
         bodyQuad.object.termType === "BlankNode" ||
         bodyQuad.object.termType === "NamedNode"
       ) {
-        const graphId = bodyQuad.object.termType === "BlankNode"
-          ? `_:${bodyQuad.object.value}`
-          : bodyQuad.object.value;
-        const subgraph = resultStore.getQuads(
-          null,
-          null,
-          null,
-          graphId,
-        ) as Quad[];
-        for (const quad of subgraph) {
-          bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
+        // Check if this is an HTML page
+        const isHtmlPage = resultStore.getQuads(
+          bodyQuad.object,
+          DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+          DataFactory.namedNode("http://www.w3.org/1999/xhtml#page"),
+          null
+        ).length > 0;
+
+        if (isHtmlPage) {
+          body = renderHTML(resultStore, bodyQuad.object);
+        } else {
+          const graphId = bodyQuad.object.termType === "BlankNode"
+            ? `_:${bodyQuad.object.value}`
+            : bodyQuad.object.value;
+          const subgraph = resultStore.getQuads(
+            null,
+            null,
+            null,
+            graphId,
+          ) as Quad[];
+          for (const quad of subgraph) {
+            bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
+          }
         }
       } else {
         console.log(

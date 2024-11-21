@@ -13,18 +13,14 @@
     http:respondsTo ?request;
     http:responseCode 200;
     http:contentType "text/html";
-    # We don't currently handle this kind of output, but we should
     http:body [
       a html:page ;
       html:title ?name;
-      html:body (
-        [
-          a html:p ;
-          html:content ?desc
-        ]
-      )
+      html:body [
+        a html:p ;
+        html:content ?desc
+      ]
     ] .
-
 }.
 
 # Users list as HTML fragment
