@@ -2,8 +2,8 @@ import { Store, DataFactory } from "n3";
 import { Term } from "@rdfjs/types";
 import { RDF } from "./namespace.ts";
 
-// HTML namespace constants
-export const HTML = {
+// HTML namespace constants 
+const HTML = {
   element: DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
   text: DataFactory.namedNode("http://www.w3.org/1999/xhtml#text"),
   tagName: DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
@@ -73,6 +73,8 @@ function getRDFList(store: Store, listNode: Term): Term[] {
   const node = getNodeType(store, listNode);
   return node.type === "list" && node.children ? node.children : [];
 }
+
+export { HTML };
 
 export async function renderHTML(store: Store, subject: Term): Promise<string> {
   const node = getNodeType(store, subject);

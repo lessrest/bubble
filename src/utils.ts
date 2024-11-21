@@ -198,7 +198,8 @@ export function withGroundFacts(facts: string): Store {
   return store;
 }
 
-export { renderHTML } from "./html.ts";
+import { renderHTML } from "./html.ts";
+export { renderHTML };
 
 export async function handleWithRules(
   request: Request,
