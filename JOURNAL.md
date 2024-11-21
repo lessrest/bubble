@@ -61,6 +61,7 @@ _:request a http:Request;
 - Add more sophisticated content negotiation
 - Implement outbox and activity distribution
 - Build more complex routing patterns
+- Implement proper HTML user interface (removed temporary HTML fragment code)
 
 ### Latest Achievement: Modular ActivityPub Implementation
 We've successfully refactored the ActivityPub implementation to be more modular by:

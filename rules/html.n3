@@ -22,20 +22,3 @@
       ]
     ] .
 }.
-
-# Users list as HTML fragment
-{
-  ?request http:path "/users" .
-  ?user a schema:Person;
-        schema:name ?name.
-} => {
-  ?response a http:Response;
-    http:respondsTo ?request;
-    http:responseCode 200;
-    http:contentType "text/html";
-    http:body """
-      <div class="user">
-        <div class="profile"></div>
-      </div>
-    """.
-}.
