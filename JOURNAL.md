@@ -2,6 +2,14 @@
 
 ## November 21, 2024
 
+Simplified HTTP request RDF representation:
+- Changed from complex RDF list path representation to simple string literal
+- Using http:requestURI predicate to store full URL pathname
+- Updated tests to verify new representation format
+- All tests passing with cleaner implementation
+
+## November 21, 2024
+
 Started development of HTTP request to RDF graph conversion:
 - Creating test-driven approach for converting Deno HTTP requests to RDF
 - Focusing on representing URL path segments as RDF lists
