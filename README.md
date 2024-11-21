@@ -176,7 +176,7 @@ deno task test:rules
 
 ## License
 
-This project is licensed under the [GNU Aferro GPL v3.0 or later](LICENSE.md).
+This project is licensed under the [GNU Affero GPL v3.0 or later](LICENSE.md), so watch out.
 
 ## Contributing
 
