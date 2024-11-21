@@ -30,7 +30,9 @@ export async function writeN3(quads: Quad[]): Promise<string> {
   }
 
   return new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
+    writer.end((error: Error | null, result: string) =>
+      error ? reject(error) : resolve(result)
+    );
   });
 }
 
@@ -65,7 +67,10 @@ export function assertTriple(
   );
 }
 
-export function assertTriples(store: Store, triples: [Term, Term, Term][]): void {
+export function assertTriples(
+  store: Store,
+  triples: [Term, Term, Term][],
+): void {
   for (const [subject, predicate, object] of triples) {
     assertTriple(store, subject, predicate, object);
   }
@@ -118,12 +123,11 @@ export async function assertN3Query(
   assertEquals(
     successQuads.length > 0,
     true,
-    `N3 query failed to match expected pattern.\nActual graph contents:\n${
-      await writeN3(store.getQuads())
-    }`,
-  );
+    `N3 query failed to match expected pattern.
+Actual graph contents:
 
-  for (const quad of successQuads) {
-    console.log(`✓ ${quad.object.value}`);
-  }
+${await writeN3(
+      store.getQuads(),
+    )}`,
+  );
 }
