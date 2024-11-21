@@ -53,9 +53,18 @@ export function assertTriples(store: Store, triples: [Term, Term, Term][]) {
   });
 }
 
+function getStandardPrefixes(): string {
+  return `
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+`;
+}
+
 export async function assertTurtleGraph(store: Store, turtleGraph: string) {
   const parser = new N3.Parser();
-  const expectedQuads = parser.parse(turtleGraph);
+  const graphWithPrefixes = getStandardPrefixes() + turtleGraph;
+  const expectedQuads = parser.parse(graphWithPrefixes);
   
   for (const quad of expectedQuads) {
     const matches = store.getQuads(quad.subject, quad.predicate, quad.object, null);

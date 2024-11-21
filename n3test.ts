@@ -16,7 +16,6 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
 
   await t.step("should identify Eve and Bob correctly", () => {
     assertTurtleGraph(store, `
-      @prefix schema: <${Schema("").value}> .
       schema:Eve a schema:Rat .
       schema:Bob a schema:Eel .
     `);
@@ -33,7 +32,6 @@ Deno.test("Pet Classifications with Reasoning", async (t) => {
   
   await t.step("should infer all animals as both Pals and Pets through subclass reasoning", () => {
     assertTurtleGraph(store, `
-      @prefix schema: <${Schema("").value}> .
       schema:Eve a schema:Pet, schema:Pal .
       schema:Bob a schema:Pet, schema:Pal .
       schema:Jim a schema:Pet, schema:Pal .
@@ -64,7 +62,6 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples and infer transitive relationships", () => {
     assertTurtleGraph(store, `
-      @prefix schema: <${Schema("").value}> .
       schema:Jim a schema:Owl ;
         schema:knows schema:Eve .
     `);
