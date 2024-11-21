@@ -41,7 +41,7 @@ export async function applyRules(
 
   const n3Data = await writeN3(data);
   const reasoner = new CommandLineReasoner();
-  const result = await reasoner.reason(`${n3Data}\n${rules}`);
+  const result = await reasoner.reason(n3Data, rules);
 
   const parser = new N3.Parser({ format: "text/n3" });
   const resultQuads = parser.parse(result) as Quad[];
@@ -111,9 +111,9 @@ export async function assertN3Query(
 ): Promise<void> {
   const reasoner = new CommandLineReasoner();
   const result = await reasoner.reason(
-    await writeN3(store.getQuads()) + "\n" + query,
+    await writeN3(store.getQuads()),
     "",
-    { output: "deductive_closure" }
+    { query },
   );
   const resultStore = new N3.Store();
   const parser = new N3.Parser({ format: "text/n3" });
@@ -225,7 +225,7 @@ export function renderHTML(store: Store, subject: Term): string {
     throw new Error("No html:outerHTML found for subject");
   }
 
-  return `<!DOCTYPE html>\n${outerHTML}`;
+  return `${outerHTML}`;
 }
 
 export async function handleWithRules(
@@ -246,9 +246,9 @@ export async function handleWithRules(
   }
 
   // Apply the rules
-  const reasoner = new WebAssemblyReasoner();
-  const n3Input = await writeN3(store.getQuads()) + "\n" + rules;
-  const result = await reasoner.reason(n3Input, "", { output: "deductive_closure" });
+  const reasoner = new CommandLineReasoner();
+  const n3Input = await writeN3(store.getQuads());
+  const result = await reasoner.reason(n3Input, rules);
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();
@@ -332,9 +332,9 @@ export async function handleWithRules(
         ).length > 0;
 
         if (isHtmlPage) {
-          console.log(
-            `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
-          );
+          // console.log(
+          //   `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
+          // );
           body = renderHTML(resultStore, bodyQuad.object);
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"

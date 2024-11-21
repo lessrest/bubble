@@ -8,19 +8,24 @@
 
 # Server root shows HTML homepage
 {
-  ?request http:path "/" .
-  ?site schema:name ?name ;
-      schema:description ?desc .
+   ?request http:path "/" .
+   ?site schema:name ?name ;
+       schema:description ?desc .
+   ( """<!doctype html>
+<title>%s</title>
+<meta charset=\"utf-8\">
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<p>%s</p>
+""" ?name ?desc ) string:format ?html .
 }
 => 
 {
-  ?response a http:Response ;
-    http:respondsTo ?request ;
-    http:responseCode 200 ;
-    http:contentType "text/html" ;
-    http:body [
-      html:outerHTML ?html
-    ] .
-
-  ( "<html><head><title>" ?name "</title><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><p>" ?desc "</p></body></html>" ) string:concatenate ?html .
+   ?response a http:Response ;
+       http:respondsTo ?request ;
+       http:responseCode 200 ;
+       http:contentType "text/html" ;
+       http:body [
+           a html:page ;
+           html:outerHTML ?html 
+       ] .
 } .

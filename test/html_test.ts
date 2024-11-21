@@ -25,7 +25,12 @@ Deno.test("HTML Endpoints", async (t) => {
     const body = await res.text();
     assertEquals(
       body,
-      "<!DOCTYPE html>\n<html><head><title>Test Site</title></head><body><p>A test website</p></body></html>",
+      `<!doctype html>
+<title>Test Site</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<p>A test website</p>
+`,
       "Homepage should include site title",
     );
   });
@@ -33,18 +38,19 @@ Deno.test("HTML Endpoints", async (t) => {
   await t.step("renders HTML from outerHTML property", () => {
     const store = new N3.Store();
     const doc = DataFactory.blankNode();
-    
+
     store.addQuad(
       doc,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
-      DataFactory.literal("<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>")
+      DataFactory.literal(
+        "<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>",
+      ),
     );
 
     const html_output = renderHTML(store, doc);
     assertEquals(
       html_output,
-      `<!DOCTYPE html>
-<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>`
+      `<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>`,
     );
   });
 });
