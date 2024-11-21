@@ -102,6 +102,60 @@ export async function assertN3Query(
   query: string,
   expectedMessage: string,
 ): Promise<void> {
+  const result = await n3reasoner(
+    await writeN3(store.getQuads()) + "\n" + query,
+    undefined,
+    {
+      output: "deductive_closure",
+    },
+  );
+  const resultStore = new N3.Store();
+  const parser = new N3.Parser({ format: "text/n3" });
+  const resultQuads = parser.parse(result);
+  resultStore.addQuads(resultQuads);
+
+  const successQuads = resultStore.getQuads(
+    null,
+    DataFactory.namedNode("http://example.org/test#message"),
+    DataFactory.literal(expectedMessage),
+    null,
+  );
+
+  assertEquals(
+    successQuads.length > 0,
+    true,
+    `N3 query failed to match expected pattern.
+Actual graph contents:
+
+${await writeN3(
+      store.getQuads(),
+    )}`,
+  );
+}
+
+export function requestToStore(request: Request): Store {
+  const store = new N3.Store();
+  const url = new URL(request.url);
+  
+  // Create a blank node for the request
+  const requestNode = DataFactory.blankNode();
+  
+  // Add basic request triples
+  store.addQuad(
+    requestNode,
+    DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
+    DataFactory.namedNode('http://www.w3.org/2011/http#Request')
+  );
+  
+  // Add path
+  store.addQuad(
+    requestNode,
+    DataFactory.namedNode('http://www.w3.org/2011/http#path'),
+    DataFactory.literal(url.pathname)
+  );
+
+  return store;
+}
 
 export async function handleWithRules(
   request: Request,
