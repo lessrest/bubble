@@ -2,6 +2,13 @@
 
 ## November 21, 2024
 
+Refactored test names and descriptions for clarity:
+- Simplified test step names by removing "should" prefix
+- Made test descriptions more concise and direct
+- Maintained test behavior and assertions
+- All tests passing after updates
+
+Earlier today:
 Updated the test suite to use three-letter animals (Rat, Eel, Owl) as the species for the characters:
 - Changed Eve's type from Mouse to Rat
 - Changed Bob's type from Dog to Eel  
