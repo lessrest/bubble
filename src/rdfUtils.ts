@@ -1,5 +1,5 @@
 import N3, { DataFactory, Store } from "n3";
-import { Term } from "@rdfjs/types";
+import { Quad, Term } from "@rdfjs/types";
 import { HTTP, RDF } from "./namespace.ts";
 
 export function findSubject(store: Store, type: string): Term | null {
