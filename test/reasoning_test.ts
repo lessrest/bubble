@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { WebAssemblyReasoner, CommandLineReasoner } from "../src/reasoning.ts";
+import { CommandLineReasoner, WebAssemblyReasoner } from "../src/reasoning.ts";
 
 const TEST_DATA = `
 @prefix : <http://example.org/>.
@@ -19,7 +19,7 @@ const TEST_RULES = `
 
 Deno.test("WebAssembly Reasoner", async (t) => {
   const reasoner = new WebAssemblyReasoner();
-  
+
   await t.step("applies transitive rules", async () => {
     const result = await reasoner.reason(TEST_DATA, TEST_RULES);
     assertTrue(result.includes(":alice :knows :charlie"));
@@ -28,7 +28,7 @@ Deno.test("WebAssembly Reasoner", async (t) => {
 
 Deno.test("CommandLine Reasoner", async (t) => {
   const reasoner = new CommandLineReasoner();
-  
+
   await t.step("applies transitive rules", async () => {
     const result = await reasoner.reason(TEST_DATA, TEST_RULES);
     assertTrue(result.includes(":alice :knows :charlie"));

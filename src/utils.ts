@@ -235,8 +235,10 @@ interface HTMLNode {
 }
 
 function getNodeType(store: Store, subject: Term): HTMLNode {
-  const isElement = store.getQuads(subject, RDF("type"), HTML.element, null).length > 0;
-  const isText = store.getQuads(subject, RDF("type"), HTML.text, null).length > 0;
+  const isElement =
+    store.getQuads(subject, RDF("type"), HTML.element, null).length > 0;
+  const isText =
+    store.getQuads(subject, RDF("type"), HTML.text, null).length > 0;
 
   if (isElement) {
     const tagName = store.getObjects(subject, HTML.tagName, null)[0]?.value;
@@ -249,7 +251,8 @@ function getNodeType(store: Store, subject: Term): HTMLNode {
   }
 
   if (isText) {
-    const content = store.getObjects(subject, HTML.content, null)[0]?.value ?? "";
+    const content = store.getObjects(subject, HTML.content, null)[0]?.value ??
+      "";
     return { type: "text", content };
   }
 
@@ -285,8 +288,8 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
   switch (node.type) {
     case "element": {
       const innerHTML = await Promise.all(
-        (node.children ?? []).map(child => renderHTML(store, child))
-      ).then(parts => parts.join(""));
+        (node.children ?? []).map((child) => renderHTML(store, child)),
+      ).then((parts) => parts.join(""));
 
       // Get attributes if any exist
       const attributes = store.getObjects(subject, HTML.attributes, null)[0];
@@ -323,7 +326,7 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
 
     case "list":
       return (await Promise.all(
-        (node.children ?? []).map(child => renderHTML(store, child))
+        (node.children ?? []).map((child) => renderHTML(store, child)),
       )).join("");
 
     default:
@@ -435,9 +438,9 @@ export async function handleWithRules(
         ).length > 0;
 
         if (isHtmlPage) {
-          console.log(
-            `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
-          );
+          // console.log(
+          //   `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
+          // );
           body = await renderHTML(resultStore, bodyQuad.object);
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"
