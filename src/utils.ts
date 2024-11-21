@@ -138,9 +138,16 @@ ${await writeN3(
   );
 }
 
+function generateSessionUrn(): string {
+  // Generate a random UUID for the session
+  const uuid = crypto.randomUUID();
+  return `urn:session:${uuid}`;
+}
+
 export async function requestToStore(request: Request): Promise<Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
+  const sessionUrn = generateSessionUrn();
 
   // Create a blank node for the request
   const requestNode = DataFactory.blankNode();
@@ -190,14 +197,15 @@ export async function requestToStore(request: Request): Promise<Store> {
   // Check if content type is Turtle
   if (request.headers.get("Content-Type")?.includes("turtle")) {
     const source = await request.text();
-    const parser = new N3.Parser({ baseIRI: request.url });
+    const parser = new N3.Parser({ baseIRI: sessionUrn });
     const quads = parser.parse(source);
     store.addQuads(quads);
 
+    // Use session-scoped body node
     store.addQuad(
       requestNode,
       DataFactory.namedNode("http://www.w3.org/2011/http#body"),
-      DataFactory.namedNode("http://example.org/body"),
+      DataFactory.namedNode(`${sessionUrn}/body`),
     );
   }
 
