@@ -1,5 +1,16 @@
 # Project Journal
 
+## November 21, 2024
+
+Updated the test suite to use three-letter animals (Rat, Eel, Owl) as the species for the characters:
+- Changed Eve's type from Mouse to Rat
+- Changed Bob's type from Dog to Eel  
+- Changed Jim's type from Seal to Owl
+- Updated all test assertions to match new species
+- Maintained existing class hierarchy with all species being subclasses of Pet/Pal
+- Fixed failing test that still expected Jim to be a Seal
+- All tests passing after updates
+
 ## November 20, 2024
 
 Initial setup of an RDF reasoning test suite using:
