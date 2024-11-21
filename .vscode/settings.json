@@ -1,0 +1,9 @@
+{
+    "github.codespaces.defaultExtensions": [
+        "denoland.vscode-deno",
+        "faubulous.mentor",
+        "GitHub.codespaces",
+        "GitHub.vscode-pull-request-github"
+    ],
+    "deno.enable": true
+}
