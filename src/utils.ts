@@ -300,6 +300,8 @@ export async function handleWithRules(
       body = await writeN3([bodyQuads[0].object]);
     } else if (bodyQuads[0].object.termType === "Literal") {
       body = bodyQuads[0].object.value;
+    } else {
+      throw new Error("Unsupported body type", { cause: bodyQuads[0].object });
     }
   }
 
