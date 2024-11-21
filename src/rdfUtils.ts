@@ -24,7 +24,7 @@ export function findObject(store: Store, subject: Term, predicate: string): Term
 
 export function findSubjects(store: Store, predicate: string, object: Term): Term[] {
   return store.getQuads(null, DataFactory.namedNode(predicate), object, null)
-    .map((quad) => quad.subject);
+    .map((quad: Quad) => quad.subject);
 }
 
 export function getResponseData(store: Store, requestNode: Term): {
