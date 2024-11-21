@@ -156,13 +156,17 @@ Deno.test("Rules-based Request Handler", async (t) => {
   });
 
   await t.step("can use ground facts in rules", async () => {
-    // Create a store with some ground facts
+    // Define ground facts in Turtle format
+    const facts = `
+      @prefix ex: <http://example.org/> .
+      
+      ex:config ex:greeting "Hola!" .
+    `;
+    
+    // Parse facts into store
     const groundStore = new N3.Store();
-    groundStore.addQuad(
-      DataFactory.namedNode("http://example.org/config"),
-      DataFactory.namedNode("http://example.org/greeting"), 
-      DataFactory.literal("Hola!")
-    );
+    const parser = new N3.Parser();
+    groundStore.addQuads(parser.parse(facts));
 
     const rules = `
       @prefix http: <http://www.w3.org/2011/http#>.
