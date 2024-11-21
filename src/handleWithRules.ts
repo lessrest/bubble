@@ -37,7 +37,9 @@ export async function handleWithRules(
 
   // Get response data
   const requestNode = DataFactory.namedNode(requestIri);
+  console.log(`Getting response data for ${requestIri}`);
   const { response, statusCode } = getResponseData(resultStore, requestNode);
+  console.log(`Response data`, response);
 
   if (!response) {
     return new Response("Not Found", { status: 404 });
@@ -48,13 +50,16 @@ export async function handleWithRules(
   }
 
   // Process response body and content type
-  const { content, contentType } = await processResponseBody(resultStore, response);
+  const { content, contentType } = await processResponseBody(
+    resultStore,
+    response,
+  );
   const explicitContentType = getContentType(resultStore, response);
 
   return new Response(content || null, {
     status: statusCode,
-    headers: { 
-      "Content-Type": explicitContentType || contentType
+    headers: {
+      "Content-Type": explicitContentType || contentType,
     },
   });
 }

@@ -29,12 +29,12 @@ export class CommandLineReasoner implements Reasoner {
   ): Promise<string> {
     // Write inputs to temporary files
     const inputFiles = await Promise.all(
-      inputs.map(() => Deno.makeTempFile({ suffix: ".n3" }))
+      inputs.map(() => Deno.makeTempFile({ suffix: ".n3" })),
     );
     const queryFile = await Deno.makeTempFile({ suffix: ".n3" });
 
     await Promise.all(
-      inputs.map((input, i) => Deno.writeTextFile(inputFiles[i], input))
+      inputs.map((input, i) => Deno.writeTextFile(inputFiles[i], input)),
     );
     if (options?.query) {
       await Deno.writeTextFile(queryFile, options.query);
@@ -56,8 +56,9 @@ export class CommandLineReasoner implements Reasoner {
           // "--",
           "--pass",
           "--no-numerals",
-          // "--no-qnames",
+          "--no-qnames",
           "--no-qvars",
+          "--no-ucall",
           // "--rdf-list-output",
           "--quiet",
           "--nope",
@@ -79,7 +80,7 @@ export class CommandLineReasoner implements Reasoner {
       return result;
     } finally {
       // Cleanup temp files
-      await Promise.all(inputFiles.map(file => Deno.remove(file)));
+      await Promise.all(inputFiles.map((file) => Deno.remove(file)));
     }
   }
 }
