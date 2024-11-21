@@ -22,8 +22,9 @@ deno task test
 deno task serve
 ```
 
-When you start the server, it exposes a simple ActivityPub inbox implementation at `http://localhost:8000/users/alice/inbox`. This endpoint is defined using ground facts in `server.ts` that establish the basic ActivityPub data structure:
+When you start the server, it exposes a simple ActivityPub inbox implementation at `http://localhost:8000/users/alice/inbox`. The configuration is split into two files:
 
+1. `ground-facts.ttl` - Defines the basic ActivityPub structure:
 ```n3
 @base <http://localhost:8000/>.
 @prefix ap: <http://www.w3.org/ns/activitystreams#>.
@@ -34,7 +35,9 @@ When you start the server, it exposes a simple ActivityPub inbox implementation 
 </users/alice/inbox> a ap:Collection.
 ```
 
-The `@base` directive sets the base IRI to resolve relative paths, so `/users/alice/inbox` becomes `http://localhost:8000/users/alice/inbox`. This inbox is defined as an ActivityStreams Collection that can:
+2. `rules/inbox.n3` - Contains the N3 rules for handling requests
+
+The `@base` directive in the ground facts sets the base IRI to resolve relative paths, so `/users/alice/inbox` becomes `http://localhost:8000/users/alice/inbox`. The inbox implementation can:
 
 - Accept POST requests with new ActivityPub Notes
 - Return the collection contents via GET requests

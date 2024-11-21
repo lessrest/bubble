@@ -62,14 +62,13 @@ _:request a http:Request;
 - Implement outbox and activity distribution
 - Build more complex routing patterns
 
-### Latest Achievement: Working ActivityPub Inbox Implementation
-We've successfully implemented a working ActivityPub inbox with full test coverage:
-- GET empty inbox returns a proper ActivityStreams Collection
-- POST Note to inbox stores the activity
-- GET inbox after POST shows the new item in the collection
+### Latest Achievement: Modular ActivityPub Implementation
+We've successfully refactored the ActivityPub implementation to be more modular by:
+- Extracting ground facts into `ground-facts.ttl`
+- Moving inbox rules to `rules/inbox.n3`
+- Updating server.ts to load these files dynamically
 
-The server initializes with ground facts that define the basic ActivityPub structure using N3's base IRI feature:
-
+The ground facts file (`ground-facts.ttl`) defines the basic ActivityPub structure:
 ```n3
 @base <http://localhost:8000/>.
 @prefix ap: <http://www.w3.org/ns/activitystreams#>.
@@ -80,24 +79,34 @@ The server initializes with ground facts that define the basic ActivityPub struc
 </users/alice/inbox> a ap:Collection.
 ```
 
-This establishes:
-1. A base IRI of http://localhost:8000/
-2. An ActivityPub Person (Alice)
-3. An inbox Collection for Alice at /users/alice/inbox
+The inbox rules (`rules/inbox.n3`) handle both GET and POST operations:
+```n3
+# GET returns the Collection and its items
+{
+  ?request http:href ?collection;
+          http:method "GET" .
+  ?collection a ap:Collection.
+} => {
+  # Return collection data
+}.
 
-The test suite verifies this complete flow:
-```typescript
-// 1. GET empty inbox - verifies Collection exists
-// 2. POST Note to inbox - returns 201 Created
-// 3. GET inbox again - verifies Note was added as an item
+# POST adds new items to the collection
+{
+  ?request http:href ?collection;
+          http:method "POST" .
+  ?collection a ap:Collection.
+} => {
+  # Store the new item
+}.
 ```
 
-The base IRI handling means we can use relative paths in our N3 rules while still having them resolve correctly to full HTTP URLs. This makes the rules more portable since they don't hardcode the server domain.
-
-This demonstrates our N3 rules correctly handling both GET and POST operations while maintaining collection state between requests. The framework is evolving into a powerful platform for building federated social applications with clean separation of concerns and declarative behavior specification.
+This separation of concerns makes the codebase more maintainable and easier to extend. The server now:
+1. Loads ground facts at startup
+2. Reads rules from separate files
+3. Applies them to incoming requests
 
 Next steps:
-- Test posting multiple items to inbox
-- Verify more properties of posted Notes
-- Add error case handling (invalid content type, malformed activity)
-- Implement outbox functionality
+- Add more specialized rules for different activity types
+- Implement outbox functionality in separate rule files
+- Add validation rules for incoming activities
+- Create rules for federation and delivery
