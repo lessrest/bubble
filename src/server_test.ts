@@ -92,13 +92,13 @@ Deno.test("GET inbox after POST shows new item", async (t) => {
   const result = await parseRDF(body);
   await store.addQuads(result);
 
-  // await assertQuery(
-  //   store,
-  //   `
-  //     { ?collection a as:Collection.
-  //       ?collection as:items ?item .
-  //     }
-  //   `,
-  //   "a collection with an item",
-  // );
+  await assertQuery(
+    store,
+    `
+      { ?collection a as:Collection.
+        ?collection as:items ?item .
+      }
+    `,
+    "a collection with an item",
+  );
 });

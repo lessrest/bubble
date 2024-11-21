@@ -1,27 +1,28 @@
 import N3, { DataFactory, Store } from "n3";
-import { Quad } from "@rdfjs/types";
+import { Quad, Term } from "@rdfjs/types";
 import { CommandLineReasoner } from "./reasoning.ts";
 import { withGroundFacts, writeN3 } from "./utils.ts";
 import { requestToStore } from "./requestToStore.ts";
-import { getResponseData } from "./rdfUtils.ts";
+import { findObject, getResponseData } from "./rdfUtils.ts";
 import { getContentType, processResponseBody } from "./responseUtils.ts";
+import { RDF } from "./namespace.ts";
 
 export async function handleWithRules(
   request: Request,
   rules: string[],
-  groundFacts: Store,
+  factStore: Store,
 ): Promise<Response> {
   // Initialize stores and process request
   const uuid = crypto.randomUUID();
   const requestIri = `urn:request:${uuid.slice(0, 8)}`;
   const requestStore = await requestToStore(request, requestIri);
-  requestStore.addQuads(groundFacts.getQuads());
+  requestStore.addQuads(factStore.getQuads());
 
   console.log("*** Request Quads ***");
   console.log(await writeN3(requestStore.getQuads()));
 
   console.log("*** Ground Facts ***");
-  console.log(await writeN3(groundFacts.getQuads()));
+  console.log(await writeN3(factStore.getQuads()));
 
   console.log("*** Rules ***");
   console.log(rules);
@@ -39,7 +40,7 @@ export async function handleWithRules(
 
   const resultStore = new N3.Store();
   resultStore.addQuads(resultQuads);
-  resultStore.addQuads(groundFacts.getQuads());
+  resultStore.addQuads(factStore.getQuads());
 
   // Get response data
   const requestNode = DataFactory.namedNode(requestIri);
@@ -66,10 +67,28 @@ export async function handleWithRules(
   );
   const explicitContentType = getContentType(resultStore, response);
 
+  if (asserts) {
+    // for now asserts is just one statement
+    const assertedQuad = getQuadFromStatement(resultStore, asserts);
+    console.log("*** Asserted Quad ***");
+    console.log(assertedQuad);
+    factStore.addQuads([assertedQuad]);
+  }
+
   return new Response(content || null, {
     status: statusCode,
     headers: {
       "Content-Type": explicitContentType || contentType,
     },
   });
+}
+
+function getQuadFromStatement(store: Store, statement: Term): Quad {
+  const subject = findObject(store, statement, RDF("subject").value);
+  const predicate = findObject(store, statement, RDF("predicate").value);
+  const object = findObject(store, statement, RDF("object").value);
+  if (!subject || !predicate || !object) {
+    throw new Error("Statement missing subject, predicate, or object");
+  }
+  return DataFactory.quad(subject, predicate, object, null);
 }

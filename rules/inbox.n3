@@ -47,6 +47,10 @@
    ?response a http:Response ;
        http:respondsTo ?request ;
        http:responseCode 201 ;
-       http:body "Activity accepted" .
-   ?collection ap:items ?object .
+       http:body "Activity accepted" ;
+       http:asserts ?asserts .
+   ?asserts a rdf:Statement ;
+       rdf:subject ?collection ;
+       rdf:predicate ap:items ;
+       rdf:object ?object .
 } .
