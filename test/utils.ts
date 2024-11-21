@@ -140,6 +140,4 @@ ${await writeN3(
       store.getQuads(),
     )}`,
   );
-
-  console.log(await writeN3(resultStore.getQuads()));
 }
