@@ -30,7 +30,7 @@ export async function writeN3(quads: Quad[]): Promise<string> {
   }
 
   return new Promise<string>((resolve, reject) => {
-    writer.end((error, result) => error ? reject(error) : resolve(result));
+    writer.end((error: Error | null, result: string) => error ? reject(error) : resolve(result));
   });
 }
 
