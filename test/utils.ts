@@ -63,18 +63,26 @@ function getStandardPrefixes(): string {
 
 export async function assertN3Query(store: Store, query: string) {
   const result = await n3reasoner(await writeN3(store.getQuads()), query);
-  const parser = new N3.Parser({ format: 'text/n3' });
-  const resultQuads = parser.parse(result);
   
-  const successQuads = resultQuads.filter(quad => 
-    quad.predicate.value === 'http://example.org/test#message'
-  );
-
-  assertEquals(successQuads.length > 0, true,
+  // Query to find success messages
+  const messageQuery = `
+    @prefix test: <http://example.org/test#> .
+    {
+      ?x a test:Success;
+         test:message ?message.
+    } => {
+      ?x test:foundMessage ?message.
+    }.
+  `;
+  
+  const messages = await n3reasoner(result, messageQuery);
+  
+  assertEquals(messages.length > 0, true,
     `N3 query failed to match expected pattern.\nActual graph contents:\n${await writeN3(store.getQuads())}`);
 
   console.log("\nTest successes:");
-  for (const quad of successQuads) {
-    console.log(`✓ ${quad.object.value}`);
+  const messageRegex = /test:foundMessage "([^"]+)"/g;
+  for (const match of messages.matchAll(messageRegex)) {
+    console.log(`✓ ${match[1]}`);
   }
 }
