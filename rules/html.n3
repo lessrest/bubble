@@ -17,6 +17,19 @@
    ?element a html:element ;
        html:tagName ?tagName .
 } .
+
+# element with content
+{
+   ?element a html:element ;
+       html:content ?content 
+}
+=> 
+{
+   ?element html:children ( [
+       a html:text ;
+       html:content ?content 
+   ] ) 
+} .
 html:paragraph a html:HTMLElementType ;
    html:tagName "p" .
 html:body a html:HTMLElementType ;
@@ -41,34 +54,25 @@ html:html a html:HTMLElementType ;
    ?site html:representation [
        a html:html ;
        html:children ( [
-           a html:head ;
-           html:children ( [
-               a html:title ;
-               html:children ( [
-                   a html:text ;
-                   html:content ?name 
-               ] ) 
-           ] [
-               a html:meta ;
-               html:attributes [
-                   html:name "charset" ;
-                   html:value "utf-8" 
-               ] 
-           ] [
-               a html:meta ;
-               html:attributes [
-                   html:name "viewport" ;
-                   html:value "width=device-width, initial-scale=1" 
-               ] 
-           ] ) 
+           a html:title ;
+           html:content ?name 
+       ] [
+           a html:meta ;
+           html:attributes [
+               html:name "charset" ;
+               html:value "utf-8" 
+           ] 
+       ] [
+           a html:meta ;
+           html:attributes [
+               html:name "viewport" ;
+               html:value "width=device-width, initial-scale=1" 
+           ] 
        ] [
            a html:body ;
            html:children ( [
                a html:paragraph ;
-               html:children ( [
-                   a html:text ;
-                   html:content ?desc 
-               ] ) 
+               html:content ?desc 
            ] ) 
        ] ) 
    ] .

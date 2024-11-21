@@ -26,7 +26,7 @@ Deno.test("HTML Endpoints", async (t) => {
     assertEquals(
       body,
       `<!doctype html>
-<html><head><title>Test Site</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><p>A test website</p></body></html>`,
+<html><title>Test Site</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><body><p>A test website</p></body></html>`,
       "Homepage should include site title and metadata",
     );
   });
