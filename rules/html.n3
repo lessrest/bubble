@@ -16,18 +16,6 @@
     http:body """
       <!DOCTYPE html>
       <html>
-        <head>
-          <title>""" ?name """</title>
-          <script src="https://unpkg.com/htmx.org@1.9.9"></script>
-        </head>
-        <body>
-          <h1>""" ?name """</h1>
-          <p>""" ?desc """</p>
-          <div id="users">
-            <h2>Users</h2>
-            <div hx-get="/users" hx-trigger="load">Loading...</div>
-          </div>
-        </body>
       </html>
     """.
 }.
@@ -44,10 +32,6 @@
     http:contentType "text/html";
     http:body """
       <div class="user">
-        <h3>""" ?name """</h3>
-        <button hx-get="/users/""" ?name """/profile" hx-target="next div">
-          View Profile
-        </button>
         <div class="profile"></div>
       </div>
     """.
