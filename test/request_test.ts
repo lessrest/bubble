@@ -19,7 +19,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
     );
   });
 
-  await t.step("can match request URI prefix with string:startsWith", async (step) => {
+  await t.step("can match request path prefix with string:startsWith", async (step) => {
     await assertQuery(
       store,
       `
@@ -28,8 +28,8 @@ Deno.test("HTTP Request to RDF", async (t) => {
     
     {
       ?request a http:Request;
-        http:path ?uri .
-      ?uri string:startsWith "/api/" .
+        http:path ?path .
+      ?path string:startsWith "/api/" .
     }`,
       step.name,
     );
