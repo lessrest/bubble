@@ -16,6 +16,7 @@ const rules = `
   @prefix http: <http://www.w3.org/2011/http#>.
   @prefix ap: <http://www.w3.org/ns/activitystreams#>.
   @prefix string: <http://www.w3.org/2000/10/swap/string#>.
+  @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
   
   # Handle root path
   {
@@ -29,33 +30,31 @@ const rules = `
 
   # Handle inbox GET
   {
-    ?request http:path ?path;
+    ?request http:href ?collection;
             http:method "GET" .
     
-    ?collection a ap:Collection;
-              http:path ?path .
+    ?collection a ap:Collection.
   } => {
     ?response a http:Response;
       http:respondsTo ?request;
       http:responseCode 200;
-      http:contentType "text/turtle";
+      http:contentType "application/turtle";
       http:body ?n3 .
 
     # Get all items in the collection
     ?collection ap:items ?items .
     
     # Convert to N3 string
-    (?collection ?items) log:n3String ?n3 .
+    (?collection) e:n3String ?n3 .
   }.
 
   # Handle inbox POST
   {
-    ?request http:path ?path;
-            http:method "POST" .
+    ?request http:href ?collection;
+            http:method "POST" ;
+            http:body ?object .
     
-    ?collection a ap:Collection;
-              http:path ?path .
-    
+    ?collection a ap:Collection .    
     ?object a ap:Note .
   } => {
     ?response a http:Response;
@@ -67,8 +66,10 @@ const rules = `
   }.
 `;
 
+const store = await withGroundFacts(groundFacts);
+
 export async function handler(req: Request): Promise<Response> {
-  return handleWithRules(req, rules, withGroundFacts(groundFacts));
+  return handleWithRules(req, rules, store, store);
 }
 
 if (import.meta.main) {

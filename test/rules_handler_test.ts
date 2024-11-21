@@ -185,6 +185,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
   });
 
   await t.step("handles ActivityPub inbox POST", async () => {
+    // Define initial graph with Alice's inbox collection
     const facts = `
       @base <http://example.org/>.
       @prefix ap: <http://www.w3.org/ns/activitystreams#>.
@@ -196,10 +197,10 @@ Deno.test("Rules-based Request Handler", async (t) => {
       </cap/alice-inbox-root> a ap:Collection.
     `;
 
+    // Rule: POST to collection adds Note to items
     const rules = `
       @prefix http: <http://www.w3.org/2011/http#>.
       @prefix ap: <http://www.w3.org/ns/activitystreams#>.
-      @base <http://example.org/>.
       
       {
         ?request http:href ?collection ;
@@ -217,6 +218,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
       }.
     `;
 
+    // POST a Note to Alice's inbox
     const req = new Request("http://example.org/cap/alice-inbox-root", {
       method: "POST",
       headers: {
@@ -231,6 +233,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
       `,
     });
 
+    // Apply rules and verify Note was added
     const store = await withGroundFacts(facts);
     const resultStore = new N3.Store();
     const res = await handleWithRules(req, rules, store, resultStore);
