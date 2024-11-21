@@ -1,5 +1,5 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu
-RUN apt install -y swi-prolog
+FROM mcr.microsoft.com/devcontainers/base:debian
+RUN apt update && apt install -y swi-prolog
 RUN mkdir -p /src && cd /src && git clone https://github.com/eyereasoner/eye
 RUN cd /src/eye && sh install.sh
 RUN ln -s /opt/eye/bin/eye /usr/bin/eye
