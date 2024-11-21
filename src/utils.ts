@@ -235,7 +235,7 @@ export function renderHTML(store: Store, subject: Term): string {
     );
 
     const childContent = children
-      .map(child => renderElement(child))
+      .map((child: Term) => renderElement(child))
       .join("\n");
 
     return `<${tagName}>${content}${childContent}</${tagName}>`;
