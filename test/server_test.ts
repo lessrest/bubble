@@ -12,6 +12,25 @@ Deno.test("Server Routes", async (t) => {
     assertEquals(await res.text(), "Not Found");
   });
 
+  await t.step("POST note to inbox", async () => {
+    const req = new Request("http://localhost:8000/users/alice/inbox", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/turtle",
+      },
+      body: `
+        @prefix as: <http://www.w3.org/ns/activitystreams#>.
+        
+        <#note> a as:Note;
+          as:content "Hello Alice!".
+      `,
+    });
+    const res = await handler(req);
+
+    assertEquals(res.status, 201);
+    assertEquals(await res.text(), "Activity accepted");
+  });
+
   await t.step("GET to inbox returns 200", async () => {
     const req = new Request("http://localhost:8000/users/alice/inbox", {
       method: "GET",

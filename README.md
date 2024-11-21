@@ -54,6 +54,19 @@ Define routes using N3 rules:
                rdfs:label "Example Collection".
            }.
 }.
+
+# Handle RDF in request body
+{
+  ?request http:method "POST";
+           http:contentType "application/turtle";
+           http:body ?body.
+  ?body a as:Note.
+} => {
+  ?response a http:Response;
+           http:respondsTo ?request;
+           http:responseCode 201;
+           http:body "Note received".
+}.
 ```
 
 HTTP requests are represented as RDF:
