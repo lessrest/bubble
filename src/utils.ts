@@ -306,7 +306,7 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
 
       // Handle self-closing tags
       const selfClosing = ["meta", "link", "br", "hr", "img", "input"];
-      if (selfClosing.includes(node.tagName)) {
+      if (node.tagName && selfClosing.includes(node.tagName)) {
         return `<${node.tagName}${attrString}>`;
       }
 
