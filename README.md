@@ -69,7 +69,7 @@ deno task test:rules
 
 ## License
 
-This project is licensed under the [Ferro GPL v3.0 or later](LICENSE).
+This project is licensed under the [GNU Aferro GPL v3.0 or later](LICENSE.md).
 
 ## Contributing
 
