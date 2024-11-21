@@ -33,7 +33,24 @@ Built a playful test domain using Tom & Jerry characters:
 - Provides concrete examples for testing
 
 ### Technical Achievements
-1. **Declarative Routing**: HTTP routes are now defined purely in N3 rules:
+1. **HTML Generation from RDF**: Complete HTML document generation using semantic graphs:
+```turtle
+[] a html:element ;
+   html:tagName "html" ;
+   html:children ( 
+     [ a html:element ;
+       html:tagName "head" ;
+       html:children ( 
+         [ a html:element ;
+           html:tagName "title" ;
+           html:children ( [ a html:text ; html:content "Hello" ] )
+         ]
+       )
+     ]
+   ) .
+```
+
+2. **Declarative Routing**: HTTP routes are now defined purely in N3 rules:
 ```n3
 {
   ?request http:path "/hello".
@@ -63,7 +80,55 @@ _:request a http:Request;
 - Build more complex routing patterns
 - Implement proper HTML user interface (removed temporary HTML fragment code)
 
-### Latest Achievement: HTML Rendering with String Concatenation
+### Latest Achievement: HTML Generation from RDF Graph
+
+Successfully implemented a complete HTML generation system using RDF graphs and N3 rules. The system can now:
+
+1. **Represent HTML Structure in RDF**: Each HTML element is represented as a node in the RDF graph with:
+   - Element type (element/text)
+   - Tag name
+   - Children as RDF lists
+   - Attributes as nested objects
+
+2. **Smart Tag Handling**: 
+   - Proper handling of self-closing tags (meta, link, br, hr, img, input)
+   - Correct DOCTYPE for html documents
+   - Special handling for meta viewport tags
+
+3. **Clean Integration**: HTML generation integrates seamlessly with HTTP response handling:
+```n3
+{
+  ?response http:body [ html:element ?html ]
+}
+```
+
+Example RDF representation of an HTML page:
+```turtle
+[] a html:element ;
+   html:tagName "html" ;
+   html:children ( 
+     [ a html:element ;
+       html:tagName "head" ;
+       html:children ( 
+         [ a html:element ;
+           html:tagName "meta" ;
+           html:attributes [
+             html:name "viewport" ;
+             html:value "width=device-width, initial-scale=1"
+           ]
+         ]
+       )
+     ]
+   ) .
+```
+
+This is rendered correctly as:
+```html
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head></html>
+```
+
+### Previous Achievement: HTML Rendering with String Concatenation
 
 Successfully implemented basic HTML page generation using N3 rules and string concatenation. Key points:
 
