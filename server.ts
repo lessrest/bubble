@@ -33,27 +33,6 @@ const rules = `
   @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
   @prefix log: <http://www.w3.org/2000/10/swap/log#>.
   
-  # Handle root path
-  {
-    ?request http:path "/" .
-  } => {
-    ?response a http:Response;
-      http:respondsTo ?request;
-      http:responseCode 200;
-      http:body "RDF Test Server - Try /data for the Tom & Jerry dataset" .
-  }.
-
-  # Handle /data path
-  {
-    ?request http:path "/data" .
-  } => {
-    ?response a http:Response;
-      http:respondsTo ?request;
-      http:responseCode 200;
-      http:contentType "text/turtle";
-      http:body """${tomAndJerryData}""" .
-  }.
-  
   # Handle inbox GET
   {
     ?request http:href ?collection;
