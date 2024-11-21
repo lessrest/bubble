@@ -61,7 +61,7 @@ function getStandardPrefixes(): string {
 `;
 }
 
-export async function assertN3Query(store: Store, query: string) {
+export async function assertN3Query(store: Store, query: string, expectedMessage?: string) {
   const result = await n3reasoner(await writeN3(store.getQuads()), query);
   
   // Query to find success messages
