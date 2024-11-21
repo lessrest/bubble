@@ -1,13 +1,11 @@
 import { assertEquals } from "@std/assert";
 import { assertQuery, handleWithRules, withGroundFacts } from "../src/utils.ts";
-import N3, { DataFactory } from "n3";
-import { writeN3 } from "../src/utils.ts";
+import N3 from "n3";
 
 Deno.test("Rules-based Request Handler", async (t) => {
   await t.step("handles basic routing rule", async () => {
     const rules = `
       @prefix http: <http://www.w3.org/2011/http#>.
-      @prefix string: <http://www.w3.org/2000/10/swap/string#>.
 
       {
         ?request http:path "/hello".

@@ -47,14 +47,14 @@ export class CommandLineReasoner implements Reasoner {
 
     try {
       // Run eye command
-      const command = new Deno.Command("swipl", {
+      const command = new Deno.Command("eye", {
         args: [
-          "-q",
-          "-f",
-          "/opt/eye/src/eye/eye.pl",
-          "-g",
-          "main",
-          "--",
+          // "-q",
+          // "-f",
+          // "/opt/eye/src/eye/eye.pl",
+          // "-g",
+          // "main",
+          // "--",
           "--pass",
           "--no-numerals",
           // "--no-qnames",
