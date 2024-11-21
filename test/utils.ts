@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { Quad, Term } from "@rdfjs/types";
-import N3 from "n3";
+import N3, { DataFactory } from "n3";
 import { Readable } from "node:stream";
 import { n3reasoner } from "eyereasoner";
 import { Schema } from "./namespace.ts";
@@ -86,7 +86,7 @@ export async function assertN3Query(store: Store, query: string, expectedMessage
 
   const successQuads = resultStore.getQuads(
     null,
-    DataFactory.namedNode('http://example.org/test#message'),
+    N3.DataFactory.namedNode('http://example.org/test#message'),
     null,
     null
   );
