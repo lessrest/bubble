@@ -14,15 +14,15 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   const store = new N3.Store();
   store.addQuads(quads);
 
-  await t.step("should identify Pet and Pal correctly", () => {
+  await t.step("should identify Eve and Bob correctly", () => {
     assertTriples(store, [
-      [Schema.Pet, RDF.type, Schema.Bird],
-      [Schema.Pal, RDF.type, Schema.Fish]
+      [Schema.Eve, RDF.type, Schema.Bird],
+      [Schema.Bob, RDF.type, Schema.Fish]
     ]);
   });
 
-  await t.step("should establish Pal knows Pet", () => {
-    assertTriple(store, Schema.Pal, Schema.knows, Schema.Pet);
+  await t.step("should establish Bob knows Eve", () => {
+    assertTriple(store, Schema.Bob, Schema.knows, Schema.Eve);
   });
 });
 
@@ -30,14 +30,14 @@ Deno.test("Character and Pet Classifications with Reasoning", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, typeInferenceRule);
   
-  await t.step("should infer all animals as both Characters and Pets through subclass reasoning", () => {
+  await t.step("should infer all animals as both Pals and Pets through subclass reasoning", () => {
     assertTriples(store, [
-      [Schema.Pet, RDF.type, Schema.Pet],
-      [Schema.Pet, RDF.type, Schema.Character],
-      [Schema.Pal, RDF.type, Schema.Pet],
-      [Schema.Pal, RDF.type, Schema.Character],
-      [Schema.Pip, RDF.type, Schema.Pet],
-      [Schema.Pip, RDF.type, Schema.Character]
+      [Schema.Eve, RDF.type, Schema.Pet],
+      [Schema.Eve, RDF.type, Schema.Pal],
+      [Schema.Bob, RDF.type, Schema.Pet],
+      [Schema.Bob, RDF.type, Schema.Pal],
+      [Schema.Jim, RDF.type, Schema.Pet],
+      [Schema.Jim, RDF.type, Schema.Pal]
     ]);
   });
 });
@@ -48,14 +48,14 @@ Deno.test("RDF without transitive rules", async (t) => {
   store.addQuads(quads);
   
   await t.step("should not have transitive inference without rules", () => {
-    const pipKnowsPet = store.getQuads(
-      Schema.Pip,
+    const jimKnowsEve = store.getQuads(
+      Schema.Jim,
       Schema.knows,
-      Schema.Pet,
+      Schema.Eve,
       null
     );
-    assertEquals(pipKnowsPet.length, 0,
-      "Should not infer that Pip knows Pet without applying rules");
+    assertEquals(jimKnowsEve.length, 0,
+      "Should not infer that Jim knows Eve without applying rules");
   });
 });
 
@@ -65,13 +65,13 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   
   await t.step("should have basic triples", () => {
     assertTriples(store, [
-      [Schema.Pip, RDF.type, Schema.Seal]
+      [Schema.Jim, RDF.type, Schema.Seal]
     ]);
   });
 
-  await t.step("should infer Pip knows Pet through transitivity", () => {
+  await t.step("should infer Jim knows Eve through transitivity", () => {
     assertTriples(store, [
-      [Schema.Pip, Schema.knows, Schema.Pet]
+      [Schema.Jim, Schema.knows, Schema.Eve]
     ]);
   });
 });
