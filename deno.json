@@ -2,7 +2,7 @@
   "tasks": {
     "dev": "deno run --watch main.ts",
     "test": "deno test --allow-read n3test.ts",
-    "serve": "deno run --allow-net --allow-read server.ts"
+    "serve": "deno run --watch --allow-net --allow-env --allow-read server.ts"
   },
   "imports": {
     "@rdfjs/namespace": "npm:@rdfjs/namespace@^2.0.1",
