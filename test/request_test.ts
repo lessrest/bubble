@@ -1,6 +1,4 @@
-import { assertEquals } from "@std/assert";
-import { writeN3 } from "./utils.ts";
-import { n3reasoner } from "eyereasoner";
+import { assertN3Query } from "./utils.ts";
 import { requestToStore } from "./request.ts";
 
 Deno.test("HTTP Request to RDF", async (t) => {
@@ -9,19 +7,18 @@ Deno.test("HTTP Request to RDF", async (t) => {
     const store = requestToStore(request);
     
     const query = `
+      @prefix test: <http://example.org/test#> .
       @prefix http: <http://www.w3.org/2011/http#> .
-      @prefix log: <http://www.w3.org/2000/10/swap/log#> .
       
       {
         ?request a http:Request;
           http:requestURI "/api/users/123" .
       } => {
-        ?request a http:Request;
-          http:requestURI "/api/users/123" .
+        [] a test:Success;
+          test:message "Found expected HTTP request" .
       }.
     `;
     
-    const result = await n3reasoner(await writeN3(store.getQuads()), query);
-    assertEquals(result.length > 0, true, "Expected to find matching HTTP request");
+    await assertN3Query(store, query);
   });
 });

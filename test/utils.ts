@@ -61,16 +61,8 @@ function getStandardPrefixes(): string {
 `;
 }
 
-export async function assertTurtleGraph(store: Store, turtleGraph: string) {
-  const parser = new N3.Parser();
-  const graphWithPrefixes = getStandardPrefixes() + turtleGraph;
-  const expectedQuads = parser.parse(graphWithPrefixes);
-  
-  for (const quad of expectedQuads) {
-    const matches = store.getQuads(quad.subject, quad.predicate, quad.object, null);
-    assertEquals(matches.length > 0, true,
-      `Expected triple not found in graph:\n` +
-      `${quad.subject.value} ${quad.predicate.value} ${quad.object.value}\n\n` +
-      `Actual graph contents:\n${await writeN3(store.getQuads())}`);
-  }
+export async function assertN3Query(store: Store, query: string) {
+  const result = await n3reasoner(await writeN3(store.getQuads()), query);
+  assertEquals(result.length > 0, true, 
+    `N3 query failed to match expected pattern.\nActual graph contents:\n${await writeN3(store.getQuads())}`);
 }
