@@ -5,7 +5,7 @@
     "serve": "deno run --watch --allow-net --allow-env --allow-read server.ts"
   },
   "imports": {
-    "@rdfjs/namespace": "npm:@rdfjs/namespace@^2.0.2",
+    "@rdfjs/namespace": "npm:@rdfjs/namespace@^2.0.1",
     "@rdfjs/types": "npm:@rdfjs/types@^1.1.2",
     "@std/assert": "jsr:@std/assert@1",
     "eyereasoner": "npm:eyereasoner@^17.0.2",
