@@ -21,7 +21,7 @@ Deno.test("Server Routes", async (t) => {
       body: `
         @prefix as: <http://www.w3.org/ns/activitystreams#>.
         
-        <#note> a as:Note;
+        <#body> a as:Note;
           as:content "Hello Alice!".
       `,
     });

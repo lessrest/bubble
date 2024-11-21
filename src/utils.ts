@@ -222,7 +222,8 @@ export async function handleWithRules(
 ): Promise<Response> {
   // Convert request to RDF store
   // Use request URL as the IRI
-  const requestIri = request.url;
+  const uuid = crypto.randomUUID();
+  const requestIri = `urn:request:${uuid}`;
   const store = await requestToStore(request, requestIri);
 
   // Add ground facts if provided
