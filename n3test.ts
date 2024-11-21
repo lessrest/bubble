@@ -16,8 +16,8 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
 
   await t.step("should identify Eve and Bob correctly", () => {
     assertTriples(store, [
-      [Schema.Eve, RDF.type, Schema.Bird],
-      [Schema.Bob, RDF.type, Schema.Fish]
+      [Schema.Eve, RDF.type, Schema.Rat],
+      [Schema.Bob, RDF.type, Schema.Eel]
     ]);
   });
 

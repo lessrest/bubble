@@ -3,14 +3,14 @@ import { Schema, RDFS } from "./namespace.ts";
 export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   PREFIX rdfs: <${RDFS("").value}>
   schema:Pet rdfs:subClassOf schema:Pal .
-  schema:Bird rdfs:subClassOf schema:Pet .
-  schema:Fish rdfs:subClassOf schema:Pet .
-  schema:Seal rdfs:subClassOf schema:Pet .
+  schema:Rat rdfs:subClassOf schema:Pet .
+  schema:Eel rdfs:subClassOf schema:Pet .
+  schema:Owl rdfs:subClassOf schema:Pet .
   
-  schema:Eve a schema:Bird .
-  schema:Bob a schema:Fish ;
+  schema:Eve a schema:Rat .
+  schema:Bob a schema:Eel ;
     schema:knows schema:Eve .
-  schema:Jim a schema:Seal ;
+  schema:Jim a schema:Owl ;
     schema:knows schema:Bob .`;
 
 export const typeInferenceRule = await Deno.readTextFile(
