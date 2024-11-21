@@ -95,8 +95,7 @@ export async function assertN3Query(
 ): Promise<void> {
   const reasoner = new CommandLineReasoner();
   const result = await reasoner.reason(
-    await writeN3(store.getQuads()),
-    "",
+    [await writeN3(store.getQuads())],
     { query },
   );
   const resultStore = new N3.Store();
@@ -221,7 +220,7 @@ export async function handleWithRules(
   // Apply the rules
   const reasoner = new CommandLineReasoner();
   const n3Input = await writeN3(store.getQuads());
-  const result = await reasoner.reason(n3Input, rules);
+  const result = await reasoner.reason([n3Input, rules]);
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();

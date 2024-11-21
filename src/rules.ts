@@ -12,7 +12,7 @@ export async function applyRules(
 
   const n3Data = await writeN3(data);
   const reasoner = new CommandLineReasoner();
-  const result = await reasoner.reason(n3Data, rules);
+  const result = await reasoner.reason([n3Data, rules]);
 
   const parser = new N3.Parser({ format: "text/n3" });
   const resultQuads = parser.parse(result) as Quad[];
