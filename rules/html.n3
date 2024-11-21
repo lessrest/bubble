@@ -8,90 +8,19 @@
 
 # Server root shows HTML homepage
 {
-   ?request http:path "/" .
-   ?site schema:name ?name ;
-       schema:description ?desc .
+  ?request http:path "/" .
+  ?site schema:name ?name ;
+      schema:description ?desc .
 }
 => 
 {
-   ?response a http:Response ;
-       http:respondsTo ?request ;
-       http:responseCode 200 ;
-       http:contentType "text/html" ;
-       http:body [
-           a html:element ;
-           html:tagName "html" ;
-           html:children ( [
-               a html:element ;
-               html:tagName "head" ;
-               html:children ( [
-                   a html:element ;
-                   html:tagName "title" ;
-                   html:textContent ?name 
-               ] [
-                   a html:element ;
-                   html:tagName "meta" ;
-                   html:attributes ( [
-                       a html:attribute ;
-                       html:name "charset" ;
-                       html:value "utf-8" 
-                   ] ) 
-               ] [
-                   a html:element ;
-                   html:tagName "meta" ;
-                   html:attributes ( [
-                       a html:attribute ;
-                       html:name "viewport" ;
-                       html:value "width=device-width, initial-scale=1" 
-                   ] ) 
-               ] ) 
-           ] [
-               a html:element ;
-               html:tagName "body" ;
-               html:children ( [
-                   a html:element ;
-                   html:tagName "p" ;
-                   html:children ( [
-                       a html:text ;
-                       html:content ?desc 
-                   ] ) 
-               ] ) 
-           ] ) 
-       ] 
-} .
-{
-   ?element a html:element ;
-       html:tagName ?tagName ;
-       html:children ?children .
-   ?children html:outerHTML ?childrenOuterHTML .
-}
-=> 
-{
-   ( "<" ?tagName ">" ?childrenOuterHTML "</" ?tagName ">" ) string:concatenate ?outerHTML .
-   ?element html:outerHTML ?outerHTML .
-} .
+  ?response a http:Response ;
+    http:respondsTo ?request ;
+    http:responseCode 200 ;
+    http:contentType "text/html" ;
+    http:body [
+      html:outerHTML ?html
+    ] .
 
-# html:text
-{
-   ?text a html:text ;
-       html:content ?content .
-}
-=> 
-{
-   ?text html:outerHTML ?content .
-} .
-
-# HTML string building
-( ) html:outerHTML "" .
-{
-   ?list a rdf:List ;
-       rdf:first ?first ;
-       rdf:rest ?rest .
-   ?first html:outerHTML ?firstOuterHTML .
-   ?rest html:outerHTML ?restOuterHTML .
-}
-=> 
-{
-   ?list html:outerHTML ?html .
-   ( ?firstOuterHTML ?restOuterHTML ) string:concatenate ?html .
+  ( "<html><head><title>" ?name "</title><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><p>" ?desc "</p></body></html>" ) string:concatenate ?html .
 } .
