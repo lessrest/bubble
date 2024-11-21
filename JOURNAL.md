@@ -2,6 +2,13 @@
 
 ## November 21, 2024
 
+Started development of HTTP request to RDF graph conversion:
+- Creating test-driven approach for converting Deno HTTP requests to RDF
+- Focusing on representing URL path segments as RDF lists
+- Adding tests for request-to-triple conversion
+- Planning REST request routing based on N3 rules
+
+Earlier today:
 Refactored test names and descriptions for clarity:
 - Simplified test step names by removing "should" prefix
 - Made test descriptions more concise and direct
