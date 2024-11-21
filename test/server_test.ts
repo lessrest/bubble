@@ -3,7 +3,8 @@ import { handler } from "../server.ts";
 
 Deno.test("Server Routes", async (t) => {
   await t.step("root path returns welcome message", async () => {
-    const req = new Request("http://localhost:8000/");
+    const reqUrl = "http://localhost:8000/";
+    const req = new Request(reqUrl);
     const res = await handler(req);
     const text = await res.text();
     

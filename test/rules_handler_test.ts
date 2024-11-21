@@ -19,7 +19,8 @@ Deno.test("Rules-based Request Handler", async (t) => {
       }.
     `;
 
-    const req = new Request("http://localhost:8000/hello");
+    const reqUrl = "http://localhost:8000/hello";
+    const req = new Request(reqUrl);
     const res = await handleWithRules(req, rules);
 
     assertEquals(res.status, 200);

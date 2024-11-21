@@ -139,18 +139,11 @@ ${await writeN3(
   );
 }
 
-function generateSessionUrn(): string {
-  // Generate a random UUID for the session
-  const uuid = crypto.randomUUID();
-  return `urn:session:${uuid}`;
-}
-
-export async function requestToStore(request: Request): Promise<Store> {
+export async function requestToStore(request: Request, requestIri: string): Promise<Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
 
-  // Create a blank node for the request
-  const requestNode = DataFactory.namedNode(generateSessionUrn());
+  const requestNode = DataFactory.namedNode(requestIri);
 
   // Add basic request triples
   store.addQuad(
@@ -225,7 +218,9 @@ export async function handleWithRules(
   resultStore?: Store,
 ): Promise<Response> {
   // Convert request to RDF store
-  const store = await requestToStore(request);
+  // Use request URL as the IRI
+  const requestIri = request.url;
+  const store = await requestToStore(request, requestIri);
 
   // Add ground facts if provided
   if (groundFacts) {
