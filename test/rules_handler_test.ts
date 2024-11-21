@@ -10,8 +10,10 @@ Deno.test("Rules-based Request Handler", async (t) => {
       {
         ?request http:path "/hello".
       } => {
-        [] http:responseCode 200;
-           http:body "Hello, World!".
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 200;
+          http:body "Hello, World!".
       }.
     `;
 
@@ -29,8 +31,10 @@ Deno.test("Rules-based Request Handler", async (t) => {
       {
         ?request http:path "/specific-path".
       } => {
-        [] http:responseCode 200;
-           http:body "Found!".
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 200;
+          http:body "Found!".
       }.
     `;
 
@@ -49,8 +53,10 @@ Deno.test("Rules-based Request Handler", async (t) => {
         ?request http:path ?path.
         ?path string:startsWith "/api/".
       } => {
-        [] http:responseCode 200;
-           http:body "API Request".
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 200;
+          http:body "API Request".
       }.
     `;
 
