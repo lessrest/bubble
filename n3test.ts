@@ -15,10 +15,11 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   store.addQuads(quads);
 
   await t.step("should identify Eve and Bob correctly", () => {
-    assertTriples(store, [
-      [Schema.Eve, RDF.type, Schema.Rat],
-      [Schema.Bob, RDF.type, Schema.Eel]
-    ]);
+    assertTurtleGraph(store, `
+      @prefix schema: <${Schema("").value}> .
+      schema:Eve a schema:Rat .
+      schema:Bob a schema:Eel .
+    `);
   });
 
   await t.step("should establish Bob knows Eve", () => {
@@ -31,14 +32,12 @@ Deno.test("Pet Classifications with Reasoning", async (t) => {
   const store = await applyRules(quads, typeInferenceRule);
   
   await t.step("should infer all animals as both Pals and Pets through subclass reasoning", () => {
-    assertTriples(store, [
-      [Schema.Eve, RDF.type, Schema.Pet],
-      [Schema.Eve, RDF.type, Schema.Pal],
-      [Schema.Bob, RDF.type, Schema.Pet],
-      [Schema.Bob, RDF.type, Schema.Pal],
-      [Schema.Jim, RDF.type, Schema.Pet],
-      [Schema.Jim, RDF.type, Schema.Pal]
-    ]);
+    assertTurtleGraph(store, `
+      @prefix schema: <${Schema("").value}> .
+      schema:Eve a schema:Pet, schema:Pal .
+      schema:Bob a schema:Pet, schema:Pal .
+      schema:Jim a schema:Pet, schema:Pal .
+    `);
   });
 });
 
@@ -63,15 +62,11 @@ Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, transitiveRule);
   
-  await t.step("should have basic triples", () => {
-    assertTriples(store, [
-      [Schema.Jim, RDF.type, Schema.Owl]
-    ]);
-  });
-
-  await t.step("should infer Jim knows Eve through transitivity", () => {
-    assertTriples(store, [
-      [Schema.Jim, Schema.knows, Schema.Eve]
-    ]);
+  await t.step("should have basic triples and infer transitive relationships", () => {
+    assertTurtleGraph(store, `
+      @prefix schema: <${Schema("").value}> .
+      schema:Jim a schema:Owl ;
+        schema:knows schema:Eve .
+    `);
   });
 });
