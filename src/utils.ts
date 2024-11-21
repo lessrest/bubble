@@ -304,6 +304,12 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
         }
       }
 
+      // Handle self-closing tags
+      const selfClosing = ["meta", "link", "br", "hr", "img", "input"];
+      if (selfClosing.includes(node.tagName)) {
+        return `<${node.tagName}${attrString}>`;
+      }
+
       // Special case for document
       if (node.tagName === "html") {
         return `<!doctype html>\n<html>${innerHTML}</html>`;
