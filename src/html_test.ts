@@ -15,7 +15,7 @@ Deno.test("HTML Endpoints", async (t) => {
     const req = new Request("http://localhost:8000/");
     const res = await handleWithRules(
       req,
-      await Deno.readTextFile("./rules/html.n3"),
+      [await Deno.readTextFile("./rules/html.n3")],
       withGroundFacts(facts),
     );
 

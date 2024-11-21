@@ -19,7 +19,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
 
     const reqUrl = "http://localhost:8000/hello";
     const req = new Request(reqUrl);
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "Hello, World!");
@@ -177,7 +177,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/greet");
-    const res = await handleWithRules(req, rules, withGroundFacts(facts));
+    const res = await handleWithRules(req, [rules], withGroundFacts(facts));
 
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "Hola!");
@@ -235,7 +235,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     // Apply rules and verify Note was added
     const store = await withGroundFacts(facts);
     const resultStore = new N3.Store();
-    const res = await handleWithRules(req, rules, store, resultStore);
+    const res = await handleWithRules(req, [rules], store, resultStore);
 
     assertEquals(res.status, 201);
     assertEquals(await res.text(), "Activity accepted");
