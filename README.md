@@ -22,50 +22,43 @@ deno task test
 deno task serve
 ```
 
-## Example
+## Example: ActivityPub Inbox
 
-Define routes using N3 rules:
+Define an ActivityPub-compatible inbox using N3 rules:
 
 ```n3
 @prefix http: <http://www.w3.org/2011/http#>.
 @prefix as: <http://www.w3.org/ns/activitystreams#>.
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 
-# Return plain text
+# GET inbox - return collection
 {
-  ?request http:path "/hello".
+  ?request http:href ?collection;
+          http:method "GET" .
+  
+  ?collection a as:Collection.
 } => {
   ?response a http:Response;
-           http:respondsTo ?request;
-           http:responseCode 200;
-           http:body "Hello, World!".
+    http:respondsTo ?request;
+    http:responseCode 200;
+    http:contentType "application/turtle";
+    http:body { ?collection a as:Collection } .
 }.
 
-# Return RDF graph as Turtle
+# POST note to inbox
 {
-  ?request http:path "/collection".
+  ?request http:href ?collection;
+          http:method "POST";
+          http:body ?object .
+  
+  ?collection a as:Collection .    
+  ?object a as:Note .
 } => {
   ?response a http:Response;
-           http:respondsTo ?request;
-           http:responseCode 200;
-           http:contentType "application/turtle";
-           http:body {
-             </collection> a as:Collection;
-               rdfs:label "Example Collection".
-           }.
-}.
+    http:respondsTo ?request;
+    http:responseCode 201;
+    http:body "Activity accepted" .
 
-# Handle RDF in request body
-{
-  ?request http:method "POST";
-           http:contentType "application/turtle";
-           http:body ?body.
-  ?body a as:Note.
-} => {
-  ?response a http:Response;
-           http:respondsTo ?request;
-           http:responseCode 201;
-           http:body "Note received".
+  ?collection as:items ?object .
 }.
 ```
 

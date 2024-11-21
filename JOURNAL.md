@@ -62,18 +62,23 @@ _:request a http:Request;
 - Implement outbox and activity distribution
 - Build more complex routing patterns
 
-### Latest Achievement: RDF Graph Responses
-We've successfully implemented the ability to return RDF graph responses from our HTTP handlers. The server can now:
-- Return complete RDF graphs as responses
-- Use N3 rules to construct response graphs
-- Validate response graphs with SPARQL-like queries in tests
-- Return proper Content-Type headers for Turtle
+### Latest Achievement: Working ActivityPub Inbox Implementation
+We've successfully implemented a working ActivityPub inbox with full test coverage:
+- GET empty inbox returns a proper ActivityStreams Collection
+- POST Note to inbox stores the activity
+- GET inbox after POST shows the new item in the collection
 
-This is demonstrated in our new test case that verifies an inbox GET returns a proper ActivityStreams Collection:
-
-```turtle
-</users/alice/inbox> a as:Collection;
-   rdfs:label "Inbox".
+The test suite now verifies this complete flow:
+```typescript
+// 1. GET empty inbox - verifies Collection exists
+// 2. POST Note to inbox - returns 201 Created
+// 3. GET inbox again - verifies Note was added as an item
 ```
 
-The framework is evolving into a powerful platform for building semantic web applications with clean separation of concerns and declarative behavior specification.
+This demonstrates our N3 rules correctly handling both GET and POST operations while maintaining collection state between requests. The framework is evolving into a powerful platform for building federated social applications with clean separation of concerns and declarative behavior specification.
+
+Next steps:
+- Test posting multiple items to inbox
+- Verify more properties of posted Notes
+- Add error case handling (invalid content type, malformed activity)
+- Implement outbox functionality
