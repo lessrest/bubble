@@ -16,7 +16,7 @@ export function requestToStore(request: Request): N3.Store {
 
   store.addQuad(
     requestNode,
-    HTTP('requestURI'),
+    HTTP('path'),
     literal(url.pathname)
   );
 

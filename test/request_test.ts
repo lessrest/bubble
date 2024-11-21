@@ -13,7 +13,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
     
     {
       ?request a http:Request;
-        http:requestURI "/api/users/123" .
+        http:path "/api/users/123" .
     }`,
       step.name,
     );
@@ -28,7 +28,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
     
     {
       ?request a http:Request;
-        http:requestURI ?uri .
+        http:path ?uri .
       ?uri string:startsWith "/api/" .
     }`,
       step.name,
