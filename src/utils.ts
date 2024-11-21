@@ -102,6 +102,51 @@ export async function assertN3Query(
   query: string,
   expectedMessage: string,
 ): Promise<void> {
+
+export async function handleWithRules(
+  request: Request,
+  rules: string
+): Promise<Response> {
+  // Convert request to RDF store
+  const store = requestToStore(request);
+  
+  // Apply the rules
+  const result = await n3reasoner(
+    await writeN3(store.getQuads()) + "\n" + rules,
+    undefined,
+    { output: "deductive_closure" }
+  );
+
+  // Parse the results
+  const resultStore = new N3.Store();
+  const parser = new N3.Parser({ format: "text/n3" });
+  const resultQuads = parser.parse(result);
+  resultStore.addQuads(resultQuads);
+
+  // Look for response triples
+  const responseQuads = resultStore.getQuads(
+    null,
+    DataFactory.namedNode("http://www.w3.org/2011/http#responseCode"),
+    null,
+    null
+  );
+
+  if (responseQuads.length === 0) {
+    return new Response("No response derived", { status: 404 });
+  }
+
+  const statusCode = parseInt(responseQuads[0].object.value);
+  const bodyQuads = resultStore.getQuads(
+    responseQuads[0].subject,
+    DataFactory.namedNode("http://www.w3.org/2011/http#body"),
+    null,
+    null
+  );
+
+  const body = bodyQuads.length > 0 ? bodyQuads[0].object.value : "";
+  
+  return new Response(body, { status: statusCode });
+}
   const result = await n3reasoner(
     await writeN3(store.getQuads()) + "\n" + query,
     undefined,
