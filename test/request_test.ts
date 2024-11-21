@@ -11,7 +11,6 @@ const { literal, blankNode } = DataFactory;
 async function requestToStore(request: Request): Promise<N3.Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
-  const pathSegments = url.pathname.split('/').filter(Boolean);
   
   const requestNode = blankNode();
   store.addQuad(
@@ -20,38 +19,10 @@ async function requestToStore(request: Request): Promise<N3.Store> {
     HTTP('Request')
   );
 
-  // Create the path list
-  let listHead = blankNode();
-  const firstNode = listHead;
-  
-  pathSegments.forEach((segment, index) => {
-    store.addQuad(
-      listHead,
-      RDF('first'),
-      literal(segment)
-    );
-    
-    if (index < pathSegments.length - 1) {
-      const nextNode = blankNode();
-      store.addQuad(
-        listHead,
-        RDF('rest'),
-        nextNode
-      );
-      listHead = nextNode;
-    } else {
-      store.addQuad(
-        listHead,
-        RDF('rest'),
-        RDF('nil')
-      );
-    }
-  });
-
   store.addQuad(
     requestNode,
-    HTTP('path'),
-    firstNode
+    HTTP('requestURI'),
+    literal(url.pathname)
   );
 
   return store;
@@ -62,20 +33,14 @@ Deno.test("HTTP Request to RDF", async (t) => {
     const request = new Request("http://example.com/api/users/123");
     const store = await requestToStore(request);
     
-    // Query to check if there exists a request with the expected path list
+    // Query to check if there exists a request with the expected URI
     const query = `
       @prefix http: <http://www.w3.org/2011/http#> .
       @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
       
       {
         ?request a http:Request ;
-                http:path ?list .
-        ?list rdf:first "api" ;
-              rdf:rest ?rest1 .
-        ?rest1 rdf:first "users" ;
-               rdf:rest ?rest2 .
-        ?rest2 rdf:first "123" ;
-               rdf:rest rdf:nil .
+                http:requestURI "/api/users/123" .
       } => {
         ?request a http:Request .
       } .
