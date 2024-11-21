@@ -1,4 +1,4 @@
-import N3, { Store } from "n3";
+import N3, { DataFactory, Store } from "n3";
 import { Quad } from "@rdfjs/types";
 import { renderHTML } from "./html.ts";
 import { CommandLineReasoner } from "./reasoning.ts";
@@ -40,7 +40,7 @@ export async function handleWithRules(
     return new Response("Request not found in result", { status: 500 });
   }
 
-  const { response, statusCode, body: initialBody, contentType } = getResponseData(resultStore, requestNode);
+  const { response, statusCode, body: initialBody, contentType: responseContentType } = getResponseData(resultStore, requestNode);
   
   if (!response) {
     return new Response("Not Found", { status: 404 });
@@ -51,6 +51,13 @@ export async function handleWithRules(
   }
 
   let body = initialBody;
+
+  const bodyQuads = resultStore.getQuads(
+    response,
+    HTTP("body"),
+    null,
+    null
+  );
 
   if (bodyQuads.length > 0) {
     const bodyStore = new N3.Store();
@@ -116,12 +123,12 @@ export async function handleWithRules(
     null,
   );
 
-  const contentType = contentTypeQuads.length > 0
+  const finalContentType = contentTypeQuads.length > 0
     ? contentTypeQuads[0].object.value
     : "text/plain";
 
   return new Response(body, {
     status: statusCode,
-    headers: { "Content-Type": contentType },
+    headers: { "Content-Type": finalContentType },
   });
 }

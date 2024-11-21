@@ -1,4 +1,4 @@
-import N3, { Store } from "n3";
+import N3, { DataFactory, Store } from "n3";
 import { HTTP, RDF } from "./namespace.ts";
 
 export async function requestToStore(
