@@ -22,58 +22,93 @@ deno task test
 deno task serve
 ```
 
-## Example: ActivityPub Inbox
+## Example: ActivityPub Inbox with N3 Rules
 
-Define an ActivityPub-compatible inbox using N3 rules:
+This example shows how to implement an ActivityPub inbox using N3 rules. N3 rules are logical implications of the form:
+`{ condition } => { conclusion }` where both sides are RDF graph patterns.
+
+The framework:
+1. Converts HTTP requests into RDF graphs
+2. Applies N3 rules to match patterns and generate responses
+3. Converts response graphs back to HTTP responses
+
+When the response includes RDF graphs in the `http:body` predicate, they are automatically serialized as Turtle in the HTTP response body.
 
 ```n3
+# First, declare our namespaces
 @prefix http: <http://www.w3.org/2011/http#>.
 @prefix as: <http://www.w3.org/ns/activitystreams#>.
 
-# GET inbox - return collection and its items
+# Rule 1: GET request to an inbox
+# When we match:
 {
-  ?request http:href ?collection;
-          http:method "GET" .
+  # An HTTP request...
+  ?request http:href ?collection;  # ...to some URL
+          http:method "GET" .      # ...using GET method
   
+  # And that URL identifies a Collection
   ?collection a as:Collection.
 } => {
+  # Then generate a response...
   ?response a http:Response;
-    http:respondsTo ?request;
-    http:responseCode 200;
-    http:contentType "application/turtle";
-    http:body { ?collection a as:Collection } .
+    http:respondsTo ?request;     # ...for this request
+    http:responseCode 200;        # ...with 200 OK status
+    http:contentType "application/turtle";  # ...as Turtle
+    # Include a graph in the response body
+    http:body { 
+      ?collection a as:Collection 
+    } .
 }.
 
-# Return any items in the collection
+# Rule 2: Include collection items in GET response
+# This rule adds to the previous response
 {
   ?request http:href ?collection;
     http:method "GET" .
   
+  # Find the existing response
   ?response a http:Response ;
     http:respondsTo ?request .
 
+  # Match any items in the collection
   ?collection ap:items ?item .
 } => {
-  ?response http:body { ?collection ap:items ?item } .
+  # Add those items to the response body
+  ?response http:body { 
+    ?collection ap:items ?item 
+  } .
 }.
 
-# POST note to inbox
+# Rule 3: POST new items to the inbox
 {
+  # Match POST request
   ?request http:href ?collection;
           http:method "POST";
-          http:body ?object .
+          http:body ?object .     # Extract posted content
   
+  # Verify collection exists
   ?collection a as:Collection .    
+  # Verify posted content is a Note
   ?object a as:Note .
 } => {
+  # Create success response
   ?response a http:Response;
     http:respondsTo ?request;
     http:responseCode 201;
     http:body "Activity accepted" .
 
+  # Add the Note to the collection
   ?collection as:items ?object .
 }.
 ```
+
+The framework handles all the RDF conversion:
+- Incoming requests become RDF graphs with `http:Request` type
+- Posted content in Turtle format is parsed into the request graph
+- Response graphs are converted back to HTTP responses
+- RDF graphs in `http:body` are serialized as Turtle
+
+This declarative approach lets us focus on the logic of what should happen rather than how to implement it. The rules engine handles matching patterns and generating the appropriate responses.
 
 HTTP requests are represented as RDF:
 
