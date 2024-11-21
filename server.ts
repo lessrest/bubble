@@ -1,7 +1,7 @@
 import { handleWithRules, withGroundFacts } from "./src/utils.ts";
 
 const store = await withGroundFacts(
-  await Deno.readTextFile("./ground-facts.ttl")
+  await Deno.readTextFile("./config.ttl"),
 );
 
 const inboxRules = await Deno.readTextFile("./rules/inbox.n3");

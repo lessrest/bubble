@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { assertQuery, handleWithRules, withGroundFacts } from "../src/utils.ts";
+import { assertQuery, handleWithRules, withGroundFacts } from "./utils.ts";
 import N3 from "n3";
 
 Deno.test("Rules-based Request Handler", async (t) => {
