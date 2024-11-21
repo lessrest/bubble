@@ -4,13 +4,15 @@ import { Schema } from "./namespace.ts";
 import N3 from "n3";
 
 import { HTTP, RDF } from "./namespace.ts";
+import { DataFactory } from "n3";
+const { literal, blankNode } = DataFactory;
 
 async function requestToStore(request: Request): Promise<N3.Store> {
   const store = new N3.Store();
   const url = new URL(request.url);
   const pathSegments = url.pathname.split('/').filter(Boolean);
   
-  const requestNode = store.createBlankNode();
+  const requestNode = blankNode();
   store.addQuad(
     requestNode,
     RDF('type'),
@@ -18,18 +20,18 @@ async function requestToStore(request: Request): Promise<N3.Store> {
   );
 
   // Create the path list
-  let listHead = store.createBlankNode();
+  let listHead = blankNode();
   const firstNode = listHead;
   
   pathSegments.forEach((segment, index) => {
     store.addQuad(
       listHead,
       RDF('first'),
-      store.createLiteral(segment)
+      literal(segment)
     );
     
     if (index < pathSegments.length - 1) {
-      const nextNode = store.createBlankNode();
+      const nextNode = blankNode();
       store.addQuad(
         listHead,
         RDF('rest'),
