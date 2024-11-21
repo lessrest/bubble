@@ -58,7 +58,7 @@ Deno.test("HTTP Request to RDF", async (t) => {
   );
 
   await t.step(
-    "can split path using string:concatenation in reverse",
+    "can split path using string:stringSplit",
     async (step) => {
       await assertQuery(
         store,
@@ -70,10 +70,8 @@ Deno.test("HTTP Request to RDF", async (t) => {
       ?request a http:Request;
         http:path ?path .
       
-      # If we know the full path is "/api/users/123"
-      # And we know the prefix is "/api/"
-      # Then string:concatenation can find the suffix
-      ("/api/" ?suffix) string:concatenation "/api/users/123" .
+      # Split the path on "/" character
+      (?path "/") string:stringSplit ("" "api" "users" "123") .
     }`,
         step.name,
       );
