@@ -32,7 +32,9 @@ Define routes using N3 rules:
 {
   ?request http:path "/hello".
 } => {
-  ?response http:responseCode 200;
+  ?response a http:Response;
+           http:respondsTo ?request;
+           http:responseCode 200;
            http:body "Hello, World!".
 }.
 ```
