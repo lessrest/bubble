@@ -71,8 +71,6 @@ export async function assertTurtleGraph(store: Store, turtleGraph: string) {
     assertEquals(matches.length > 0, true,
       `Expected triple not found in graph:\n` +
       `${quad.subject.value} ${quad.predicate.value} ${quad.object.value}\n\n` +
-      `Actual graph contents:\n${store.getQuads().map(q => 
-        `${q.subject.value} ${q.predicate.value} ${q.object.value}`
-      ).join('\n')}`);
+      `Actual graph contents:\n${await writeN3(store.getQuads())}`);
   }
 }
