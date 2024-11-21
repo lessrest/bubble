@@ -215,58 +215,61 @@ export function withGroundFacts(facts: string): Store {
 }
 
 export function renderHTML(store: Store, subject: Term): string {
-  // Get HTML properties
-  const title =
-    store.getObjects(
-      subject,
-      DataFactory.namedNode("http://www.w3.org/1999/xhtml#title"),
+  function renderElement(element: Term): string {
+    const tagName = store.getObjects(
+      element,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
+      null,
+    )[0]?.value || "div";
+
+    const content = store.getObjects(
+      element,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#textContent"),
       null,
     )[0]?.value || "";
-  const bodyQuads = store.getQuads(
-    subject,
-    DataFactory.namedNode("http://www.w3.org/1999/xhtml#body"),
-    null,
-    null,
-  );
 
-  let bodyContent = "";
-  for (const bodyQuad of bodyQuads) {
-    if (bodyQuad.object.termType === "BlankNode") {
-      // Handle body elements
-      const element = bodyQuad.object;
-      const type =
-        store.getObjects(
-          element,
-          DataFactory.namedNode(
-            "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-          ),
-          null,
-        )[0];
-      const content =
-        store.getObjects(
-          element,
-          DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"),
-          null,
-        )[0]?.value || "";
+    const children = store.getObjects(
+      element,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#child"),
+      null,
+    );
 
-      if (type?.value === "http://www.w3.org/1999/xhtml#p") {
-        bodyContent += `<p>${content}</p>\n`;
-      }
-      // Add more element types as needed
-    }
+    const childContent = children
+      .map(child => renderElement(child))
+      .join("\n");
+
+    return `<${tagName}>${content}${childContent}</${tagName}>`;
   }
 
-  return `<!DOCTYPE html>
-<html>
-  <head>
-    <title>${title}</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-  </head>
-  <body>
-    ${bodyContent}
-  </body>
-</html>`;
+  // Get HTML document properties
+  const htmlElement = store.getObjects(
+    subject,
+    DataFactory.namedNode("http://www.w3.org/1999/xhtml#documentElement"),
+    null,
+  )[0];
+
+  if (!htmlElement) {
+    throw new Error("No html:documentElement found");
+  }
+
+  const head = store.getObjects(
+    htmlElement,
+    DataFactory.namedNode("http://www.w3.org/1999/xhtml#head"),
+    null,
+  )[0];
+
+  const body = store.getObjects(
+    htmlElement,
+    DataFactory.namedNode("http://www.w3.org/1999/xhtml#body"),
+    null,
+  )[0];
+
+  if (!head || !body) {
+    throw new Error("Document must have head and body elements");
+  }
+
+  return `<!DOCTYPE html>\n${renderElement(htmlElement)}`;
+}
 }
 
 export async function handleWithRules(

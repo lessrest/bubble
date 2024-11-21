@@ -15,11 +15,35 @@
        http:responseCode 200 ;
        http:contentType "text/html" ;
        http:body [
-           a html:page ;
-           html:title ?name ;
-           html:body [
-               a html:p ;
-               html:content ?desc 
-           ] 
+           html:documentElement [
+               html:tagName "html";
+               html:head [
+                   html:tagName "head";
+                   html:child [
+                       html:tagName "title";
+                       html:textContent ?name
+                   ];
+                   html:child [
+                       html:tagName "meta";
+                       html:attributes [
+                           html:charset "utf-8"
+                       ]
+                   ];
+                   html:child [
+                       html:tagName "meta";
+                       html:attributes [
+                           html:name "viewport";
+                           html:content "width=device-width, initial-scale=1"
+                       ]
+                   ]
+               ];
+               html:body [
+                   html:tagName "body";
+                   html:child [
+                       html:tagName "p";
+                       html:textContent ?desc
+                   ]
+               ]
+           ]
        ] .
 } .
