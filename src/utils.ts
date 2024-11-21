@@ -232,16 +232,32 @@ export function renderHTML(store: Store, subject: Term): string {
     )[0]?.value || "";
     console.log(`Content: ${content}`);
 
-    const children = store.getObjects(
+    let children = store.getObjects(
       element,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#child"),
       null,
     );
+
+    // Special handling for html element to include head and body
+    if (tagName === "html") {
+      const head = store.getObjects(
+        element,
+        DataFactory.namedNode("http://www.w3.org/1999/xhtml#head"),
+        null,
+      );
+      const body = store.getObjects(
+        element,
+        DataFactory.namedNode("http://www.w3.org/1999/xhtml#body"),
+        null,
+      );
+      children = [...head, ...body, ...children];
+    }
+
     console.log(`Found ${children.length} children`);
 
     const childContent = children
       .map((child: Term) => renderElement(child))
-      .join("\n");
+      .join("");
 
     const output = `<${tagName}>${content}${childContent}</${tagName}>`;
     console.log(`Rendered output: ${output}`);
