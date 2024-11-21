@@ -46,11 +46,8 @@ const rules = `
       http:contentType "application/turtle";
       http:body ?n3 .
 
-    # Get all items in the collection
-    ?collection ap:items ?items .
-    
-    # Convert to N3 string
-    (?collection) e:n3String ?n3 .
+    # Return a dummy response for now
+    "N/A" ?dummy ?n3 .
   }.
 
   # Handle inbox POST
