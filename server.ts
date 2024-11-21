@@ -22,7 +22,14 @@ async function handler(req: Request): Promise<Response> {
     quads.forEach((quad) => writer.addQuad(quad));
 
     return new Promise((resolve) => {
-      writer.end((error, result) => {
+      writer.end((error: Error | null, result: BodyInit | null | undefined) => {
+        if (error) {
+          console.error(error);
+          return resolve(
+            new Response("Internal Server Error", { status: 500 }),
+          );
+        }
+
         resolve(
           new Response(result, {
             headers: { "content-type": "text/turtle" },
