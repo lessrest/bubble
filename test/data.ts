@@ -1,4 +1,4 @@
-import { Schema, RDFS } from "./namespace.ts";
+import { RDFS, Schema } from "../src/namespace.ts";
 
 export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
   PREFIX rdfs: <${RDFS("").value}>
@@ -14,9 +14,9 @@ export const tomAndJerry = `PREFIX schema: <${Schema("").value}>
     schema:knows schema:Bob .`;
 
 export const typeInferenceRule = await Deno.readTextFile(
-  new URL("./rules/type-inference.n3", import.meta.url)
+  new URL("../rules/type-inference.n3", import.meta.url),
 );
 
 export const transitiveRule = await Deno.readTextFile(
-  new URL("./rules/transitive.n3", import.meta.url)
+  new URL("../rules/transitive.n3", import.meta.url),
 );

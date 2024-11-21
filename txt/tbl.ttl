@@ -1,0 +1,97 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix beer: <http://www.semanticbeer.org/ontology/> .
+@prefix review: <http://timbl.org/reviews/> .
+@prefix breweries: <http://trappists.org/breweries/> .
+
+# Classes
+beer:TrappistBeer rdf:type rdfs:Class .
+beer:Review rdf:type rdfs:Class .
+beer:Brewery rdf:type rdfs:Class .
+
+# Properties
+beer:hasABV rdf:type rdf:Property ;
+    rdfs:domain beer:TrappistBeer ;
+    rdfs:range xsd:decimal .
+
+beer:hasReview rdf:type rdf:Property ;
+    rdfs:domain beer:TrappistBeer ;
+    rdfs:range beer:Review .
+
+beer:reviewText rdf:type rdf:Property ;
+    rdfs:domain beer:Review .
+
+beer:rating rdf:type rdf:Property ;
+    rdfs:domain beer:Review ;
+    rdfs:range xsd:integer .
+
+beer:timestamp rdf:type rdf:Property ;
+    rdfs:domain beer:Review ;
+    rdfs:range xsd:dateTime .
+
+# Tim's Somewhat Wobbly Reviews
+breweries:Rochefort beer:produces [
+    rdf:type beer:TrappistBeer ;
+    rdfs:label "Rochefort 10" ;
+    beer:hasABV 11.3 ;
+    beer:hasReview [
+        rdf:type beer:Review ;
+        beer:reviewText """Absolutely brilliant! The complexity reminds me of trying to explain 
+        OWL reasoning to first-year computer science students. Notes of dark fruit, just like 
+        the dark patterns we're trying to eliminate from the web. *hic*""" ;
+        beer:rating 5 ;
+        beer:timestamp "2024-11-20T14:30:00Z"^^xsd:dateTime
+    ]
+] .
+
+breweries:Westmalle beer:produces [
+    rdf:type beer:TrappistBeer ;
+    rdfs:label "Westmalle Tripel" ;
+    beer:hasABV 9.5 ;
+    beer:hasReview [
+        rdf:type beer:Review ;
+        beer:reviewText """Much like the Semantic Web itself, this tripel is misunderstood 
+        by many but appreciated by those who take the time to understand its complexity. 
+        The foam forms a perfect directed graph structure. Is anyone else seeing these 
+        nodes float around?""" ;
+        beer:rating 5 ;
+        beer:timestamp "2024-11-20T15:15:00Z"^^xsd:dateTime
+    ]
+] .
+
+breweries:Chimay beer:produces [
+    rdf:type beer:TrappistBeer ;
+    rdfs:label "Chimay Blue" ;
+    beer:hasABV 9.0 ;
+    beer:hasReview [
+        rdf:type beer:Review ;
+        beer:reviewText """After careful consideration and multiple samples (for validation 
+        purposes), I can confirm this beer exhibits perfect data consistency. The mouthfeel 
+        is as smooth as a well-normalized database. Note to self: Must remember to normalize 
+        myself before standing up."""" ;
+        beer:rating 5 ;
+        beer:timestamp "2024-11-20T16:00:00Z"^^xsd:dateTime
+    ]
+] .
+
+breweries:Orval beer:produces [
+    rdf:type beer:TrappistBeer ;
+    rdfs:label "Orval" ;
+    beer:hasABV 6.2 ;
+    beer:hasReview [
+        rdf:type beer:Review ;
+        beer:reviewText """Unlike my attempts to get everyone to adopt RDF, this beer needs 
+        no convincing - it speaks for itself. The Brett character is as wild as trying to 
+        parse inconsistent XML in the 90s. Why is my glass making recursive calls?""" ;
+        beer:rating 5 ;
+        beer:timestamp "2024-11-20T16:45:00Z"^^xsd:dateTime
+    ]
+] .
+
+# Metadata about the reviews
+review:MetaData rdf:type rdf:Description ;
+    rdfs:comment """These reviews were conducted as part of a rigorous semantic analysis 
+    of Belgian Trappist beers. Any typos or circular reasoning can be attributed to the 
+    recursive nature of the sampling methodology. No RDF triples were harmed in the making 
+    of these reviews, though several were quite wobbly by the end.""" .

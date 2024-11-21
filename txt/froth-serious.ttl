@@ -1,0 +1,160 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix bfo: <http://purl.obolibrary.org/obo/bfo.owl#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix nt: <https://node.town/2024/> .
+
+# Core System Entities
+
+nt:Bubble
+    rdfs:subClassOf bfo:Object ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:hasDataset ;
+        owl:someValuesFrom nt:Dataset
+    ] ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:hasRuleset ;
+        owl:someValuesFrom nt:Ruleset
+    ] ;
+    rdfs:comment """An active node containing an RDF dataset and logical rules 
+    that define its reactions and capabilities."""@en .
+
+# Dataset Structure
+
+nt:Dataset
+    rdfs:subClassOf rdf:Dataset ;
+    rdfs:comment """An RDF dataset containing named graphs for different aspects 
+    of the bubble's knowledge."""@en .
+
+nt:hasDataset
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Bubble ;
+    rdfs:range nt:Dataset .
+
+nt:hasDefaultGraph
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Dataset ;
+    rdfs:range rdf:Graph .
+
+nt:hasNamedGraph
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Dataset ;
+    rdfs:range nt:NamedGraph .
+
+nt:NamedGraph
+    rdfs:subClassOf rdf:Graph ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty dct:identifier ;
+        owl:someValuesFrom xsd:anyURI
+    ] .
+
+# Rule Structure
+
+nt:Ruleset
+    rdf:type owl:Class ;
+    rdfs:comment """A collection of logical rules defining the bubble's 
+    behavior."""@en .
+
+nt:hasRuleset
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Bubble ;
+    rdfs:range nt:Ruleset .
+
+nt:Rule
+    rdf:type owl:Class ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:hasCondition ;
+        owl:someValuesFrom nt:Pattern
+    ] ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:hasAction ;
+        owl:someValuesFrom nt:Action
+    ] .
+
+nt:Pattern
+    rdf:type owl:Class ;
+    rdfs:comment """A SPARQL pattern or other logical condition that triggers 
+    a rule."""@en .
+
+nt:Action
+    rdf:type owl:Class ;
+    rdfs:comment """An operation to perform when a rule's condition is met."""@en .
+
+# Rule Types
+
+nt:ReactionRule
+    rdfs:subClassOf nt:Rule ;
+    rdfs:comment """Rules that define how the bubble responds to changes in 
+    its own or adjacent bubbles' datasets."""@en .
+
+nt:CapabilityRule
+    rdfs:subClassOf nt:Rule ;
+    rdfs:comment """Rules that define the bubble's abilities to process and 
+    transform knowledge."""@en .
+
+nt:FederationRule
+    rdfs:subClassOf nt:Rule ;
+    rdfs:comment """Rules governing how the bubble participates in larger 
+    network structures."""@en .
+
+# Bottle as Specification
+
+nt:Bottle
+    rdfs:subClassOf bfo:InformationContentEntity ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:specifiesDataset ;
+        owl:someValuesFrom nt:Dataset
+    ] ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:specifiesRuleset ;
+        owl:someValuesFrom nt:Ruleset
+    ] .
+
+nt:specifiesDataset
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Bottle ;
+    rdfs:range nt:Dataset .
+
+nt:specifiesRuleset
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Bottle ;
+    rdfs:range nt:Ruleset .
+
+# Network Structure (kept focused on core topology)
+
+nt:Froth
+    rdfs:subClassOf bfo:ObjectAggregate ;
+    rdfs:subClassOf [
+        rdf:type owl:Restriction ;
+        owl:onProperty nt:hasBubble ;
+        owl:someValuesFrom nt:Bubble
+    ] ;
+    rdfs:comment """A connected network of bubbles formed by adjacency 
+    closure."""@en .
+
+nt:adjacentTo
+    rdf:type owl:ObjectProperty ;
+    rdf:type owl:SymmetricProperty ;
+    rdfs:domain nt:Bubble ;
+    rdfs:range nt:Bubble .
+
+# Rule Execution Context
+
+nt:ExecutionContext
+    rdf:type owl:Class ;
+    rdfs:comment """The context in which rules are evaluated and 
+    executed."""@en .
+
+nt:hasExecutionContext
+    rdf:type owl:ObjectProperty ;
+    rdfs:domain nt:Rule ;
+    rdfs:range nt:ExecutionContext .

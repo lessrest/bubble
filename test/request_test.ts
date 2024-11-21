@@ -1,5 +1,5 @@
-import { assertQuery } from "./utils.ts";
-import { requestToStore } from "./request.ts";
+import { assertQuery } from "../src/utils.ts";
+import { requestToStore } from "../src/request.ts";
 
 Deno.test("HTTP Request to RDF", async (t) => {
   const request = new Request("http://example.com/api/users/123");
