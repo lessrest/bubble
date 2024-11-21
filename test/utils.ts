@@ -69,6 +69,10 @@ export async function assertTurtleGraph(store: Store, turtleGraph: string) {
   for (const quad of expectedQuads) {
     const matches = store.getQuads(quad.subject, quad.predicate, quad.object, null);
     assertEquals(matches.length > 0, true,
-      `Expected triple not found: ${quad.subject.value} ${quad.predicate.value} ${quad.object.value}`);
+      `Expected triple not found in graph:\n` +
+      `${quad.subject.value} ${quad.predicate.value} ${quad.object.value}\n\n` +
+      `Actual graph contents:\n${store.getQuads().map(q => 
+        `${q.subject.value} ${q.predicate.value} ${q.object.value}`
+      ).join('\n')}`);
   }
 }
