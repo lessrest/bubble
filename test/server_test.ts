@@ -29,11 +29,11 @@ Deno.test("Server Routes", async (t) => {
     await assertQuery(
       store,
       `
-      { ?collection a as:Collection. 
-        ?collection rdfs:label "Inbox" .
+      { ?collection a as:Collection;
+          as:items ?item .
       }
     `,
-      "a collection labeled 'Inbox'",
+      "collection has an item",
     );
   });
 
