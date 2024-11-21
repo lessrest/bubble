@@ -66,4 +66,71 @@ Deno.test("Rules-based Request Handler", async (t) => {
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "API Request");
   });
+
+  await t.step("handles multiple possible responses", async () => {
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      
+      {
+        ?request http:path "/multi".
+      } => {
+        ?response1 a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 200;
+          http:body "First response".
+
+        ?response2 a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 201;
+          http:body "Second response".
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/multi");
+    const res = await handleWithRules(req, rules);
+    
+    // Should use the first matching response
+    assertEquals(res.status, 200);
+    assertEquals(await res.text(), "First response");
+  });
+
+  await t.step("handles missing response code", async () => {
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      
+      {
+        ?request http:path "/incomplete".
+      } => {
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:body "Missing status code".
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/incomplete");
+    const res = await handleWithRules(req, rules);
+    
+    assertEquals(res.status, 500);
+    assertEquals(await res.text(), "Response missing status code");
+  });
+
+  await t.step("handles missing response body", async () => {
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      
+      {
+        ?request http:path "/nobody".
+      } => {
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 204.
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/nobody");
+    const res = await handleWithRules(req, rules);
+    
+    assertEquals(res.status, 204);
+    assertEquals(await res.text(), "");
+  });
 });
