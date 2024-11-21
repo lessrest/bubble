@@ -62,4 +62,18 @@ _:request a http:Request;
 - Implement outbox and activity distribution
 - Build more complex routing patterns
 
+### Latest Achievement: RDF Graph Responses
+We've successfully implemented the ability to return RDF graph responses from our HTTP handlers. The server can now:
+- Return complete RDF graphs as responses
+- Use N3 rules to construct response graphs
+- Validate response graphs with SPARQL-like queries in tests
+- Return proper Content-Type headers for Turtle
+
+This is demonstrated in our new test case that verifies an inbox GET returns a proper ActivityStreams Collection:
+
+```turtle
+</users/alice/inbox> a as:Collection;
+   rdfs:label "Inbox".
+```
+
 The framework is evolving into a powerful platform for building semantic web applications with clean separation of concerns and declarative behavior specification.
