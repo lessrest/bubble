@@ -28,7 +28,10 @@ Define routes using N3 rules:
 
 ```n3
 @prefix http: <http://www.w3.org/2011/http#>.
+@prefix as: <http://www.w3.org/ns/activitystreams#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 
+# Return plain text
 {
   ?request http:path "/hello".
 } => {
@@ -36,6 +39,20 @@ Define routes using N3 rules:
            http:respondsTo ?request;
            http:responseCode 200;
            http:body "Hello, World!".
+}.
+
+# Return RDF graph as Turtle
+{
+  ?request http:path "/collection".
+} => {
+  ?response a http:Response;
+           http:respondsTo ?request;
+           http:responseCode 200;
+           http:contentType "application/turtle";
+           http:body {
+             </collection> a as:Collection;
+               rdfs:label "Example Collection".
+           }.
 }.
 ```
 
