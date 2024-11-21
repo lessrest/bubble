@@ -201,33 +201,3 @@ export async function handleWithRules(
   
   return new Response(body, { status: statusCode });
 }
-  const result = await n3reasoner(
-    await writeN3(store.getQuads()) + "\n" + query,
-    undefined,
-    {
-      output: "deductive_closure",
-    },
-  );
-  const resultStore = new N3.Store();
-  const parser = new N3.Parser({ format: "text/n3" });
-  const resultQuads = parser.parse(result);
-  resultStore.addQuads(resultQuads);
-
-  const successQuads = resultStore.getQuads(
-    null,
-    DataFactory.namedNode("http://example.org/test#message"),
-    DataFactory.literal(expectedMessage),
-    null,
-  );
-
-  assertEquals(
-    successQuads.length > 0,
-    true,
-    `N3 query failed to match expected pattern.
-Actual graph contents:
-
-${await writeN3(
-      store.getQuads(),
-    )}`,
-  );
-}
