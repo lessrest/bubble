@@ -30,7 +30,7 @@ Define an ActivityPub-compatible inbox using N3 rules:
 @prefix http: <http://www.w3.org/2011/http#>.
 @prefix as: <http://www.w3.org/ns/activitystreams#>.
 
-# GET inbox - return collection
+# GET inbox - return collection and its items
 {
   ?request http:href ?collection;
           http:method "GET" .
@@ -42,6 +42,19 @@ Define an ActivityPub-compatible inbox using N3 rules:
     http:responseCode 200;
     http:contentType "application/turtle";
     http:body { ?collection a as:Collection } .
+}.
+
+# Return any items in the collection
+{
+  ?request http:href ?collection;
+    http:method "GET" .
+  
+  ?response a http:Response ;
+    http:respondsTo ?request .
+
+  ?collection ap:items ?item .
+} => {
+  ?response http:body { ?collection ap:items ?item } .
 }.
 
 # POST note to inbox
