@@ -4,7 +4,7 @@ import { parseRDF, applyRules, assertTriple, assertTriples, assertTurtleGraph } 
 import { tomAndJerry, transitiveRule, typeInferenceRule } from "./test/data.ts";
 import { RDF, Schema } from "./test/namespace.ts";
 
-Deno.test("Basic Tom and Jerry RDF", async (t) => {
+Deno.test("RDF Parser", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   
   await t.step("should parse correct number of triples", () => {
@@ -26,7 +26,7 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   });
 });
 
-Deno.test("Pet Classifications with Reasoning", async (t) => {
+Deno.test("RDFS Subclass Inference", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, typeInferenceRule);
   
@@ -39,7 +39,7 @@ Deno.test("Pet Classifications with Reasoning", async (t) => {
   });
 });
 
-Deno.test("RDF without transitive rules", async (t) => {
+Deno.test("No Inference Without Rules", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = new N3.Store();
   store.addQuads(quads);
@@ -56,7 +56,7 @@ Deno.test("RDF without transitive rules", async (t) => {
   });
 });
 
-Deno.test("Transitive Reasoning with N3 Rules", async (t) => {
+Deno.test("Transitive Inference", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, transitiveRule);
   
