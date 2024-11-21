@@ -13,21 +13,20 @@ Deno.test("HTML Endpoints", async (t) => {
 
   await t.step("server root returns HTML homepage", async () => {
     const req = new Request("http://localhost:8000/");
-    const res = await handleWithRules(req, await Deno.readTextFile("./rules/html.n3"), withGroundFacts(facts));
+    const res = await handleWithRules(
+      req,
+      await Deno.readTextFile("./rules/html.n3"),
+      withGroundFacts(facts),
+    );
 
     assertEquals(res.status, 200);
     assertEquals(res.headers.get("Content-Type"), "text/html");
-    
+
     const body = await res.text();
     assertEquals(
-      body.includes("<title>Test Site</title>"),
-      true,
-      "Homepage should include site title"
-    );
-    assertEquals(
-      body.includes("<p>A test website</p>"),
-      true,
-      "Homepage should include site description"
+      body,
+      "<!DOCTYPE html>\n<html><head><title>Test Site</title></head><body><p>A test website</p></body></html>",
+      "Homepage should include site title",
     );
   });
 
@@ -43,80 +42,80 @@ Deno.test("HTML Endpoints", async (t) => {
     store.addQuad(
       doc,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#documentElement"),
-      html
+      html,
     );
 
     store.addQuad(
       html,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      DataFactory.literal("html")
+      DataFactory.literal("html"),
     );
 
     store.addQuad(
       html,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#head"),
-      head
+      head,
     );
 
     store.addQuad(
       head,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      DataFactory.literal("head")
+      DataFactory.literal("head"),
     );
 
     store.addQuad(
       head,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#child"),
-      title
+      title,
     );
 
     store.addQuad(
       title,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      DataFactory.literal("title")
+      DataFactory.literal("title"),
     );
 
     store.addQuad(
       title,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#textContent"),
-      DataFactory.literal("Test Page")
+      DataFactory.literal("Test Page"),
     );
 
     store.addQuad(
       html,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#body"),
-      body
+      body,
     );
 
     store.addQuad(
       body,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      DataFactory.literal("body")
+      DataFactory.literal("body"),
     );
 
     store.addQuad(
       body,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#child"),
-      p
+      p,
     );
 
     store.addQuad(
       p,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      DataFactory.literal("p")
+      DataFactory.literal("p"),
     );
 
     store.addQuad(
       p,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#textContent"),
-      DataFactory.literal("Hello World")
+      DataFactory.literal("Hello World"),
     );
 
     const html_output = renderHTML(store, doc);
     assertEquals(
       html_output,
       `<!DOCTYPE html>
-<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>`
+<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>`,
     );
   });
 });

@@ -216,30 +216,39 @@ export function withGroundFacts(facts: string): Store {
 
 export function renderHTML(store: Store, subject: Term): string {
   function renderElement(element: Term): string {
+    console.log(`Rendering element: ${element.value}`);
+
     const tagName = store.getObjects(
       element,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
       null,
     )[0]?.value || "div";
+    console.log(`Tag name: ${tagName}`);
 
     const content = store.getObjects(
       element,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#textContent"),
       null,
     )[0]?.value || "";
+    console.log(`Content: ${content}`);
 
     const children = store.getObjects(
       element,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#child"),
       null,
     );
+    console.log(`Found ${children.length} children`);
 
     const childContent = children
       .map((child: Term) => renderElement(child))
       .join("\n");
 
-    return `<${tagName}>${content}${childContent}</${tagName}>`;
+    const output = `<${tagName}>${content}${childContent}</${tagName}>`;
+    console.log(`Rendered output: ${output}`);
+    return output;
   }
+
+  console.log(`Rendering HTML for subject: ${subject.value}`);
 
   // Get HTML document properties
   const htmlElement = store.getObjects(
@@ -249,6 +258,7 @@ export function renderHTML(store: Store, subject: Term): string {
   )[0];
 
   if (!htmlElement) {
+    console.error("No html:documentElement found");
     throw new Error("No html:documentElement found");
   }
 
@@ -265,10 +275,16 @@ export function renderHTML(store: Store, subject: Term): string {
   )[0];
 
   if (!head || !body) {
+    console.error("Missing head or body element", {
+      head: !!head,
+      body: !!body,
+    });
     throw new Error("Document must have head and body elements");
   }
 
-  return `<!DOCTYPE html>\n${renderElement(htmlElement)}`;
+  const result = `<!DOCTYPE html>\n${renderElement(htmlElement)}`;
+  console.log("Final HTML output:", result);
+  return result;
 }
 
 export async function handleWithRules(
