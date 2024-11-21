@@ -1,5 +1,6 @@
 import N3, { DataFactory, Store } from "n3";
 import { Quad } from "@rdfjs/types";
+import { HTTP } from "./namespace.ts";
 import { renderHTML } from "./html.ts";
 import { CommandLineReasoner } from "./reasoning.ts";
 import { writeN3 } from "./utils.ts";
@@ -117,7 +118,7 @@ export async function handleWithRules(
 
   // Content-Type
   const contentTypeQuads = resultStore.getQuads(
-    responseQuads[0].subject,
+    response,
     DataFactory.namedNode("http://www.w3.org/2011/http#contentType"),
     null,
     null,
