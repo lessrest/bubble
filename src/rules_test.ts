@@ -40,7 +40,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/wrong-path");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 404);
   });
@@ -62,7 +62,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/api/users");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "API Request");
@@ -88,7 +88,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/multi");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     // Should use the first matching response
     assertEquals(res.status, 200);
@@ -109,7 +109,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/incomplete");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 500);
     assertEquals(await res.text(), "Response missing status code");
@@ -129,7 +129,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/nobody");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 204);
     assertEquals(await res.text(), "");
@@ -149,7 +149,7 @@ Deno.test("Rules-based Request Handler", async (t) => {
     `;
 
     const req = new Request("http://localhost:8000/nobody");
-    const res = await handleWithRules(req, rules);
+    const res = await handleWithRules(req, [rules]);
 
     assertEquals(res.status, 204);
     assertEquals(await res.text(), "");
