@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { Quad, Term } from "@rdfjs/types";
 import N3, { DataFactory } from "n3";
 import { CommandLineReasoner } from "./reasoning.ts";
-import { ACTIVITY_STREAMS, EXAMPLE, HTTP, Schema } from "./namespace.ts";
+import { ACTIVITY_STREAMS, EXAMPLE, HTTP, RDF, Schema } from "./namespace.ts";
 import { Store } from "n3";
 
 export async function parseRDF(input: string): Promise<Quad[]> {
