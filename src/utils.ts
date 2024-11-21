@@ -215,21 +215,35 @@ export function withGroundFacts(facts: string): Store {
 }
 
 export async function renderHTML(store: Store, subject: Term): Promise<string> {
+  console.log("Rendering HTML for subject:", subject.value);
+
   // Check if this is an HTML element
   const isElement = store.getQuads(
     subject,
     DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
     DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
-    null
+    null,
   ).length > 0;
+
+  const isText = store.getQuads(
+    subject,
+    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+    DataFactory.namedNode("http://www.w3.org/1999/xhtml#text"),
+    null,
+  ).length > 0;
+
+  console.log("Subject is element:", isElement);
+  console.log("Subject is text:", isText);
 
   if (isElement) {
     // Get tag name
     const tagName = store.getObjects(
       subject,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      null
+      null,
     )[0]?.value;
+
+    console.log("Tag name:", tagName);
 
     if (!tagName) {
       throw new Error("HTML element missing tagName");
@@ -239,19 +253,29 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
     const childrenList = store.getObjects(
       subject,
       DataFactory.namedNode("http://www.w3.org/1999/xhtml#children"),
-      null
+      null,
     )[0];
 
+    console.log("Children list:", childrenList?.value);
+
     let innerHTML = "";
-    
+
     if (childrenList) {
       // Handle both literal children and nested elements
       const children = store.getQuads(childrenList, null, null, null);
+      console.log("Number of child quads:", children.length);
+
       for (const child of children) {
-        if (child.predicate.value.includes("first") || child.predicate.value.includes("rest")) {
+        console.log("Processing child:", child.predicate.value);
+        if (
+          child.predicate.value.includes("first") ||
+          child.predicate.value.includes("rest")
+        ) {
           if (child.object.termType === "Literal") {
+            console.log("Adding literal child:", child.object.value);
             innerHTML += child.object.value;
           } else {
+            console.log("Recursively rendering child:", child.object.value);
             innerHTML += await renderHTML(store, child.object);
           }
         }
@@ -260,11 +284,21 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
 
     // Special case for document
     if (tagName === "html") {
+      console.log("Rendering complete HTML document");
       return `<!doctype html>\n${innerHTML}`;
     }
 
     // Regular elements
+    console.log(`Rendering ${tagName} element with innerHTML:`, innerHTML);
     return `<${tagName}>${innerHTML}</${tagName}>`;
+  } else if (isText) {
+    // find content
+    const content = store.getObjects(
+      subject,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"),
+      null,
+    )[0]?.value;
+    return content ?? "";
   }
 
   // Check for direct outerHTML (fallback)
@@ -274,10 +308,17 @@ export async function renderHTML(store: Store, subject: Term): Promise<string> {
     null,
   )[0]?.value;
 
+  // is this just nil?
+  if (subject.value === "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil") {
+    return "";
+  }
+
   if (outerHTML) {
+    console.log("Using outerHTML fallback:", outerHTML);
     return outerHTML;
   }
 
+  console.error("Failed to render HTML for subject:", subject.value);
   throw new Error("Subject is neither an HTML element nor has outerHTML");
 }
 
@@ -385,9 +426,9 @@ export async function handleWithRules(
         ).length > 0;
 
         if (isHtmlPage) {
-          // console.log(
-          //   `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
-          // );
+          console.log(
+            `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
+          );
           body = await renderHTML(resultStore, bodyQuad.object);
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"
