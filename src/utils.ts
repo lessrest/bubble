@@ -157,6 +157,13 @@ export function requestToStore(request: Request): Store {
   return store;
 }
 
+export function withGroundFacts(facts: string): Store {
+  const store = new N3.Store();
+  const parser = new N3.Parser();
+  store.addQuads(parser.parse(facts));
+  return store;
+}
+
 export async function handleWithRules(
   request: Request,
   rules: string,
