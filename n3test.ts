@@ -26,7 +26,7 @@ Deno.test("Basic Tom and Jerry RDF", async (t) => {
   });
 });
 
-Deno.test("Character and Pet Classifications with Reasoning", async (t) => {
+Deno.test("Pet Classifications with Reasoning", async (t) => {
   const quads = await parseRDF(tomAndJerry);
   const store = await applyRules(quads, typeInferenceRule);
   
