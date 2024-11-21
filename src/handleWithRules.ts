@@ -5,7 +5,7 @@ import { renderHTML } from "./html.ts";
 import { CommandLineReasoner } from "./reasoning.ts";
 import { writeN3 } from "./utils.ts";
 import { requestToStore } from "./requestToStore.ts";
-import { findSubject, getResponseData } from "./rdfUtils.ts";
+import { getResponseData } from "./rdfUtils.ts";
 
 export async function handleWithRules(
   request: Request,
@@ -27,6 +27,8 @@ export async function handleWithRules(
   const n3Input = await writeN3(store.getQuads());
   const result = await reasoner.reason([n3Input, ...rules]);
 
+  console.log(result);
+
   // Parse the results
   if (!resultStore) {
     resultStore = new N3.Store();
@@ -36,13 +38,14 @@ export async function handleWithRules(
   const resultQuads = parser.parse(result) as Quad[];
   resultStore.addQuads(resultQuads);
 
-  const requestNode = findSubject(resultStore, "http://www.w3.org/2011/http#Request");
-  if (!requestNode) {
-    return new Response("Request not found in result", { status: 500 });
-  }
+  const requestNode = DataFactory.namedNode(requestIri);
+  const {
+    response,
+    statusCode,
+    body: initialBody,
+    contentType: responseContentType,
+  } = getResponseData(resultStore, requestNode);
 
-  const { response, statusCode, body: initialBody, contentType: responseContentType } = getResponseData(resultStore, requestNode);
-  
   if (!response) {
     return new Response("Not Found", { status: 404 });
   }
@@ -51,13 +54,13 @@ export async function handleWithRules(
     return new Response("Response missing status code", { status: 500 });
   }
 
-  let body = initialBody;
+  let body = "";
 
   const bodyQuads = resultStore.getQuads(
     response,
     HTTP("body"),
     null,
-    null
+    null,
   );
 
   if (bodyQuads.length > 0) {
@@ -68,7 +71,9 @@ export async function handleWithRules(
         bodyStore.addQuad(bodyQuad.object);
       } else if (bodyQuad.object.termType === "Literal") {
         // For literals, concatenate their values
+        console.log(`Adding literal: ${bodyQuad.object.value}`);
         body = (body ?? "") + bodyQuad.object.value;
+        console.log(`Body is now: ${body}`);
       } else if (
         bodyQuad.object.termType === "BlankNode" ||
         bodyQuad.object.termType === "NamedNode"
@@ -112,6 +117,7 @@ export async function handleWithRules(
 
     // If we collected any quads, serialize them
     if (bodyStore.size > 0) {
+      console.log(`Adding body: ${await writeN3(bodyStore.getQuads())}`);
       body = (body ?? "") + await writeN3(bodyStore.getQuads());
     }
   }
@@ -128,7 +134,7 @@ export async function handleWithRules(
     ? contentTypeQuads[0].object.value
     : "text/plain";
 
-  return new Response(body, {
+  return new Response(body || null, {
     status: statusCode,
     headers: { "Content-Type": finalContentType },
   });
