@@ -242,8 +242,10 @@ export async function handleWithRules(
     resultStore = new N3.Store();
   }
 
-  const parser = new N3.Parser({ format: "text/n3-star" });
-  const resultQuads = parser.parse(result);
+  const parser = new N3.Parser({ format: "text/n3" });
+
+  const resultQuads = parser.parse(result) as Quad[];
+
   resultStore.addQuads(resultQuads);
 
   // Find request node
@@ -300,8 +302,23 @@ export async function handleWithRules(
       body = await writeN3([bodyQuads[0].object]);
     } else if (bodyQuads[0].object.termType === "Literal") {
       body = bodyQuads[0].object.value;
+    } else if (bodyQuads[0].object.termType === "BlankNode") {
+      const subgraph = resultStore.getQuads(
+        null,
+        null,
+        null,
+        `_:${bodyQuads[0].object.value}`,
+      ) as Quad[];
+      const bodyStore = new N3.Store();
+      for (const quad of subgraph) {
+        bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
+      }
+      body = await writeN3(bodyStore.getQuads());
     } else {
-      throw new Error("Unsupported body type", { cause: bodyQuads[0].object });
+      console.log(
+        await writeN3(resultQuads),
+      );
+      throw new Error(`Unsupported body type: ${bodyQuads[0].object.termType}`);
     }
   }
 

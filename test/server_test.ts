@@ -26,6 +26,14 @@ Deno.test("Server Routes", async (t) => {
     const store = new N3.Store();
     await store.addQuads(result);
 
-    assertQuery(store, "{ ?collection a as:Collection. }", "a collection");
+    await assertQuery(
+      store,
+      `
+      { ?collection a as:Collection. 
+        ?collection rdfs:label "Inbox" .
+      }
+    `,
+      "a collection labeled 'Inbox'",
+    );
   });
 });

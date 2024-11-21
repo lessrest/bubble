@@ -29,6 +29,7 @@ ex:Jerry a schema:Character;
 const rules = `
   @prefix http: <http://www.w3.org/2011/http#>.
   @prefix ap: <http://www.w3.org/ns/activitystreams#>.
+  @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
   @prefix string: <http://www.w3.org/2000/10/swap/string#>.
   @prefix e: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
   @prefix log: <http://www.w3.org/2000/10/swap/log#>.
@@ -44,7 +45,10 @@ const rules = `
       http:respondsTo ?request;
       http:responseCode 200;
       http:contentType "application/turtle";
-      http:body << ?collection a ap:Collection >> .
+      http:body {
+        ?collection a ap:Collection .
+        ?collection rdfs:label "Inbox" .
+      } .
   }.
 
   # Handle inbox POST
