@@ -16,18 +16,52 @@
    ?site html:representation [
        a html:element ;
        html:tagName "html" ;
-       html:children ( [
+       html:children ( 
+         [
            a html:element ;
            html:tagName "head" ;
-           html:children ( [
+           html:children ( 
+             [
                a html:element ;
                html:tagName "title" ;
                html:children ( [
                    a html:text ;
                    html:content ?name 
-               ] ) 
-           ] ) 
-       ] ) 
+               ] )
+             ]
+             [
+               a html:element ;
+               html:tagName "meta" ;
+               html:attributes [
+                 html:name "charset" ;
+                 html:value "utf-8"
+               ]
+             ]
+             [
+               a html:element ;
+               html:tagName "meta" ;
+               html:attributes [
+                 html:name "viewport" ;
+                 html:value "width=device-width, initial-scale=1"
+               ]
+             ]
+           )
+         ]
+         [
+           a html:element ;
+           html:tagName "body" ;
+           html:children (
+             [
+               a html:element ;
+               html:tagName "p" ;
+               html:children ( [
+                   a html:text ;
+                   html:content ?desc
+               ] )
+             ]
+           )
+         ]
+       )
    ] .
 } .
 
