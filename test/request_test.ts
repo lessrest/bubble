@@ -1,7 +1,8 @@
 import { assertEquals } from "@std/assert";
-import { assertTurtleGraph } from "./utils.ts";
+import { assertTurtleGraph, writeN3 } from "./utils.ts";
 import { Schema } from "./namespace.ts";
 import N3 from "n3";
+import { n3reasoner } from "eyereasoner";
 
 import { HTTP, RDF } from "./namespace.ts";
 import { DataFactory } from "n3";
