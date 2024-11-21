@@ -32,12 +32,12 @@ Deno.test("Character and Pet Classifications with Reasoning", async (t) => {
   
   await t.step("should infer all animals as both Characters and Pets through subclass reasoning", () => {
     assertTriples(store, [
-      [Schema.Tom, RDF.type, Schema.Pet],
-      [Schema.Tom, RDF.type, Schema.Character],
-      [Schema.Jerry, RDF.type, Schema.Pet],
-      [Schema.Jerry, RDF.type, Schema.Character],
-      [Schema.Spike, RDF.type, Schema.Pet],
-      [Schema.Spike, RDF.type, Schema.Character]
+      [Schema.Alice, RDF.type, Schema.Pet],
+      [Schema.Alice, RDF.type, Schema.Character],
+      [Schema.Bobby, RDF.type, Schema.Pet],
+      [Schema.Bobby, RDF.type, Schema.Character],
+      [Schema.Carol, RDF.type, Schema.Pet],
+      [Schema.Carol, RDF.type, Schema.Character]
     ]);
   });
 });
