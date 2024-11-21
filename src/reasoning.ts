@@ -2,8 +2,7 @@ import { Quad } from "@rdfjs/types";
 
 export interface Reasoner {
   reason(
-    data: string,
-    rules: string,
+    inputs: string[],
     options?: ReasonerOptions,
   ): Promise<string>;
 }
@@ -14,29 +13,29 @@ export interface ReasonerOptions {
 
 export class WebAssemblyReasoner implements Reasoner {
   async reason(
-    data: string,
-    rules: string,
+    inputs: string[],
     options?: ReasonerOptions,
   ): Promise<string> {
     const { n3reasoner } = await import("eyereasoner");
     const query = options?.query;
-    return n3reasoner(data + "\n" + rules, query, options);
+    return n3reasoner(inputs.join("\n"), query, options);
   }
 }
 
 export class CommandLineReasoner implements Reasoner {
   async reason(
-    data: string,
-    rules: string,
+    inputs: string[],
     options?: ReasonerOptions,
   ): Promise<string> {
-    // Write data and rules to temporary files
-    const dataFile = await Deno.makeTempFile({ suffix: ".n3" });
-    const rulesFile = await Deno.makeTempFile({ suffix: ".n3" });
+    // Write inputs to temporary files
+    const inputFiles = await Promise.all(
+      inputs.map(() => Deno.makeTempFile({ suffix: ".n3" }))
+    );
     const queryFile = await Deno.makeTempFile({ suffix: ".n3" });
 
-    await Deno.writeTextFile(dataFile, data);
-    await Deno.writeTextFile(rulesFile, rules);
+    await Promise.all(
+      inputs.map((input, i) => Deno.writeTextFile(inputFiles[i], input))
+    );
     if (options?.query) {
       await Deno.writeTextFile(queryFile, options.query);
     }
@@ -62,8 +61,7 @@ export class CommandLineReasoner implements Reasoner {
           // "--rdf-list-output",
           "--quiet",
           "--nope",
-          dataFile,
-          rulesFile,
+          ...inputFiles,
           ...(options?.query ? ["--query", queryFile] : []),
         ],
       });
@@ -81,8 +79,7 @@ export class CommandLineReasoner implements Reasoner {
       return result;
     } finally {
       // Cleanup temp files
-      await Deno.remove(dataFile);
-      await Deno.remove(rulesFile);
+      await Promise.all(inputFiles.map(file => Deno.remove(file)));
     }
   }
 }

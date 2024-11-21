@@ -21,7 +21,7 @@ Deno.test("WebAssembly Reasoner", async (t) => {
   const reasoner = new WebAssemblyReasoner();
 
   await t.step("applies transitive rules", async () => {
-    const result = await reasoner.reason(TEST_DATA, TEST_RULES);
+    const result = await reasoner.reason([TEST_DATA, TEST_RULES]);
     assertTrue(result.includes(":alice :knows :charlie"));
   });
 });
@@ -30,7 +30,7 @@ Deno.test("CommandLine Reasoner", async (t) => {
   const reasoner = new CommandLineReasoner();
 
   await t.step("applies transitive rules", async () => {
-    const result = await reasoner.reason(TEST_DATA, TEST_RULES);
+    const result = await reasoner.reason([TEST_DATA, TEST_RULES]);
     assertTrue(result.includes(":alice :knows :charlie"));
   });
 });
