@@ -154,6 +154,13 @@ export function requestToStore(request: Request): Store {
     DataFactory.literal(url.pathname)
   );
 
+  // Add method
+  store.addQuad(
+    requestNode,
+    DataFactory.namedNode('http://www.w3.org/2011/http#method'),
+    DataFactory.literal(request.method)
+  );
+
   return store;
 }
 

@@ -62,6 +62,14 @@ Added a Deno web server that:
   - /data - The RDF dataset in Turtle format
 # Development Journal
 
+## 2024-11-21: ActivityPub Inbox Handler Development
+
+Starting work on ActivityPub support:
+- Planning inbox POST request handling using N3 rules
+- Will implement basic Activity handling for a simple actor
+- Using semantic rules to process incoming Activities
+- Goal is to demonstrate ActivityPub server capabilities using N3 reasoning
+
 ## 2024-11-21: N3 Rules-Based Request Handler
 
 Successfully implemented and tested a rules-based HTTP request handler that uses N3 reasoning to determine responses. The handler can:

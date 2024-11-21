@@ -182,4 +182,51 @@ Deno.test("Rules-based Request Handler", async (t) => {
     assertEquals(res.status, 200);
     assertEquals(await res.text(), "Hola!");
   });
+
+  await t.step("handles ActivityPub inbox POST", async () => {
+    const facts = `
+      @prefix ap: <http://www.w3.org/ns/activitystreams#>.
+      @prefix ex: <http://example.org/>.
+      
+      ex:alice a ap:Person;
+        ap:inbox </users/alice/inbox>.
+    `;
+
+    const rules = `
+      @prefix http: <http://www.w3.org/2011/http#>.
+      @prefix ap: <http://www.w3.org/ns/activitystreams#>.
+      @prefix ex: <http://example.org/>.
+      
+      {
+        ?request http:path "/users/alice/inbox";
+                http:method "POST".
+      } => {
+        ?response a http:Response;
+          http:respondsTo ?request;
+          http:responseCode 201;
+          http:body "Activity accepted".
+      }.
+    `;
+
+    const req = new Request("http://localhost:8000/users/alice/inbox", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/activity+json"
+      },
+      body: JSON.stringify({
+        "@context": "https://www.w3.org/ns/activitystreams",
+        "type": "Create",
+        "actor": "https://other.example/bob",
+        "object": {
+          "type": "Note",
+          "content": "Hello Alice!"
+        }
+      })
+    });
+
+    const res = await handleWithRules(req, rules, withGroundFacts(facts));
+    
+    assertEquals(res.status, 201);
+    assertEquals(await res.text(), "Activity accepted");
+  });
 });
