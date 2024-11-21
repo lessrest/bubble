@@ -40,7 +40,8 @@ export async function applyRules(
   store.addQuads(data);
 
   const n3Data = await writeN3(data);
-  const result = await n3reasoner(`${n3Data}\n${rules}`, undefined);
+  const reasoner = new CommandLineReasoner();
+  const result = await reasoner.reason(`${n3Data}\n${rules}`);
 
   const parser = new N3.Parser({ format: "text/n3" });
   const resultQuads = parser.parse(result) as Quad[];
@@ -108,12 +109,11 @@ export async function assertN3Query(
   query: string,
   expectedMessage: string,
 ): Promise<void> {
-  const result = await n3reasoner(
+  const reasoner = new CommandLineReasoner();
+  const result = await reasoner.reason(
     await writeN3(store.getQuads()) + "\n" + query,
-    undefined,
-    {
-      output: "deductive_closure",
-    },
+    "",
+    { output: "deductive_closure" }
   );
   const resultStore = new N3.Store();
   const parser = new N3.Parser({ format: "text/n3" });
