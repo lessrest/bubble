@@ -22,6 +22,37 @@ deno task test
 deno task serve
 ```
 
+When you start the server, it exposes a simple ActivityPub inbox implementation at `http://localhost:8000/users/alice/inbox`. This endpoint is defined using ground facts in `server.ts` that establish the basic ActivityPub data structure:
+
+```n3
+@base <http://localhost:8000/>.
+@prefix ap: <http://www.w3.org/ns/activitystreams#>.
+
+</users/alice> a ap:Person;
+  ap:inbox </users/alice/inbox>.
+
+</users/alice/inbox> a ap:Collection.
+```
+
+The `@base` directive sets the base IRI to resolve relative paths, so `/users/alice/inbox` becomes `http://localhost:8000/users/alice/inbox`. This inbox is defined as an ActivityStreams Collection that can:
+
+- Accept POST requests with new ActivityPub Notes
+- Return the collection contents via GET requests
+- Maintain the collection items between requests
+
+You can test it with curl:
+
+```bash
+# Get the inbox contents
+curl http://localhost:8000/users/alice/inbox
+
+# Post a new Note
+curl -X POST -H "Content-Type: application/turtle" \
+  -d '@prefix as: <http://www.w3.org/ns/activitystreams#>. 
+      <#body> a as:Note; as:content "Hello Alice!".' \
+  http://localhost:8000/users/alice/inbox
+```
+
 ## Example: ActivityPub Inbox with N3 Rules
 
 This example shows how to implement an ActivityPub inbox using N3 rules. N3 rules are logical implications of the form:

@@ -68,12 +68,31 @@ We've successfully implemented a working ActivityPub inbox with full test covera
 - POST Note to inbox stores the activity
 - GET inbox after POST shows the new item in the collection
 
-The test suite now verifies this complete flow:
+The server initializes with ground facts that define the basic ActivityPub structure using N3's base IRI feature:
+
+```n3
+@base <http://localhost:8000/>.
+@prefix ap: <http://www.w3.org/ns/activitystreams#>.
+
+</users/alice> a ap:Person;
+  ap:inbox </users/alice/inbox>.
+
+</users/alice/inbox> a ap:Collection.
+```
+
+This establishes:
+1. A base IRI of http://localhost:8000/
+2. An ActivityPub Person (Alice)
+3. An inbox Collection for Alice at /users/alice/inbox
+
+The test suite verifies this complete flow:
 ```typescript
 // 1. GET empty inbox - verifies Collection exists
 // 2. POST Note to inbox - returns 201 Created
 // 3. GET inbox again - verifies Note was added as an item
 ```
+
+The base IRI handling means we can use relative paths in our N3 rules while still having them resolve correctly to full HTTP URLs. This makes the rules more portable since they don't hardcode the server domain.
 
 This demonstrates our N3 rules correctly handling both GET and POST operations while maintaining collection state between requests. The framework is evolving into a powerful platform for building federated social applications with clean separation of concerns and declarative behavior specification.
 
