@@ -214,112 +214,96 @@ export function withGroundFacts(facts: string): Store {
   return store;
 }
 
-export async function renderHTML(store: Store, subject: Term): Promise<string> {
-  console.log("Rendering HTML for subject:", subject.value);
+// HTML namespace constants
+const HTML = {
+  element: DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
+  text: DataFactory.namedNode("http://www.w3.org/1999/xhtml#text"),
+  tagName: DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
+  children: DataFactory.namedNode("http://www.w3.org/1999/xhtml#children"),
+  content: DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"),
+  outerHTML: DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
+};
 
-  // Check if this is an HTML element
-  const isElement = store.getQuads(
-    subject,
-    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
-    DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
-    null,
-  ).length > 0;
+interface HTMLNode {
+  type: "element" | "text" | "list";
+  tagName?: string;
+  content?: string;
+  children?: Term[];
+}
 
-  const isText = store.getQuads(
-    subject,
-    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
-    DataFactory.namedNode("http://www.w3.org/1999/xhtml#text"),
-    null,
-  ).length > 0;
-
-  console.log("Subject is element:", isElement);
-  console.log("Subject is text:", isText);
+function getNodeType(store: Store, subject: Term): HTMLNode {
+  const isElement = store.getQuads(subject, RDF("type"), HTML.element, null).length > 0;
+  const isText = store.getQuads(subject, RDF("type"), HTML.text, null).length > 0;
 
   if (isElement) {
-    // Get tag name
-    const tagName = store.getObjects(
-      subject,
-      DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
-      null,
-    )[0]?.value;
+    const tagName = store.getObjects(subject, HTML.tagName, null)[0]?.value;
+    if (!tagName) throw new Error("HTML element missing tagName");
 
-    console.log("Tag name:", tagName);
+    const childrenList = store.getObjects(subject, HTML.children, null)[0];
+    const children = childrenList ? getRDFList(store, childrenList) : [];
 
-    if (!tagName) {
-      throw new Error("HTML element missing tagName");
-    }
-
-    // Get children if any
-    const childrenList = store.getObjects(
-      subject,
-      DataFactory.namedNode("http://www.w3.org/1999/xhtml#children"),
-      null,
-    )[0];
-
-    console.log("Children list:", childrenList?.value);
-
-    let innerHTML = "";
-
-    if (childrenList) {
-      // Handle both literal children and nested elements
-      const children = store.getQuads(childrenList, null, null, null);
-      console.log("Number of child quads:", children.length);
-
-      for (const child of children) {
-        console.log("Processing child:", child.predicate.value);
-        if (
-          child.predicate.value.includes("first") ||
-          child.predicate.value.includes("rest")
-        ) {
-          if (child.object.termType === "Literal") {
-            console.log("Adding literal child:", child.object.value);
-            innerHTML += child.object.value;
-          } else {
-            console.log("Recursively rendering child:", child.object.value);
-            innerHTML += await renderHTML(store, child.object);
-          }
-        }
-      }
-    }
-
-    // Special case for document
-    if (tagName === "html") {
-      console.log("Rendering complete HTML document");
-      return `<!doctype html>\n${innerHTML}`;
-    }
-
-    // Regular elements
-    console.log(`Rendering ${tagName} element with innerHTML:`, innerHTML);
-    return `<${tagName}>${innerHTML}</${tagName}>`;
-  } else if (isText) {
-    // find content
-    const content = store.getObjects(
-      subject,
-      DataFactory.namedNode("http://www.w3.org/1999/xhtml#content"),
-      null,
-    )[0]?.value;
-    return content ?? "";
+    return { type: "element", tagName, children };
   }
 
-  // Check for direct outerHTML (fallback)
-  const outerHTML = store.getObjects(
-    subject,
-    DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
-    null,
-  )[0]?.value;
-
-  // is this just nil?
-  if (subject.value === "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil") {
-    return "";
+  if (isText) {
+    const content = store.getObjects(subject, HTML.content, null)[0]?.value ?? "";
+    return { type: "text", content };
   }
 
+  // Check for direct outerHTML
+  const outerHTML = store.getObjects(subject, HTML.outerHTML, null)[0]?.value;
   if (outerHTML) {
-    console.log("Using outerHTML fallback:", outerHTML);
-    return outerHTML;
+    return { type: "text", content: outerHTML };
   }
 
-  console.error("Failed to render HTML for subject:", subject.value);
-  throw new Error("Subject is neither an HTML element nor has outerHTML");
+  // Handle rdf:nil
+  if (subject.value === RDF("nil").value) {
+    return { type: "list", children: [] };
+  }
+
+  // Handle list nodes
+  const first = store.getObjects(subject, RDF("first"), null)[0];
+  const rest = store.getObjects(subject, RDF("rest"), null)[0];
+  if (first && rest) {
+    return { type: "list", children: [first, ...getRDFList(store, rest)] };
+  }
+
+  throw new Error(`Unknown HTML node type for: ${subject.value}`);
+}
+
+function getRDFList(store: Store, listNode: Term): Term[] {
+  const node = getNodeType(store, listNode);
+  return node.type === "list" && node.children ? node.children : [];
+}
+
+export async function renderHTML(store: Store, subject: Term): Promise<string> {
+  const node = getNodeType(store, subject);
+
+  switch (node.type) {
+    case "element": {
+      const innerHTML = await Promise.all(
+        (node.children ?? []).map(child => renderHTML(store, child))
+      ).then(parts => parts.join(""));
+
+      // Special case for document
+      if (node.tagName === "html") {
+        return `<!doctype html>\n${innerHTML}`;
+      }
+
+      return `<${node.tagName}>${innerHTML}</${node.tagName}>`;
+    }
+
+    case "text":
+      return node.content ?? "";
+
+    case "list":
+      return (await Promise.all(
+        (node.children ?? []).map(child => renderHTML(store, child))
+      )).join("");
+
+    default:
+      throw new Error(`Cannot render node type: ${(node as HTMLNode).type}`);
+  }
 }
 
 export async function handleWithRules(
