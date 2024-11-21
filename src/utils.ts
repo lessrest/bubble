@@ -215,18 +215,70 @@ export function withGroundFacts(facts: string): Store {
 }
 
 export async function renderHTML(store: Store, subject: Term): Promise<string> {
-  console.log("quads", await writeN3(store.getQuads()));
+  // Check if this is an HTML element
+  const isElement = store.getQuads(
+    subject,
+    DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
+    DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
+    null
+  ).length > 0;
+
+  if (isElement) {
+    // Get tag name
+    const tagName = store.getObjects(
+      subject,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#tagName"),
+      null
+    )[0]?.value;
+
+    if (!tagName) {
+      throw new Error("HTML element missing tagName");
+    }
+
+    // Get children if any
+    const childrenList = store.getObjects(
+      subject,
+      DataFactory.namedNode("http://www.w3.org/1999/xhtml#children"),
+      null
+    )[0];
+
+    let innerHTML = "";
+    
+    if (childrenList) {
+      // Handle both literal children and nested elements
+      const children = store.getQuads(childrenList, null, null, null);
+      for (const child of children) {
+        if (child.predicate.value.includes("first") || child.predicate.value.includes("rest")) {
+          if (child.object.termType === "Literal") {
+            innerHTML += child.object.value;
+          } else {
+            innerHTML += await renderHTML(store, child.object);
+          }
+        }
+      }
+    }
+
+    // Special case for document
+    if (tagName === "html") {
+      return `<!doctype html>\n${innerHTML}`;
+    }
+
+    // Regular elements
+    return `<${tagName}>${innerHTML}</${tagName}>`;
+  }
+
+  // Check for direct outerHTML (fallback)
   const outerHTML = store.getObjects(
     subject,
     DataFactory.namedNode("http://www.w3.org/1999/xhtml#outerHTML"),
     null,
   )[0]?.value;
 
-  if (!outerHTML) {
-    throw new Error("No html:outerHTML found for subject");
+  if (outerHTML) {
+    return outerHTML;
   }
 
-  return `${outerHTML}`;
+  throw new Error("Subject is neither an HTML element nor has outerHTML");
 }
 
 export async function handleWithRules(
