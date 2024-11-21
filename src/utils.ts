@@ -335,6 +335,9 @@ export async function handleWithRules(
         ).length > 0;
 
         if (isHtmlPage) {
+          console.log(
+            `Before rendering HTML: ${await writeN3(resultStore.getQuads())}`,
+          );
           body = renderHTML(resultStore, bodyQuad.object);
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"
