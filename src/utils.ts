@@ -242,7 +242,7 @@ export async function handleWithRules(
     resultStore = new N3.Store();
   }
 
-  const parser = new N3.Parser({ format: "text/n3" });
+  const parser = new N3.Parser({ format: "text/n3-star" });
   const resultQuads = parser.parse(result);
   resultStore.addQuads(resultQuads);
 
@@ -292,10 +292,16 @@ export async function handleWithRules(
     null,
   );
 
-  // Don't include body for 204 No Content responses
-  const body = statusCode === 204
-    ? null
-    : (bodyQuads.length > 0 ? bodyQuads[0].object.value : "");
+  let body: string | null = null;
+
+  if (bodyQuads.length > 0) {
+    // if the body object is a Quad, convert it to N3 string
+    if (bodyQuads[0].object.termType === "Quad") {
+      body = await writeN3([bodyQuads[0].object]);
+    } else if (bodyQuads[0].object.termType === "Literal") {
+      body = bodyQuads[0].object.value;
+    }
+  }
 
   // Content-Type
   const contentTypeQuads = resultStore.getQuads(

@@ -44,7 +44,7 @@ const rules = `
       http:respondsTo ?request;
       http:responseCode 200;
       http:contentType "application/turtle";
-      http:body "n/a" .
+      http:body << ?collection a ap:Collection >> .
   }.
 
   # Handle inbox POST
