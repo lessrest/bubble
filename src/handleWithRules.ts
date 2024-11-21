@@ -57,13 +57,26 @@ export async function handleWithRules(
   // Handle response body
   const bodyQuads = resultStore.getQuads(response, HTTP("body"), null, null);
   let body = "";
+  let contentType = finalContentType;
   
   if (bodyQuads.length > 0) {
     const bodyStore = new N3.Store();
     let isHtmlContent = false;
+    let isLiteralContent = false;
 
     for (const bodyQuad of bodyQuads) {
-      if (bodyQuad.object.termType === "Quad") {
+      if (isLiteralContent || isHtmlContent) {
+        break; // Stop processing once we have literal/HTML content
+      }
+
+      if (bodyQuad.object.termType === "Literal") {
+        if (bodyStore.size > 0) {
+          throw new Error("Cannot mix N3 and literal content in response body");
+        }
+        body = bodyQuad.object.value;
+        isLiteralContent = true;
+        contentType = "text/plain";
+      } else if (bodyQuad.object.termType === "Quad") {
         bodyStore.addQuad(bodyQuad.object);
       } else if (
         bodyQuad.object.termType === "BlankNode" ||
@@ -83,7 +96,7 @@ export async function handleWithRules(
           }
           body = await renderHTML(resultStore, bodyQuad.object);
           isHtmlContent = true;
-          break;
+          contentType = "text/html";
         } else {
           const graphId = bodyQuad.object.termType === "BlankNode"
             ? `_:${bodyQuad.object.value}`
@@ -91,18 +104,13 @@ export async function handleWithRules(
           const subgraph = resultStore.getQuads(null, null, null, graphId) as Quad[];
           bodyStore.addQuads(subgraph);
         }
-      } else if (bodyQuad.object.termType === "Literal") {
-        if (bodyStore.size > 0) {
-          throw new Error("Cannot mix N3 and literal content in response body");
-        }
-        body = bodyQuad.object.value;
-        break;
       }
     }
 
-    // If we collected any quads and haven't set a literal/HTML body, serialize them
-    if (bodyStore.size > 0 && !isHtmlContent && body === "") {
+    // Only serialize N3 if we haven't found literal or HTML content
+    if (!isLiteralContent && !isHtmlContent && bodyStore.size > 0) {
       body = await writeN3(bodyStore.getQuads());
+      contentType = "text/turtle";
     }
   }
 
@@ -120,6 +128,6 @@ export async function handleWithRules(
 
   return new Response(body || null, {
     status: statusCode,
-    headers: { "Content-Type": finalContentType },
+    headers: { "Content-Type": contentType },
   });
 }
