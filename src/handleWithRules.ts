@@ -54,29 +54,17 @@ export async function handleWithRules(
     return new Response("Response missing status code", { status: 500 });
   }
 
+  // Handle response body
+  const bodyQuads = resultStore.getQuads(response, HTTP("body"), null, null);
   let body = "";
-  const bodyStore = new N3.Store();
-  let hasN3Content = false;
-  let hasLiteralContent = false;
-
-  const bodyQuads = resultStore.getQuads(
-    response,
-    HTTP("body"),
-    null,
-    null,
-  );
-
+  
   if (bodyQuads.length > 0) {
+    const bodyStore = new N3.Store();
+    let isHtmlContent = false;
+
     for (const bodyQuad of bodyQuads) {
       if (bodyQuad.object.termType === "Quad") {
         bodyStore.addQuad(bodyQuad.object);
-        hasN3Content = true;
-      } else if (bodyQuad.object.termType === "Literal") {
-        if (hasN3Content) {
-          throw new Error("Cannot mix N3 and literal content in response body");
-        }
-        body = bodyQuad.object.value;
-        hasLiteralContent = true;
       } else if (
         bodyQuad.object.termType === "BlankNode" ||
         bodyQuad.object.termType === "NamedNode"
@@ -84,44 +72,36 @@ export async function handleWithRules(
         // Check if this is an HTML page
         const isHtmlPage = resultStore.getQuads(
           bodyQuad.object,
-          DataFactory.namedNode(
-            "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-          ),
+          DataFactory.namedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"),
           DataFactory.namedNode("http://www.w3.org/1999/xhtml#element"),
-          null,
+          null
         ).length > 0;
 
         if (isHtmlPage) {
-          if (hasN3Content) {
+          if (bodyStore.size > 0) {
             throw new Error("Cannot mix N3 and HTML content in response body");
           }
           body = await renderHTML(resultStore, bodyQuad.object);
-          hasLiteralContent = true;
+          isHtmlContent = true;
+          break;
         } else {
-          if (hasLiteralContent) {
-            throw new Error("Cannot mix N3 and literal content in response body");
-          }
           const graphId = bodyQuad.object.termType === "BlankNode"
             ? `_:${bodyQuad.object.value}`
             : bodyQuad.object.value;
-          const subgraph = resultStore.getQuads(
-            null,
-            null,
-            null,
-            graphId,
-          ) as Quad[];
-          for (const quad of subgraph) {
-            bodyStore.addQuad(quad.subject, quad.predicate, quad.object);
-          }
-          hasN3Content = true;
+          const subgraph = resultStore.getQuads(null, null, null, graphId) as Quad[];
+          bodyStore.addQuads(subgraph);
         }
-      } else {
-        throw new Error(`Unsupported body type: ${bodyQuad.object.termType}`);
+      } else if (bodyQuad.object.termType === "Literal") {
+        if (bodyStore.size > 0) {
+          throw new Error("Cannot mix N3 and literal content in response body");
+        }
+        body = bodyQuad.object.value;
+        break;
       }
     }
 
-    // If we collected any quads, serialize them
-    if (hasN3Content) {
+    // If we collected any quads and haven't set a literal/HTML body, serialize them
+    if (bodyStore.size > 0 && !isHtmlContent && body === "") {
       body = await writeN3(bodyStore.getQuads());
     }
   }
