@@ -1,0 +1,32 @@
+[project]
+name = "bubble"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "rdflib>=7.1.1",
+    "rich>=13.9.4",
+    "trio>=0.27.0",
+]
+
+[tool.ruff]
+line-length = 76
+target-version = "py312"
+
+[tool.ruff.lint.isort]
+# Use a single line between direct and from import.
+lines-between-types = 1
+length-sort = true
+
+[tool.uv]
+dev-dependencies = ["ruff>=0.6.2"]
+python-preference = "managed"
+python-downloads = "automatic"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+trio_mode = true
