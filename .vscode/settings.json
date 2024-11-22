@@ -8,5 +8,6 @@
         "github.copilot",
         "github.copilot-chat"
     ],
-    "deno.enable": true
+    "deno.enable": true,
+    "makefile.configureOnOpen": false
 }

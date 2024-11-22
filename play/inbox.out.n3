@@ -1,8 +1,28 @@
 @prefix swa: <https://swa.sh/>.
-@prefix : <https://node.town/>.
+@prefix nt: <https://node.town/2024/>.
 
-swa:eve a :Eel.
-swa:eve :thinks {
-    swa:bob :looks :cute.
+<https://swa.sh/X123/#step> a swa:Step.
+<https://swa.sh/X123/#next> a swa:Step.
+<https://swa.sh/X123/#step> swa:supposes {
+    swa:nonce swa:ranks 1 .
+    <https://apple.com/iphone> a nt:Product.
 }.
-swa:bob :looks :cute.
+<https://swa.sh/X123/#next> swa:succeeds <https://swa.sh/X123/#step>.
+<https://swa.sh/X123/#step> swa:decides {
+    <https://apple.com/macbook> a nt:Product.
+}.
+<https://swa.sh/X123/#step> swa:revokes {
+    <https://apple.com/iphone> a nt:Product.
+}.
+<https://apple.com/iphone> a nt:Product.
+<https://swa.sh/X123/#step> swa:decides {
+    swa:nonce swa:ranks 2.
+}.
+<https://swa.sh/X123/#step> swa:revokes {
+    swa:nonce swa:ranks 1.
+}.
+swa:nonce swa:ranks 1 .
+<https://swa.sh/X123/#next> swa:supposes {
+    <https://apple.com/macbook> a nt:Product.
+    swa:nonce swa:ranks 2.
+}.

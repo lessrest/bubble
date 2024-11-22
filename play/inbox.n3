@@ -1,15 +1,101 @@
-@base <https://swa.sh/> .
+@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+@prefix nt: <https://node.town/2024/> .
 @prefix swa: <https://swa.sh/> .
-@prefix : <https://node.town/> .
-@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
+@base <https://swa.sh/X123/> .
 
-<eve> a :Eel ;
-    :thinks { <bob> :looks :cute } .
+# The current step
+<#step> a swa:Step ;
+   swa:supposes 
+   {
+       swa:nonce swa:ranks 1 .
+       <https://apple.com/iphone> a nt:Product 
+   } .
+
+# A formula can be supposed during a step.
+# If the current step supposes a formula, that formula is true in the default graph.
+{
+   <#step> swa:supposes ?g 
+}
+=> ?g .
+
+# The current step has a successor step.
+<#next> a swa:Step ;
+   swa:succeeds <#step> .
+
+# The successor step has a rank that is one greater than the rank of the current step.
+{
+   swa:nonce swa:ranks ?rank .
+   ( ?rank 1 ) math:sum ?next 
+}
+=> 
+{
+   <#step> swa:decides 
+   {
+       swa:nonce swa:ranks ?next 
+   } .
+   <#step> swa:revokes 
+   {
+       swa:nonce swa:ranks ?rank 
+   } .
+} .
+
+# We compute the next step's suppositions from the current step:
+# 
+#   N_s = (C_s + C_d) - R_r
+{
+   ?s1 a swa:Step .
+   ?s2 swa:succeeds ?s1 .
+
+   # Find lists of graphs.
+   [] eye:findall (
+       ?x
+       {
+           ?s1 swa:supposes ?x 
+       }
+       ?xs
+   ) ;
+       eye:findall (
+           ?y
+           {
+               ?s1 swa:decides ?y 
+           }
+           ?ys
+       ) ;
+       eye:findall (
+           ?z
+           {
+               ?s1 swa:revokes ?z 
+           }
+           ?zs
+       ) .
+
+   # Turn the lists of graphs into merged graphs.
+   # Conjunction of null is undefined, but we always have the nonce update.
+   ?xs log:conjunction ?suppositions .
+   ?ys log:conjunction ?decisions .
+   ?zs log:conjunction ?revocations .
+
+   # Now we remove the revocations from the suppositions.
+   ( ?suppositions ?revocations ) eye:graphDifference ?g1 .
+
+   # Now we add the decisions to the result.
+   ( ?g1 ?decisions ) log:conjunction ?g2 .
+}
+=> 
+{
+   ?s2 swa:supposes ?g2 
+} .
 
 
-{ ?x :thinks ?g .
-?g eye:graphMember ?f }
-=>
-    { <future> :holds ?f  } .
-    
-    
+# For example:
+<#step> swa:decides 
+{
+   <https://apple.com/macbook> a nt:Product .
+}
+;
+   swa:revokes 
+   {
+       <https://apple.com/iphone> a nt:Product .
+   } .
