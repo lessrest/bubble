@@ -4,7 +4,7 @@ import tempfile
 from rdflib import RDF, BNode, Graph, Literal, URIRef, Namespace
 import sys
 
-from rich import pretty, print
+from rich import inspect, pretty, print
 from rich.syntax import Syntax
 from rich.panel import Panel
 from rich.progress import Progress
@@ -12,6 +12,9 @@ from rich.progress import Progress
 import trio
 
 from rich.console import Console
+
+import httpx
+import replicate
 
 console = Console()
 
@@ -73,30 +76,32 @@ class N3Processor:
             return
 
         console.print(f"processing {len(invocations)} invocations")
-
-        with Progress() as progress:
-            async with trio.open_nursery() as nursery:
-                for invocation in invocations:
-                    parameter, target_type = self.get_invocation_details(
-                        invocation
+        console.rule()
+        async with trio.open_nursery() as nursery:
+            for invocation in invocations:
+                parameter, target_type = self.get_invocation_details(
+                    invocation
+                )
+                if target_type == NT.ShellCapability:
+                    nursery.start_soon(
+                        self.run_shell_command,
+                        parameter,
+                        invocation,
                     )
-                    if target_type == NT.ShellCapability:
-                        task = progress.add_task(f"{parameter}", total=None)
-                        nursery.start_soon(
-                            self.run_shell_command,
-                            parameter,
-                            progress,
-                            task,
-                            invocation,
-                        )
+                elif target_type == NT.ArtGenerationCapability:
+                    nursery.start_soon(
+                        self.run_art_generation_command,
+                        parameter,
+                        invocation,
+                    )
 
-    async def run_shell_command(
-        self, command, progress: Progress, task: any, invocation: URIRef
-    ):
+    async def run_shell_command(self, command, invocation: URIRef):
         # make a new random directory
         temp_dir = tempfile.mkdtemp()
         # set $out to $temp_dir/out
         # run the command as a subprocess
+        print(f"running {command} in {temp_dir}")
+        console.rule()
         result = await trio.run_process(
             command,
             shell=True,
@@ -134,15 +139,49 @@ class N3Processor:
                 (result_node, NT.contentHash, Literal(contenthash))
             )
             self.graph.add((invocation, SWA.result, result_node))
+
+            print(f"{command}\n => {output_file}")
+            console.rule()
         except FileNotFoundError:
             pass
 
-        progress.update(
-            task,
-            total=100,
-            completed=100,
-            description=f"{command} ({size} bytes)",
+    async def run_art_generation_command(
+        self, parameter, invocation: URIRef
+    ):
+        prompt = self.get_single_object(
+            parameter,
+            NT.prompt,
+            "Expected one prompt for the art generation",
         )
+
+        print(f"generating art for {prompt.value}")
+        console.rule()
+        result = await replicate.async_run(
+            "black-forest-labs/flux-schnell",
+            input={
+                "prompt": prompt.value,
+                "num_outputs": 1,
+                "output_format": "webp",
+            },
+        )
+
+        if isinstance(result, list):
+            blob = await result[0].aread()
+        else:
+            blob = await result.aread()
+
+        # open $out as a file
+        temp_file = tempfile.mktemp(suffix=".webp")
+        async with await trio.open_file(temp_file, "wb") as f:
+            await f.write(blob)
+
+        result_node = BNode()
+        self.graph.add((result_node, RDF.type, NT.LocalFile))
+        self.graph.add((result_node, NT.path, Literal(temp_file)))
+        self.graph.add((invocation, SWA.result, result_node))
+
+        print(f"{prompt.value}\n => {temp_file}")
+        console.rule()
 
     async def process(self):
         self.graph.parse(sys.stdin, format="n3")
@@ -160,7 +199,7 @@ class N3Processor:
             raise Exception("No supposition found")
 
         await self.process_invocations(step)
-        self.print_n3()
+        # self.print_n3()
 
 
 def main():

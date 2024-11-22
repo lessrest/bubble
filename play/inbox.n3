@@ -137,3 +137,34 @@ _:next a swa:Step ;
        as:url "https://www.bbc.com/" 
    ] .
 } .
+
+# Example of an art generation capability.
+<#> swa:supposes 
+{
+   [
+       a nt:ArtGenerationCapability 
+   ] .
+   [
+       a nt:ImagePrompt ;
+       nt:prompt "A beautiful sunset over the ocean" 
+   ] .
+   [
+       a nt:ImagePrompt ;
+       nt:prompt "A beautiful sunrise over the mountains" 
+   ] .
+} .
+{
+    # if the current step supposes an image prompt,
+   ?prompt a nt:ImagePrompt .
+    # and there is an art generation capability,
+   ?capability a nt:ArtGenerationCapability .
+}
+=> 
+{
+    # then the current step invokes the art generation capability with the prompt.
+   <#> swa:invokes [
+       a nt:Invocation ;
+       nt:target ?capability ;
+       nt:parameter ?prompt 
+   ] .
+} .
