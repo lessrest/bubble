@@ -1,0 +1,8 @@
+@prefix swa: <https://swa.sh/>.
+@prefix : <https://node.town/>.
+
+swa:eve a :Eel.
+swa:eve :thinks {
+    swa:bob :looks :cute.
+}.
+swa:bob :looks :cute.

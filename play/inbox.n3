@@ -1,0 +1,15 @@
+@base <https://swa.sh/> .
+@prefix swa: <https://swa.sh/> .
+@prefix : <https://node.town/> .
+@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#>.
+
+<eve> a :Eel ;
+    :thinks { <bob> :looks :cute } .
+
+
+{ ?x :thinks ?g .
+?g eye:graphMember ?f }
+=>
+    { <future> :holds ?f  } .
+    
+    
