@@ -1,28 +1,32 @@
+@prefix as: <https://www.w3.org/ns/activitystreams#> .
 @prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
 @prefix log: <http://www.w3.org/2000/10/swap/log#> .
 @prefix math: <http://www.w3.org/2000/10/swap/math#> .
 @prefix nt: <https://node.town/2024/> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
 @prefix swa: <https://swa.sh/> .
-@base <https://swa.sh/X123/> .
+@base <https://swa.sh/2024/11/22/step/1> .
 
-# The current step
-<#step> a swa:Step ;
-   swa:supposes 
-   {
-       swa:nonce swa:ranks 1 .
-       <https://apple.com/iphone> a nt:Product 
-   } .
 
 # A formula can be supposed during a step.
 # If the current step supposes a formula, that formula is true in the default graph.
 {
-   <#step> swa:supposes ?g 
+   <#> swa:supposes ?g 
 }
 => ?g .
 
 # The current step has a successor step.
-<#next> a swa:Step ;
-   swa:succeeds <#step> .
+_:next a swa:Step ;
+   swa:succeeds <#> .
+
+# Succeeds is inverse of precedes.
+{
+   ?s1 swa:succeeds ?s2 
+}
+=> 
+{
+   ?s2 swa:precedes ?s1 
+} .
 
 # The successor step has a rank that is one greater than the rank of the current step.
 {
@@ -31,71 +35,105 @@
 }
 => 
 {
-   <#step> swa:decides 
+   <#> swa:decides 
    {
        swa:nonce swa:ranks ?next 
    } .
-   <#step> swa:revokes 
+   <#> swa:revokes 
    {
        swa:nonce swa:ranks ?rank 
    } .
 } .
 
-# We compute the next step's suppositions from the current step:
-# 
-#   N_s = (C_s + C_d) - R_r
+# next = current + decisions - revocations
 {
    ?s1 a swa:Step .
    ?s2 swa:succeeds ?s1 .
-
-   # Find lists of graphs.
    [] eye:findall (
-       ?x
+       ?g1
        {
-           ?s1 swa:supposes ?x 
+           ?s1 swa:supposes ?g1 
        }
-       ?xs
+       ?gs1
    ) ;
        eye:findall (
-           ?y
+           ?g2
            {
-               ?s1 swa:decides ?y 
+               ?s1 swa:decides ?g2 
            }
-           ?ys
+           ?gs2
        ) ;
        eye:findall (
-           ?z
+           ?g3
            {
-               ?s1 swa:revokes ?z 
+               ?s1 swa:revokes ?g3 
            }
-           ?zs
+           ?gs3
        ) .
-
-   # Turn the lists of graphs into merged graphs.
-   # Conjunction of null is undefined, but we always have the nonce update.
-   ?xs log:conjunction ?suppositions .
-   ?ys log:conjunction ?decisions .
-   ?zs log:conjunction ?revocations .
-
-   # Now we remove the revocations from the suppositions.
-   ( ?suppositions ?revocations ) eye:graphDifference ?g1 .
-
-   # Now we add the decisions to the result.
-   ( ?g1 ?decisions ) log:conjunction ?g2 .
+   ?gs1 log:conjunction ?g1m .
+   ?gs2 log:conjunction ?g2m .
+   ?gs3 log:conjunction ?g3m .
+   ( ?g1m ?g3m ) eye:graphDifference ?tmp .
+   ( ?tmp ?g2m ) log:conjunction ?result .
 }
 => 
 {
-   ?s2 swa:supposes ?g2 
+   ?s2 swa:supposes ?result 
 } .
 
-
 # For example:
-<#step> swa:decides 
-{
-   <https://apple.com/macbook> a nt:Product .
-}
-;
+# The current step
+<#> a swa:Step ;
+   swa:supposes 
+   {
+       swa:nonce swa:ranks 1 .
+       <https://apple.com/iphone> a nt:Product 
+   }
+   ;
+   swa:decides 
+   {
+       <https://apple.com/macbook> a nt:Product .
+   }
+   ;
    swa:revokes 
    {
        <https://apple.com/iphone> a nt:Product .
    } .
+
+# Given that...
+{
+   # 1. there is a link,
+   ?link a as:Link .
+   # 2. the link has a URL,
+   ?link as:url ?url .
+   # 3. there is a shell capability, and
+   ?shell a nt:ShellCapability .
+   # 4. we can imagine the curl command,
+   ( "curl -L %s -o $out" ?url ) string:format ?command 
+}
+=> 
+{
+   # then the current step invokes the capability with the command.
+   <#> swa:invokes [
+       a nt:Invocation ;
+       nt:target ?shell ;
+       nt:parameter ?command 
+   ] .
+} .
+
+# Example of a shell capability and a link.
+<#> swa:supposes 
+{
+   [
+       a nt:ShellCapability ;
+       nt:hostname "swa.sh" 
+   ] .
+   [
+       a as:Link ;
+       as:url "https://news.ycombinator.com/" 
+   ] .
+   [
+       a as:Link ;
+       as:url "https://www.bbc.com/" 
+   ] .
+} .
