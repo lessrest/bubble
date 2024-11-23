@@ -22,7 +22,11 @@ lines-between-types = 1
 length-sort = true
 
 [tool.uv]
-dev-dependencies = ["ruff>=0.6.2"]
+dev-dependencies = [
+    "ruff>=0.6.2",
+    "pytest>=8.0.0",
+    "pytest-trio>=0.8.0"
+]
 python-preference = "managed"
 python-downloads = "automatic"
 

@@ -1,0 +1,11 @@
+@prefix swa: <https://swa.sh/> .
+@prefix nt: <https://node.town/2024/> .
+@base <https://test.example/> .
+
+<#> a swa:Step ;
+    swa:supposes {
+        swa:nonce swa:ranks 1 .
+    } .
+
+_:next a swa:Step ;
+    swa:succeeds <#> .
