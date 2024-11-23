@@ -16,16 +16,27 @@ class Mint:
         )
         return encoded
 
-    def fresh_iri(self, namespace: Namespace) -> URIRef:
-        """Create a new random IRI under the given namespace.
+    def fresh_secure_iri(self, namespace: Namespace) -> URIRef:
+        """Create a new secure random IRI under the given namespace.
 
         Args:
             namespace: An rdflib Namespace to use as the base
 
         Returns:
-            URIRef: A new random IRI combining the namespace and a token
+            URIRef: A new random IRI combining the namespace and a secure token
         """
         return namespace[self.fresh_token()]
+
+    def fresh_casual_iri(self, namespace: Namespace) -> URIRef:
+        """Create a new casual IRI under the given namespace using XID.
+
+        Args:
+            namespace: An rdflib Namespace to use as the base
+
+        Returns:
+            URIRef: A new random IRI combining the namespace and an XID
+        """
+        return namespace[self.fresh_id()]
 
     def fresh_id(self) -> str:
         """Generate a non-secure pseudorandom identifier."""
