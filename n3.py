@@ -32,38 +32,25 @@ class N3Processor:
         )  # Replace 4 spaces with 2 spaces globally
         print(Panel(Syntax(n3, "turtle"), title="N3"))
 
-    def get_single_object(self, subject, predicate, error_msg):
+    def get_single_object(self, subject, predicate):
         objects = list(self.graph.objects(subject, predicate))
         if len(objects) != 1:
-            print(error_msg)
             return None
         return objects[0]
 
     def get_next_step(self, step):
-        next_step = self.get_single_object(
-            step, SWA.precedes, "Expected one successor step"
-        )
+        next_step = self.get_single_object(step, SWA.precedes)
         return next_step
 
     def get_supposition(self, step):
-        supposition = self.get_single_object(
-            step, SWA.supposes, "Expected one supposition for the next step"
-        )
+        supposition = self.get_single_object(step, SWA.supposes)
 
         return supposition
 
     def get_invocation_details(self, invocation):
-        target = self.get_single_object(
-            invocation, NT.target, "Expected one target for the invocation"
-        )
-        target_type = self.get_single_object(
-            target, RDF.type, "Expected one type for the target"
-        )
-        parameter = self.get_single_object(
-            invocation,
-            NT.parameter,
-            "Expected one parameter for the invocation",
-        )
+        target = self.get_single_object(invocation, NT.target)
+        target_type = self.get_single_object(target, RDF.type)
+        parameter = self.get_single_object(invocation, NT.parameter)
         return parameter, target_type
 
     async def process_invocations(self, step):
@@ -144,11 +131,7 @@ class N3Processor:
     async def run_art_generation_command(
         self, parameter, invocation: URIRef
     ):
-        prompt = self.get_single_object(
-            parameter,
-            NT.prompt,
-            "Expected one prompt for the art generation",
-        )
+        prompt = self.get_single_object(parameter, NT.prompt)
 
         print(f"generating art for {prompt.value}")
         console.rule()
