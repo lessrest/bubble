@@ -81,7 +81,7 @@ async def test_n3_processing_no_next_step(processor):
         processor.graph.parse(f.name, format="n3")
         
         with pytest.raises(ValueError) as exc_info:
-            await processor.process()
+            await processor.process(n3_content)
         assert "No next step found" in str(exc_info.value)
 
 async def test_n3_processing_no_supposition(processor):

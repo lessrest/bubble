@@ -125,7 +125,7 @@ class N3Processor:
 
     async def process_invocations(self, step: URIRef) -> None:
         """Process all invocations for a step"""
-        from capabilities import ShellCapability, ArtGenerationCapability
+        from bubble.capabilities import ShellCapability, ArtGenerationCapability
 
         invocations: List[URIRef] = list(
             self.graph.objects(step, SWA.invokes)
@@ -156,10 +156,13 @@ class N3Processor:
                         self.graph,
                     )
 
-    async def process(self) -> None:
+    async def process(self, n3_content: str = None) -> None:
         """Main processing method"""
         try:
-            self.graph.parse(sys.stdin, format="n3")
+            if n3_content:
+                self.graph.parse(data=n3_content, format="n3")
+            else:
+                self.graph.parse(sys.stdin, format="n3")
 
             step = URIRef(f"{self.base}#")
             next_step = self.get_next_step(step)
