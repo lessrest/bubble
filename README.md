@@ -1,21 +1,20 @@
-# N3 Web Framework
+# Bubble - N3 Processing Framework
 
-A semantic web framework that uses N3 rules to handle HTTP requests and
-implement ActivityPub nodes. Built with Deno, N3.js, and the EYE reasoner.
+A semantic web framework that uses N3 rules to process data and generate content. Built with Python, RDFLib, and the EYE reasoner.
 
 ## Features
 
-- 🌐 **Declarative HTTP Routing** - Define routes using N3 rules
-- 🔍 **Semantic Processing** - Handle requests through RDF and logical inference
-- 🤝 **ActivityPub Support** - Build federated social applications
-- 🧪 **Test Driven** - Comprehensive test suite using Deno's testing framework
+- 🔍 **N3 Processing** - Process N3 files with logical inference
+- 🐚 **Shell Integration** - Execute shell commands through N3 rules
+- 🎨 **Art Generation** - Generate images using AI models
+- 🧪 **Test Driven** - Comprehensive pytest test suite
 
 ## Quick Start
 
 This repository includes a GitHub Dev Container configuration that automatically
 sets up:
 
-- Deno
+- Python
 - SWI-Prolog
 - EYE Reasoner
 
@@ -23,14 +22,16 @@ Just open in GitHub Codespaces or VS Code with Dev Containers to get started
 immediately!
 
 ```bash
-# Install dependencies (not needed with Dev Container)
-deno task cache
+# Create virtual environment and install dependencies
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
 
 # Run the tests
-deno task test
+pytest
 
-# Start the server
-deno task serve
+# Process an N3 file
+python -m bubble < input.n3
 ```
 
 ## Running with Docker

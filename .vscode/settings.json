@@ -1,6 +1,7 @@
 {
     "github.codespaces.defaultExtensions": [
-        "denoland.vscode-deno",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
         "faubulous.mentor",
         "GitHub.codespaces",
         "GitHub.vscode-pull-request-github",
@@ -8,6 +9,8 @@
         "github.copilot",
         "github.copilot-chat"
     ],
-    "deno.enable": true,
+    "python.defaultInterpreterPath": ".venv/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.analysis.typeCheckingMode": "basic",
     "makefile.configureOnOpen": false
 }
