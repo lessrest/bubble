@@ -1,6 +1,6 @@
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
-from n3 import N3Processor, FileHandler, FileResult
+from bubble import N3Processor, FileHandler, FileResult
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
