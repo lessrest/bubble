@@ -32,6 +32,10 @@ class Mint:
         return XID().string()
 
     def machine_id(self) -> str:
+        """Generate a consistent machine identifier encoded in base32."""
         from machineid import hashed_id
-
-        return hashed_id("this should be a user secret")
+        # Get hex machine ID and convert to bytes
+        hex_id = hashed_id("this should be a user secret")
+        raw_bytes = bytes.fromhex(hex_id)
+        # Convert to base32 and remove padding
+        return base64.b32encode(raw_bytes).decode("ascii").rstrip("=").lower()
