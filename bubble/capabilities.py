@@ -96,7 +96,7 @@ class ArtGenerationCapability(Capability):
         async with await trio.open_file(temp_file, "wb") as f:
             await f.write(blob)
 
-        from n3 import FileResult
+        from bubble.n3 import FileResult
 
         file_result = FileResult(path=temp_file)
         result_node = await FileHandler.create_result_node(
