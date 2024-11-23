@@ -34,5 +34,6 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest > $GITHUB_STEP_SUMMARY
+        pytest --md-report-output tmp.md
+        cat tmp.md >> $GITHUB_STEP_SUMMARY
 

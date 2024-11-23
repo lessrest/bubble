@@ -48,6 +48,4 @@ venv = ".venv"
 [tool.pytest.ini_options]
 trio_mode = true
 md_report = true
-md_report_verbose = 0
-md_report_color = "auto"
-md_report_flavor = "gfm"
+md_report_verbose = 1
