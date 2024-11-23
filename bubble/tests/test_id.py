@@ -45,5 +45,6 @@ def test_machine_id_consistency(mint):
     id1 = mint.machine_id()
     id2 = mint.machine_id()
     assert id1 == id2
-    # Should be a hex string
-    assert re.match(r'^[a-f0-9]+$', id1) is not None
+    # Should be a 32-char hex string
+    assert len(id1) == 32
+    assert re.match(r'^[a-f0-9]{32}$', id1) is not None
