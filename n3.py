@@ -1,20 +1,16 @@
-import datetime
-import hashlib
-import tempfile
-from rdflib import RDF, BNode, Graph, Literal, URIRef, Namespace
 import sys
-
-from rich import inspect, pretty, print
-from rich.syntax import Syntax
-from rich.panel import Panel
-from rich.progress import Progress
+import hashlib
+import datetime
+import tempfile
 
 import trio
-
-from rich.console import Console
-
-import httpx
 import replicate
+
+from rich import print, pretty
+from rdflib import RDF, BNode, Graph, URIRef, Literal, Namespace
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.console import Console
 
 console = Console()
 
