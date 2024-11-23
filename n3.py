@@ -22,7 +22,6 @@ NT = Namespace("https://node.town/2024/")
 
 # Constants
 DEFAULT_BASE = "https://swa.sh/2024/11/22/step/1"
-WEBP_SUFFIX = ".webp"
 
 
 @dataclass
@@ -104,93 +103,32 @@ class N3Processor:
 
     async def process_invocations(self, step: URIRef) -> None:
         """Process all invocations for a step"""
+        from capabilities import ShellCapability, ArtGenerationCapability
+        
         invocations: List[URIRef] = list(self.graph.objects(step, SWA.invokes))
         if not invocations:
             return
 
         console.print(f"Processing {len(invocations)} invocations")
         console.rule()
+        
+        capability_map = {
+            NT.ShellCapability: ShellCapability(),
+            NT.ArtGenerationCapability: ArtGenerationCapability()
+        }
+        
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                parameter, target_type = self.get_invocation_details(
-                    invocation
-                )
-                if target_type == NT.ShellCapability:
+                parameter, target_type = self.get_invocation_details(invocation)
+                
+                if target_type in capability_map:
+                    capability = capability_map[target_type]
                     nursery.start_soon(
-                        self.run_shell_command,
+                        capability.execute,
                         parameter,
                         invocation,
+                        self.graph
                     )
-                elif target_type == NT.ArtGenerationCapability:
-                    nursery.start_soon(
-                        self.run_art_generation_command,
-                        parameter,
-                        invocation,
-                    )
-
-    async def run_shell_command(self, command: str, invocation: URIRef) -> None:
-        """Run a shell command and store its results"""
-        temp_dir = tempfile.mkdtemp()
-        output_file = f"{temp_dir}/out"
-        
-        print(f"Running shell command: {command}")
-        print(f"Working directory: {temp_dir}")
-        console.rule()
-        result = await trio.run_process(
-            command,
-            shell=True,
-            cwd=temp_dir,
-            env={"out": f"{temp_dir}/out"},
-            capture_stderr=True,
-        )
-        if result.returncode != 0:
-            print(f"Command failed: {result.returncode}")
-            raise Exception(f"Command failed: {result.returncode}")
-
-        try:
-            file_result = await self.file_handler.get_file_metadata(output_file)
-            result_node = await self.file_handler.create_result_node(self.graph, file_result)
-            self.graph.add((invocation, SWA.result, result_node))
-            
-            print(f"Command output saved to: {output_file}")
-            console.rule()
-        except FileNotFoundError:
-            pass
-
-    async def run_art_generation_command(
-        self, parameter: URIRef, invocation: URIRef
-    ) -> None:
-        """Generate art using the Replicate API"""
-        prompt = self.get_single_object(parameter, NT.prompt)
-        if not prompt:
-            raise ValueError("No prompt found for art generation")
-
-        print(f"Generating art for prompt: {prompt.value}")
-        console.rule()
-        result = await replicate.async_run(
-            "black-forest-labs/flux-schnell",
-            input={
-                "prompt": prompt.value,
-                "num_outputs": 1,
-                "output_format": "webp",
-            },
-        )
-
-        if isinstance(result, list):
-            blob = await result[0].aread()
-        else:
-            blob = await result.aread()
-
-        temp_file = tempfile.mktemp(suffix=WEBP_SUFFIX)
-        async with await trio.open_file(temp_file, "wb") as f:
-            await f.write(blob)
-
-        file_result = FileResult(path=temp_file)
-        result_node = await self.file_handler.create_result_node(self.graph, file_result)
-        self.graph.add((invocation, SWA.result, result_node))
-
-        print(f"Art generated and saved to: {temp_file}")
-        console.rule()
 
     async def process(self) -> None:
         """Main processing method"""
