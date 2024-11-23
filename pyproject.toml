@@ -39,6 +39,9 @@ build-backend = "setuptools.build_meta"
 # otherwise it complains about non-package directories
 include = ["bubble"]
 
+[project.scripts]
+bubble = "bubble.main:app"
+
 [tool.ruff]
 line-length = 76 # slim fit
 target-version = "py313" # I'm not interested in old Python versions
