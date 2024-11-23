@@ -101,5 +101,5 @@ _:next a swa:Step .
         processor.graph.parse(f.name, format="n3")
         
         with pytest.raises(ValueError) as exc_info:
-            await processor.process()
+            await processor.process(n3_content)
         assert "No supposition found" in str(exc_info.value)
