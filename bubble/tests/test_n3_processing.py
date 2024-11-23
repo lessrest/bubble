@@ -91,9 +91,9 @@ async def test_n3_processing_no_supposition(processor):
 @base <https://test.example/> .
 
 <#> a swa:Step ;
-    swa:precedes _:next .
+    swa:precedes <#next> .
 
-_:next a swa:Step .
+<#next> a swa:Step .
 """
     with tempfile.NamedTemporaryFile(mode='w', suffix='.n3') as f:
         f.write(n3_content)
