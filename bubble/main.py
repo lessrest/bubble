@@ -8,7 +8,7 @@ mint = Mint()
 @app.command()
 def mint_casual(
     namespace: str = typer.Option(
-        "https://node.town/2024/",
+        "https://swa.sh/",
         "--namespace", "-n",
         help="Base namespace for the IRI"
     )
