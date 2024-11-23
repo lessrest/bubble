@@ -36,6 +36,7 @@ class Mint:
         from machineid import hashed_id
         # Get hex machine ID and convert to bytes
         hex_id = hashed_id("this should be a user secret")
-        raw_bytes = bytes.fromhex(hex_id)
+        # Take first 20 bytes (40 hex chars)
+        raw_bytes = bytes.fromhex(hex_id[:40])
         # Convert to base32 and remove padding
         return base64.b32encode(raw_bytes).decode("ascii").rstrip("=").lower()
