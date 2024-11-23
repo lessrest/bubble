@@ -19,6 +19,7 @@ dependencies = [
     "anthropic==0.39.*", # Anthropic SDK (Claude, Sonnet, etc)
     "py-xid>=1.0.0",
     "py-machineid>=0.6.0",
+    "typer>=0.13.1",
 ]
 
 [tool.uv.sources]
