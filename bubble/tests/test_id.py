@@ -40,11 +40,15 @@ def test_fresh_id_format(mint):
     # Should be lowercase base32
     assert re.match(r'^[a-z0-9]+$', id) is not None
 
+def test_machine_id_format(mint):
+    """Test machine_id generates valid base32 strings"""
+    id = mint.machine_id()
+    # Should be 32 chars of base32 (no padding)
+    assert len(id) == 32
+    assert re.match(r'^[a-z2-7]+$', id) is not None
+
 def test_machine_id_consistency(mint):
     """Test machine_id returns consistent values"""
     id1 = mint.machine_id()
     id2 = mint.machine_id()
     assert id1 == id2
-    # Should be a 32-char base32 string
-    assert len(id1) == 32
-    assert re.match(r'^[a-z2-7]+$', id1) is not None
