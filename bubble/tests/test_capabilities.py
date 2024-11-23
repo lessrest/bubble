@@ -49,7 +49,7 @@ async def test_shell_capability_failure(shell_capability, graph):
     
     with pytest.raises(Exception) as exc_info:
         await shell_capability.execute(command, invocation, graph)
-    assert "Command failed" in str(exc_info.value)
+    assert "returned non-zero exit status" in str(exc_info.value)
 
 async def test_art_generation_capability(art_capability, graph):
     """Test art generation capability setup"""

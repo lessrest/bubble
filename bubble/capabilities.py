@@ -47,7 +47,7 @@ class ShellCapability(Capability):
             raise Exception(f"Command failed: {result.returncode}")
 
         try:
-            from n3 import SWA, FileHandler
+            from bubble.n3 import SWA, FileHandler
 
             file_result = await FileHandler.get_file_metadata(output_file)
             result_node = await FileHandler.create_result_node(
@@ -69,7 +69,7 @@ class ArtGenerationCapability(Capability):
     async def execute(
         self, parameter: URIRef, invocation: URIRef, graph: Graph
     ) -> None:
-        from n3 import NT, SWA, FileHandler
+        from bubble.n3 import NT, SWA, FileHandler
 
         prompt = next(graph.objects(parameter, NT.prompt), None)
         if not prompt:
