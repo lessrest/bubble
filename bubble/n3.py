@@ -1,12 +1,12 @@
 import sys
 import hashlib
 import datetime
-import tempfile
-from typing import Optional, Tuple, List
+
+from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 import trio
-import replicate
+
 from rich import print, pretty
 from rdflib import RDF, BNode, Graph, URIRef, Literal, Namespace
 from rich.panel import Panel
@@ -27,6 +27,7 @@ DEFAULT_BASE = "https://swa.sh/2024/11/22/step/1"
 @dataclass
 class FileResult:
     """Represents the result of a file operation"""
+
     path: str
     size: Optional[int] = None
     creation_date: Optional[datetime.datetime] = None
@@ -35,37 +36,54 @@ class FileResult:
 
 class FileHandler:
     """Handles file operations and metadata collection"""
-    
+
     @staticmethod
-    async def create_result_node(graph: Graph, file_result: FileResult) -> BNode:
+    async def create_result_node(
+        graph: Graph, file_result: FileResult
+    ) -> BNode:
         result_node = BNode()
         graph.add((result_node, RDF.type, NT.LocalFile))
         graph.add((result_node, NT.path, Literal(file_result.path)))
-        
+
         if file_result.creation_date:
-            graph.add((result_node, NT.creationDate, Literal(file_result.creation_date)))
+            graph.add(
+                (
+                    result_node,
+                    NT.creationDate,
+                    Literal(file_result.creation_date),
+                )
+            )
         if file_result.size:
             graph.add((result_node, NT.size, Literal(file_result.size)))
         if file_result.content_hash:
-            graph.add((result_node, NT.contentHash, Literal(file_result.content_hash)))
-            
+            graph.add(
+                (
+                    result_node,
+                    NT.contentHash,
+                    Literal(file_result.content_hash),
+                )
+            )
+
         return result_node
 
     @staticmethod
     async def get_file_metadata(path: str) -> FileResult:
         stat = await trio.Path(path).stat()
         content = await trio.Path(path).read_bytes()
-        
+
         return FileResult(
             path=path,
             size=stat.st_size,
-            creation_date=datetime.datetime.fromtimestamp(stat.st_ctime, tz=datetime.timezone.utc),
-            content_hash=hashlib.sha256(content).hexdigest()
+            creation_date=datetime.datetime.fromtimestamp(
+                stat.st_ctime, tz=datetime.timezone.utc
+            ),
+            content_hash=hashlib.sha256(content).hexdigest(),
         )
 
 
 class N3Processor:
     """Processes N3 files and handles invocations"""
+
     def __init__(self, base: str = DEFAULT_BASE):
         self.base = base
         self.graph = Graph(base=base)
@@ -79,7 +97,9 @@ class N3Processor:
         )  # Replace 4 spaces with 2 spaces globally
         print(Panel(Syntax(n3, "turtle"), title="N3"))
 
-    def get_single_object(self, subject: URIRef, predicate: URIRef) -> Optional[URIRef]:
+    def get_single_object(
+        self, subject: URIRef, predicate: URIRef
+    ) -> Optional[URIRef]:
         """Get a single object for a subject-predicate pair"""
         objects = list(self.graph.objects(subject, predicate))
         if len(objects) != 1:
@@ -94,7 +114,9 @@ class N3Processor:
         """Get the supposition for a step"""
         return self.get_single_object(step, SWA.supposes)
 
-    def get_invocation_details(self, invocation: URIRef) -> Tuple[Optional[URIRef], Optional[URIRef]]:
+    def get_invocation_details(
+        self, invocation: URIRef
+    ) -> Tuple[Optional[URIRef], Optional[URIRef]]:
         """Get the parameter and target type for an invocation"""
         target = self.get_single_object(invocation, NT.target)
         target_type = self.get_single_object(target, RDF.type)
@@ -104,37 +126,41 @@ class N3Processor:
     async def process_invocations(self, step: URIRef) -> None:
         """Process all invocations for a step"""
         from capabilities import ShellCapability, ArtGenerationCapability
-        
-        invocations: List[URIRef] = list(self.graph.objects(step, SWA.invokes))
+
+        invocations: List[URIRef] = list(
+            self.graph.objects(step, SWA.invokes)
+        )
         if not invocations:
             return
 
         console.print(f"Processing {len(invocations)} invocations")
         console.rule()
-        
+
         capability_map = {
             NT.ShellCapability: ShellCapability(),
-            NT.ArtGenerationCapability: ArtGenerationCapability()
+            NT.ArtGenerationCapability: ArtGenerationCapability(),
         }
-        
+
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                parameter, target_type = self.get_invocation_details(invocation)
-                
+                parameter, target_type = self.get_invocation_details(
+                    invocation
+                )
+
                 if target_type in capability_map:
                     capability = capability_map[target_type]
                     nursery.start_soon(
                         capability.execute,
                         parameter,
                         invocation,
-                        self.graph
+                        self.graph,
                     )
 
     async def process(self) -> None:
         """Main processing method"""
         try:
             self.graph.parse(sys.stdin, format="n3")
-            
+
             step = URIRef(f"{self.base}#")
             next_step = self.get_next_step(step)
             if not next_step:
@@ -145,7 +171,7 @@ class N3Processor:
                 raise ValueError("No supposition found for the next step")
 
             await self.process_invocations(step)
-            
+
         except Exception as e:
             console.print(f"[red]Error processing N3:[/red] {str(e)}")
             raise
