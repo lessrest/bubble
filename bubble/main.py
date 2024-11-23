@@ -9,7 +9,7 @@ mint = Mint()
 
 
 @app.command()
-def mint_casual(
+def fresh(
     namespace: str = typer.Option(
         "https://swa.sh/",
         "--namespace",
