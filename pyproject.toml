@@ -5,9 +5,6 @@ description = "Add your description here"
 authors = []
 readme = "README.md"
 requires-python = ">=3.13"
-packages = [
-    "bubble"
-]
 dependencies = [
     "httpx>=0.27.2",
     "pytest-trio>=0.8.0",
@@ -21,6 +18,9 @@ dependencies = [
 [build-system]
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include = ["bubble"]
 
 [tool.ruff]
 line-length = 76
