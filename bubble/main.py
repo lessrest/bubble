@@ -1,3 +1,4 @@
+from typing import Annotated
 import typer
 
 from rdflib import Namespace
@@ -10,15 +11,20 @@ mint = Mint()
 
 @app.command()
 def fresh(
-    namespace: str = typer.Option(
-        "https://swa.sh/",
-        "--namespace",
-        "-n",
-        help="Base namespace for the IRI",
-    ),
-    secure: bool = typer.Option(
-        False, "--secure", help="Generate a secure IRI", is_flag=True
-    ),
+    namespace: Annotated[
+        str,
+        typer.Option(
+            "--namespace",
+            "-n",
+            help="Base namespace for the IRI",
+        ),
+    ] = "https://swa.sh/",
+    secure: Annotated[
+        bool,
+        typer.Option(
+            help="Generate a secure IRI",
+        ),
+    ] = False,
 ) -> None:
     """Generate a unique IRI, either secure or casual (the default)."""
     ns = Namespace(namespace)
