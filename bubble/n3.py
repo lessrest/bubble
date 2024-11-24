@@ -79,7 +79,7 @@ class FileHandler:
         )
 
 
-class RuleEngine:
+class StepExecution:
     """Engine for processing N3 files and applying rules"""
 
     def __init__(self, base: str = DEFAULT_BASE):
@@ -169,7 +169,7 @@ class RuleEngine:
 
 def main() -> None:
     """Entry point for the N3 processor"""
-    processor = RuleEngine()
+    processor = StepExecution()
     trio.run(processor.process)
 
 

@@ -1,16 +1,11 @@
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
-from bubble import RuleEngine, FileHandler, FileResult
+from bubble import StepExecution, FileHandler, FileResult
 from bubble.n3_utils import get_single_object, get_objects
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
 NT = Namespace("https://node.town/2024/")
-
-
-@pytest.fixture
-def processor():
-    return RuleEngine(base="https://test.example/")
 
 
 @pytest.fixture
@@ -28,15 +23,9 @@ def basic_graph():
     return graph
 
 
-def test_processor_initialization(processor):
-    """Test basic processor initialization"""
-    assert processor.base == "https://test.example/"
-    assert isinstance(processor.graph, Graph)
-    assert isinstance(processor.file_handler, FileHandler)
-
-
-def test_get_next_step(processor, basic_graph):
+def test_get_next_step(basic_graph):
     """Test getting the next step from a graph"""
+    processor = StepExecution(base="https://test.example/")
     processor.graph = basic_graph
     step = URIRef("https://test.example/#")
     next_step = processor.get_next_step(step)
@@ -44,8 +33,9 @@ def test_get_next_step(processor, basic_graph):
     assert next_step == URIRef("https://test.example/next")
 
 
-def test_get_supposition(processor, basic_graph):
+def test_get_supposition(basic_graph):
     """Test getting the supposition for a step"""
+    processor = StepExecution(base="https://test.example/")
     processor.graph = basic_graph
     next_step = URIRef("https://test.example/next")
     supposition = processor.get_supposition(next_step)

@@ -9,7 +9,7 @@ import subprocess
 
 from rdflib import Graph
 
-from bubble.n3 import RuleEngine
+from bubble.n3 import StepExecution
 
 DEFAULT_N3_PATH = os.environ["BUBBLE_N3_PATH"]
 console = Console(width=80)
@@ -68,7 +68,7 @@ def main(
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
     try:
-        processor = RuleEngine()
+        processor = StepExecution()
 
         # Load and process the input graph
         g = processor.show(input_path)

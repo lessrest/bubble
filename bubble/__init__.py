@@ -1,4 +1,4 @@
-from .n3 import RuleEngine, FileHandler, FileResult
+from .n3 import StepExecution, FileHandler, FileResult
 from .n3_utils import (
     print_n3,
     get_single_object,
@@ -10,7 +10,7 @@ from .n3_utils import (
 from .capabilities import Capability, ShellCapability, ArtGenerationCapability
 
 __all__ = [
-    "RuleEngine",
+    "StepExecution",
     "FileHandler",
     "FileResult",
     "Capability",

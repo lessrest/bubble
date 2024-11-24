@@ -1,17 +1,12 @@
 import pytest
 from pathlib import Path
 from rdflib import URIRef, Namespace
-from bubble import RuleEngine
+from bubble import StepExecution
 from bubble.n3_utils import print_n3
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
 NT = Namespace("https://node.town/2024/")
-
-
-@pytest.fixture
-def processor():
-    return RuleEngine(base="https://test.example/")
 
 
 @pytest.fixture
@@ -43,7 +38,7 @@ nt:nonce nt:ranks 1 .
 """
 
 
-async def test_n3_processing_basic(processor, basic_n3, tmp_path):
+async def test_n3_processing_basic(basic_n3, tmp_path):
     """Test basic N3 processing with a shell command"""
     rules_file = Path(__file__).parent.parent / "rules" / "core.n3"
     # Create a temporary file with N3 content
@@ -51,7 +46,8 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
     n3_file.write_text(basic_n3)
 
     # Process and reason over the N3 file
-    await processor.reason([rules_file, n3_file])
+    processor = StepExecution(base="https://test.example/")
+    await processor.reason([rules_file.as_posix(), n3_file.as_posix()])
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
