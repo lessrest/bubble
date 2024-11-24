@@ -99,9 +99,7 @@ class ArtGenerationCapability(Capability):
         from bubble.n3 import FileResult
 
         file_result = FileResult(path=temp_file)
-        result_node = await FileHandler.create_result_node(
-            graph, file_result
-        )
+        result_node = await FileHandler.create_result_node(graph, file_result)
         graph.add((invocation, SWA.result, result_node))
 
         print(f"Art generated and saved to: {temp_file}")

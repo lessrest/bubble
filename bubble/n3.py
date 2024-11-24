@@ -92,9 +92,7 @@ class N3Processor:
     def print_n3(self) -> None:
         """Print the graph in N3 format"""
         n3 = self.graph.serialize(format="n3")
-        n3 = n3.replace(
-            "    ", "  "
-        )  # Replace 4 spaces with 2 spaces globally
+        n3 = n3.replace("    ", "  ")  # Replace 4 spaces with 2 spaces globally
         print(Panel(Syntax(n3, "turtle"), title="N3"))
 
     def get_single_object(
@@ -127,9 +125,7 @@ class N3Processor:
         """Process all invocations for a step"""
         from bubble.capabilities import ShellCapability, ArtGenerationCapability
 
-        invocations: List[URIRef] = list(
-            self.graph.objects(step, SWA.invokes)
-        )
+        invocations: List[URIRef] = list(self.graph.objects(step, SWA.invokes))
         if not invocations:
             return
 
@@ -143,9 +139,7 @@ class N3Processor:
 
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                parameter, target_type = self.get_invocation_details(
-                    invocation
-                )
+                parameter, target_type = self.get_invocation_details(invocation)
 
                 if target_type in capability_map:
                     capability = capability_map[target_type]

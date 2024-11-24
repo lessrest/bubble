@@ -43,7 +43,7 @@ include = ["bubble"]
 bubble = "bubble.main:app"
 
 [tool.ruff]
-line-length = 76 # slim fit
+line-length = 80 # slim fit
 target-version = "py313" # I'm not interested in old Python versions
 
 [tool.ruff.lint.isort]

@@ -6,5 +6,5 @@
 /dist
 *.egg-info
 
-**/priv   # put secrets here
-
+priv   # put secrets here
+/**/priv

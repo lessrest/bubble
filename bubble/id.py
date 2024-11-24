@@ -45,6 +45,7 @@ class Mint:
     def machine_id(self) -> str:
         """Generate a consistent machine identifier encoded in base32."""
         from machineid import hashed_id
+
         # Get hex machine ID and convert to bytes
         hex_id = hashed_id("this should be a user secret")
         # Take first 20 bytes (40 hex chars)

@@ -78,9 +78,7 @@ async def test_file_handler_metadata():
 async def test_create_result_node():
     """Test creating a result node in the graph"""
     graph = Graph()
-    file_result = FileResult(
-        path="/test/path", size=100, content_hash="abc123"
-    )
+    file_result = FileResult(path="/test/path", size=100, content_hash="abc123")
 
     result_node = await FileHandler.create_result_node(graph, file_result)
 

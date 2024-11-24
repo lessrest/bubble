@@ -1,5 +1,6 @@
 from typing import Annotated
 import typer
+from typer import Option, Argument
 from pathlib import Path
 
 from rdflib import Graph, Namespace
@@ -13,18 +14,10 @@ mint = Mint()
 @app.command()
 def fresh(
     namespace: Annotated[
-        str,
-        typer.Option(
-            "--namespace",
-            "-n",
-            help="Base namespace for the IRI",
-        ),
+        str, Option(help="Base namespace for the IRI")
     ] = "https://swa.sh/",
     casual: Annotated[
-        bool,
-        typer.Option(
-            help="Generate a casual IRI (default is secure)",
-        ),
+        bool, Option(help="Generate a casual IRI (default is secure)")
     ] = False,
 ) -> None:
     """Generate a unique IRI, either secure (default) or casual."""
@@ -40,18 +33,19 @@ def fresh(
 def show(
     file: Annotated[
         Path,
-        typer.Argument(
+        Argument(
             help="N3 file to display",
             exists=True,
             dir_okay=False,
             readable=True,
         ),
-    ]
+    ],
 ) -> None:
     """Load and display an N3 file."""
     g = Graph()
-    g.parse(file, format="n3") 
+    g.parse(file, format="n3")
     print(g.serialize(format="n3"))
+
 
 if __name__ == "__main__":
     app()
