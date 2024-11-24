@@ -9,7 +9,7 @@ app = typer.Typer()
 mint = Mint()
 
 
-@app.command()
+@app.command("fresh")
 def fresh(
     namespace: Annotated[
         str,
