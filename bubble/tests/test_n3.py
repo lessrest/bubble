@@ -11,57 +11,50 @@ NT = Namespace("https://node.town/2024/")
 
 
 @pytest.fixture
-def basic_graph():
-    """Creates a basic graph with a single step"""
-    graph = Graph(base="https://test.example/")
-    step = URIRef("https://test.example/#")
-    next_step = URIRef("https://test.example/next")
+def basic_n3():
+    """Creates basic N3 content for testing"""
+    return """
+@base <https://test.example/> .
+@prefix nt: <https://node.town/2024/> .
 
-    graph.add((step, NT.precedes, next_step))
-    graph.add(
-        (next_step, NT.supposes, URIRef("https://test.example/supposition"))
-    )
-
-    return graph
+<#> nt:precedes <next> .
+<next> nt:supposes <supposition> .
+"""
 
 
-def test_get_next_step(basic_graph):
+@pytest.fixture
+def processor(basic_n3, tmp_path):
+    """Creates a StepExecution instance with basic N3 content"""
+    n3_file = tmp_path / "test.n3"
+    n3_file.write_text(basic_n3)
+    return StepExecution(base="https://test.example/", step=n3_file.as_posix())
+
+
+def test_get_next_step(processor):
     """Test getting the next step from a graph"""
-    graph_file_tmp = Path(tempfile.mktemp())
-    basic_graph.serialize(graph_file_tmp, format="n3")
-    processor = StepExecution(
-        base="https://test.example/", step=graph_file_tmp.as_posix()
-    )
     step = URIRef("https://test.example/#")
     next_step = processor.get_next_step(step)
-
     assert next_step == URIRef("https://test.example/next")
 
 
-def test_get_supposition(basic_graph):
+def test_get_supposition(processor):
     """Test getting the supposition for a step"""
-    graph_file_tmp = Path(tempfile.mktemp())
-    basic_graph.serialize(graph_file_tmp, format="n3")
-    processor = StepExecution(
-        base="https://test.example/", step=graph_file_tmp.as_posix()
-    )
     next_step = URIRef("https://test.example/next")
     supposition = processor.get_supposition(next_step)
-
     assert supposition == URIRef("https://test.example/supposition")
 
 
-def test_get_single_object(basic_graph):
+def test_get_single_object(processor):
     """Test get_single_object utility function"""
     step = URIRef("https://test.example/#")
-    next_step = get_single_object(basic_graph, step, NT.precedes)
+    next_step = get_single_object(processor.graph, step, NT.precedes)
     assert next_step == URIRef("https://test.example/next")
 
 
-def test_get_objects(basic_graph):
+def test_get_objects(processor):
     """Test get_objects utility function"""
     step = URIRef("https://test.example/#")
-    objects = get_objects(basic_graph, step, NT.precedes)
+    objects = get_objects(processor.graph, step, NT.precedes)
     assert len(objects) == 1
     assert objects[0] == URIRef("https://test.example/next")
 
