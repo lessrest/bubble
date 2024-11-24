@@ -1,6 +1,7 @@
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
 from bubble import N3Processor, FileHandler, FileResult
+from bubble.n3_utils import get_single_object, get_objects, show, reason, skolemize
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
@@ -20,13 +21,7 @@ def basic_graph():
     next_step = URIRef("https://test.example/next")
 
     graph.add((step, NT.precedes, next_step))
-    graph.add(
-        (
-            next_step,
-            NT.supposes,
-            URIRef("https://test.example/supposition"),
-        )
-    )
+    graph.add((next_step, NT.supposes, URIRef("https://test.example/supposition")))
 
     return graph
 
@@ -56,12 +51,26 @@ def test_get_supposition(processor, basic_graph):
     assert supposition == URIRef("https://test.example/supposition")
 
 
+def test_get_single_object(basic_graph):
+    """Test get_single_object utility function"""
+    step = URIRef("https://test.example/#")
+    next_step = get_single_object(basic_graph, step, NT.precedes)
+    assert next_step == URIRef("https://test.example/next")
+
+
+def test_get_objects(basic_graph):
+    """Test get_objects utility function"""
+    step = URIRef("https://test.example/#")
+    objects = get_objects(basic_graph, step, NT.precedes)
+    assert len(objects) == 1
+    assert objects[0] == URIRef("https://test.example/next")
+
+
 async def test_file_handler_metadata():
     """Test FileHandler metadata collection"""
     import tempfile
     import trio
 
-    # Create a temporary file with some content
     async with await trio.open_file(tempfile.mktemp(), "w") as f:
         await f.write("test content")
         path = f.name
