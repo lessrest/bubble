@@ -1,6 +1,7 @@
 import sys
 import hashlib
 import datetime
+import subprocess
 
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
@@ -172,6 +173,67 @@ class N3Processor:
         except Exception as e:
             console.print(f"[red]Error processing N3:[/red] {str(e)}")
             raise
+
+    async def reason(self, input_path: str) -> Graph:
+        """Run the EYE reasoner on an N3 file and return the resulting graph"""
+        # Run EYE reasoner
+        cmd = ["eye", "--quiet", "--nope", "--pass-all", input_path]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Parse the output into a new graph
+        g = Graph()
+        g.parse(data=result.stdout, format="n3")
+        return g
+
+    def show(self, input_path: str) -> Graph:
+        """Load and normalize an N3 file"""
+        g = Graph()
+        g.parse(input_path, format="n3")
+        return g
+
+    def skolemize(
+        self,
+        input_path: str,
+        namespace: str = "https://swa.sh/.well-known/genid/",
+    ) -> Graph:
+        """Convert blank nodes in an N3 file to fresh IRIs"""
+        from bubble.id import Mint
+
+        mint = Mint()
+
+        # Create input graph and parse file
+        g = Graph()
+        g.parse(input_path, format="n3")
+
+        # Create namespace for new IRIs
+        ns = Namespace(namespace)
+
+        # Create output graph
+        g_sk = Graph()
+
+        # Copy namespace bindings
+        for prefix, namespace in g.namespaces():
+            g_sk.bind(prefix, namespace)
+
+        # Bind swa to the Skolem namespace
+        g_sk.bind("swa", ns)
+
+        # Create mapping of blank nodes to IRIs
+        bnode_map = {}
+
+        # Helper function to get or create IRI for a blank node
+        def get_iri_for_bnode(bnode):
+            if bnode not in bnode_map:
+                bnode_map[bnode] = mint.fresh_casual_iri(ns)
+            return bnode_map[bnode]
+
+        # Copy all triples, consistently replacing blank nodes
+        for s, p, o in g:
+            s_new = get_iri_for_bnode(s) if isinstance(s, BNode) else s
+            o_new = get_iri_for_bnode(o) if isinstance(o, BNode) else o
+            g_sk.add((s_new, p, o_new))
+
+        return g_sk
 
 
 def main() -> None:

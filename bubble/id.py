@@ -8,11 +8,11 @@ class Mint:
     """Generator for secure random tokens and non-secure pseudorandomidentifiers."""
 
     def fresh_token(self) -> str:
-        """Generate a secure 20-byte token encoded in base32."""
+        """Generate a secure token encoded in base32."""
         raw_token = secrets.token_bytes(20)
         # Convert to base32 and remove padding
         encoded = (
-            base64.b32encode(raw_token).decode("ascii").rstrip("=").lower()
+            base64.b32encode(raw_token).decode("ascii").rstrip("=").upper()
         )
         return encoded
 
@@ -40,7 +40,7 @@ class Mint:
 
     def fresh_id(self) -> str:
         """Generate a non-secure pseudorandom identifier."""
-        return XID().string()
+        return XID().string().upper()
 
     def machine_id(self) -> str:
         """Generate a consistent machine identifier encoded in base32."""
@@ -51,4 +51,4 @@ class Mint:
         # Take first 20 bytes (40 hex chars)
         raw_bytes = bytes.fromhex(hex_id[:40])
         # Convert to base32 and remove padding
-        return base64.b32encode(raw_bytes).decode("ascii").rstrip("=").lower()
+        return base64.b32encode(raw_bytes).decode("ascii").rstrip("=").upper()
