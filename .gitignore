@@ -9,3 +9,5 @@
 priv   # put secrets here
 /**/priv
 .DS_Store
+build
+**/build

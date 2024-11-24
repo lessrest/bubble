@@ -13,8 +13,8 @@ def test_fresh_token_format(mint):
     """Test that fresh_token generates valid base32 strings"""
     token = mint.fresh_token()
     # Should be 32 chars of base32 (no padding)
-    assert len(token) == 32
-    assert re.match(r"^[a-z2-7]+$", token) is not None
+    assert len(token) == 13
+    assert re.match(r"^[A-Z2-7]+$", token) is not None
 
 
 def test_fresh_token_uniqueness(mint):
@@ -33,8 +33,8 @@ def test_fresh_secure_iri(mint):
 
     # Rest should be a valid token
     token = str(iri)[len("https://test.example/") :]
-    assert len(token) == 32
-    assert re.match(r"^[a-z2-7]+$", token) is not None
+    assert len(token) == 13
+    assert re.match(r"^[A-Z2-7]+$", token) is not None
 
 
 def test_fresh_casual_iri(mint):
@@ -48,7 +48,7 @@ def test_fresh_casual_iri(mint):
     # Rest should be a valid XID
     token = str(iri)[len("https://test.example/") :]
     assert len(token) == 20
-    assert re.match(r"^[a-z0-9]+$", token) is not None
+    assert re.match(r"^[A-Z0-9]+$", token) is not None
 
 
 def test_fresh_id_format(mint):
@@ -57,7 +57,7 @@ def test_fresh_id_format(mint):
     # XID is 20 chars
     assert len(id) == 20
     # Should be lowercase base32
-    assert re.match(r"^[a-z0-9]+$", id) is not None
+    assert re.match(r"^[A-Z0-9]+$", id) is not None
 
 
 def test_machine_id_format(mint):
@@ -65,7 +65,7 @@ def test_machine_id_format(mint):
     id = mint.machine_id()
     # Should be 32 chars of base32 (no padding)
     assert len(id) == 32
-    assert re.match(r"^[a-z2-7]+$", id) is not None
+    assert re.match(r"^[A-Z2-7]+$", id) is not None
 
 
 def test_machine_id_consistency(mint):

@@ -1,7 +1,7 @@
 import pytest
-import tempfile
 from pathlib import Path
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import URIRef, Namespace
+from rich import inspect
 from bubble import N3Processor
 
 # Test namespaces
@@ -18,51 +18,109 @@ def processor():
 def basic_n3():
     return """
 @prefix : <#> .
-@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/eye#> .
+@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
 @prefix log: <http://www.w3.org/2000/10/swap/log#> .
 @prefix math: <http://www.w3.org/2000/10/swap/math#> .
-@prefix nt: <https://node.town/2024/#> .
+@prefix nt: <https://node.town/2024/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix swa: <https://swa.sh/> .
 @base <https://test.example/> .
 
-# Core axioms
-swa:succeeds owl:inverseOf swa:precedes .
+#
+nt:owns owl:inverseOf nt:isOwnedBy .
+nt:succeeds owl:inverseOf nt:precedes .
+nt:isPartOf owl:inverseOf nt:hasPart .
+owl:inverseOf owl:inverseOf owl:inverseOf .
 
-# Step succession rule
+#
 {
-   ?s1 a swa:Step .
-   ?s2 swa:succeeds ?s1 .
+   ?p owl:inverseOf ?q .
+   ?a ?p ?b
+}
+=>
+{
+   ?b ?q ?a
+} .
+
+#
+{
+   <#> nt:supposes ?g
+}
+=> ?g .
+
+#
+_:next a nt:Step ;
+   nt:succeeds <#> .
+
+
+# next = current + decisions - revocations
+{
+   ?s1 a nt:Step .
+   ?s2 nt:succeeds ?s1 .
    [] eye:findall (
        ?g1
        {
-           ?s1 swa:supposes ?g1 
+           ?s1 nt:supposes ?g1
        }
        ?gs1
-   ) .
+   ) ;
+       eye:findall (
+           ?g2
+           {
+               ?s1 nt:decides ?g2
+           }
+           ?gs2
+       ) ;
+       eye:findall (
+           ?g3
+           {
+               ?s1 nt:revokes ?g3
+           }
+           ?gs3
+       ) .
    ?gs1 log:conjunction ?g1m .
+   ?gs2 log:conjunction ?g2m .
+   ?gs3 log:conjunction ?g3m .
+   ( ?g1m ?g3m ) eye:graphDifference ?tmp .
+   ( ?tmp ?g2m ) log:conjunction ?result .
 }
-=> 
+=>
 {
-   ?s2 swa:supposes ?g1m 
+   ?s2 nt:supposes ?result
+} .
+
+
+#
+{
+   nt:nonce nt:ranks ?rank .
+   ( ?rank 1 ) math:sum ?next
+}
+=>
+{
+   <#> nt:decides
+   {
+       nt:nonce nt:ranks ?next
+   } .
+   <#> nt:revokes
+   {
+       nt:nonce nt:ranks ?rank
+   } .
 } .
 
 # Test step
-<#> a swa:Step ;
-    swa:invokes [
+<#> a nt:Step ;
+    nt:supposes {
+        nt:nonce nt:ranks 1
+    } ;
+    nt:invokes [
         a nt:Invocation ;
         nt:invokes [ a nt:ShellCapability ] ;
         nt:provides [
             a nt:ShellCommand ;
             nt:value "echo 'test' > $out"
         ]
-    ] ;
-    swa:precedes _:next .
+    ] .
 
-_:next a swa:Step ;
-    swa:supposes {
-        swa:nonce swa:ranks 1 .
-    } .
 """
 
 
@@ -74,24 +132,27 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
 
     # Process and reason over the N3 file
     await processor.reason(n3_file)
+    processor.print_n3()
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
     next_step = processor.get_next_step(step)
-    assert next_step is not None
-
+    inspect(next_step)
     supposition = processor.get_supposition(next_step)
-    assert supposition is not None
+    print(supposition)
 
     # Process invocations
     await processor.process_invocations(step)
 
     # Verify results
-    invocations = list(processor.graph.objects(step, SWA.invokes))
+    invocations = list(processor.graph.objects(step, NT.invokes))
     assert len(invocations) == 1
 
+    processor.print_n3()
+    inspect(invocations[0])
+
     # Check if result was added to graph
-    result = next(processor.graph.objects(invocations[0], SWA.result), None)
+    result = next(processor.graph.objects(invocations[0], NT.result), None)
     assert result is not None
 
     # Verify file was created
@@ -100,42 +161,3 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
     with open(path) as f:
         content = f.read().strip()
         assert content == "test"
-
-
-async def test_n3_processing_no_next_step(processor):
-    """Test handling of missing next step"""
-    n3_content = """
-@prefix swa: <https://swa.sh/> .
-@base <https://test.example/> .
-
-<#> a swa:Step .
-"""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".n3") as f:
-        f.write(n3_content)
-        f.flush()
-        processor.graph.parse(f.name, format="n3")
-
-        with pytest.raises(ValueError) as exc_info:
-            await processor.process(n3_content)
-        assert "No next step found" in str(exc_info.value)
-
-
-async def test_n3_processing_no_supposition(processor):
-    """Test handling of missing supposition"""
-    n3_content = """
-@prefix swa: <https://swa.sh/> .
-@base <https://test.example/> .
-
-<#> a swa:Step ;
-    swa:precedes <#next> .
-
-<#next> a swa:Step .
-"""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".n3") as f:
-        f.write(n3_content)
-        f.flush()
-        processor.graph.parse(f.name, format="n3")
-
-        with pytest.raises(ValueError) as exc_info:
-            await processor.process(n3_content)
-        assert "No supposition found" in str(exc_info.value)

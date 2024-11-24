@@ -114,11 +114,11 @@ class N3Processor:
 
     def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""
-        return self.get_single_object(step, SWA.precedes)
+        return self.get_single_object(step, NT.precedes)
 
     def get_supposition(self, step: _SubjectType) -> _ObjectType:
         """Get the supposition for a step"""
-        return self.get_single_object(step, SWA.supposes)
+        return self.get_single_object(step, NT.supposes)
 
     def get_invocation_details(
         self, invocation: _SubjectType
@@ -133,7 +133,7 @@ class N3Processor:
         from bubble.capabilities import ShellCapability, ArtGenerationCapability
 
         invocations: Sequence[_SubjectType] = list(
-            self.graph.objects(step, SWA.invokes)
+            self.graph.objects(step, NT.invokes)
         )
         if not invocations:
             return
@@ -174,6 +174,8 @@ class N3Processor:
             if not next_step:
                 raise ValueError("No next step found in the graph")
 
+            self.print_n3()
+
             supposition = self.get_supposition(next_step)
             if not supposition:
                 raise ValueError("No supposition found for the next step")
@@ -187,7 +189,7 @@ class N3Processor:
     async def reason(self, input_path: str) -> None:
         """Run the EYE reasoner on an N3 file and update the processor's graph"""
         # Run EYE reasoner
-        cmd = ["eye", "--quiet", "--nope", "--pass-all", input_path]
+        cmd = ["eye", "--quiet", "--nope", "--pass", input_path]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # Clear existing graph and parse the reasoner output

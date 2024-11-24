@@ -1,7 +1,9 @@
 import tempfile
 
 from abc import ABC, abstractmethod
+from typing import Iterable
 
+from rich import inspect
 import trio
 import replicate
 
@@ -26,7 +28,11 @@ class ShellCapability(Capability):
     """Handles shell command execution"""
 
     async def execute(
-        self, parameter: URIRef, invocation: URIRef, graph: Graph
+        self,
+        graph: Graph,
+        invocation: URIRef,
+        target: URIRef,
+        provides: Iterable[URIRef],
     ) -> None:
         """Execute shell command with optional standard input"""
         from bubble.n3 import NT
@@ -38,7 +44,7 @@ class ShellCapability(Capability):
         command = None
         stdin = None
 
-        for provided in graph.objects(invocation, NT.provides):
+        for provided in provides:
             ptype = next(graph.objects(provided, RDF.type))
             if ptype == NT.ShellCommand:
                 command = str(next(graph.objects(provided, NT.value)))
@@ -67,13 +73,13 @@ class ShellCapability(Capability):
             raise Exception(f"Command failed: {result.returncode}")
 
         try:
-            from bubble.n3 import SWA, FileHandler
+            from bubble.n3 import FileHandler
 
             file_result = await FileHandler.get_file_metadata(output_file)
             result_node = await FileHandler.create_result_node(
                 graph, file_result
             )
-            graph.add((invocation, SWA.result, result_node))
+            graph.add((invocation, NT.result, result_node))
 
             print(f"Command output saved to: {output_file}")
             console.rule()
@@ -87,18 +93,31 @@ class ArtGenerationCapability(Capability):
     WEBP_SUFFIX = ".webp"
 
     async def execute(
-        self, parameter: URIRef, invocation: URIRef, graph: Graph
+        self,
+        graph: Graph,
+        invocation: URIRef,
+        target: URIRef,
+        provides: Iterable[URIRef],
     ) -> None:
-        from bubble.n3 import NT, SWA, FileHandler
+        from bubble.n3 import NT, FileHandler
 
-        prompt = next(graph.objects(parameter, NT.prompt), None)
+        prompt = None
+        inspect(provides)
+        for provided in provides:
+            ptypes = list(graph.objects(provided, RDF.type))
+            if NT.ImagePrompt in ptypes:
+                prompts = list(graph.objects(provided, NT.prompt))
+                if len(prompts) != 1:
+                    raise ValueError("No prompt found for art generation")
+                prompt = str(prompts[0])
+
         if not prompt:
             raise ValueError("No prompt found for art generation")
 
         print(f"Generating art for prompt: {prompt}")
         console.rule()
 
-        result = await replicate.async_run(
+        blob = await replicate.async_run(
             "black-forest-labs/flux-schnell",
             input={
                 "prompt": prompt,
@@ -107,18 +126,20 @@ class ArtGenerationCapability(Capability):
             },
         )
 
-        async for blob in result:
-            temp_file = tempfile.mktemp(suffix=self.WEBP_SUFFIX)
-            async with await trio.open_file(temp_file, "wb") as f:
-                await f.write(blob)
+        # if it's a list, get the first item
+        if isinstance(blob, list):
+            blob = blob[0]
 
-            from bubble.n3 import FileResult
+        temp_file = tempfile.mktemp(suffix=self.WEBP_SUFFIX)
+        async with await trio.open_file(temp_file, "wb") as f:
+            async for chunk in blob:
+                await f.write(chunk)
 
-            file_result = FileResult(path=temp_file)
-            result_node = await FileHandler.create_result_node(
-                graph, file_result
-            )
-            graph.add((invocation, SWA.result, result_node))
+        from bubble.n3 import FileResult
 
-            print(f"Art generated and saved to: {temp_file}")
-            console.rule()
+        file_result = FileResult(path=temp_file)
+        result_node = await FileHandler.create_result_node(graph, file_result)
+        graph.add((invocation, NT.result, result_node))
+
+        print(f"Art generated and saved to: {temp_file}")
+        console.rule()

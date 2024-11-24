@@ -1,5 +1,4 @@
 import pytest
-import tempfile
 from pathlib import Path
 from rdflib import Graph, URIRef, Literal, Namespace, BNode, RDF
 from bubble import ShellCapability, ArtGenerationCapability
@@ -29,7 +28,6 @@ async def test_shell_capability_success(shell_capability, graph):
     # Create invocation with command
     invocation = URIRef("https://test.example/invocation")
     command_node = BNode()
-    stdin_node = BNode()
 
     graph.add((invocation, RDF.type, NT.Invocation))
     graph.add((invocation, NT.provides, command_node))
@@ -37,10 +35,10 @@ async def test_shell_capability_success(shell_capability, graph):
     graph.add((command_node, NT.value, Literal('echo "test" > $out')))
 
     # Execute the command
-    await shell_capability.execute(None, invocation, graph)
+    await shell_capability.execute(graph, invocation, None, [command_node])
 
     # Verify results
-    result_node = next(graph.objects(invocation, SWA.result))
+    result_node = next(graph.objects(invocation, NT.result))
     assert result_node is not None
 
     # Check file path exists
@@ -59,7 +57,7 @@ async def test_shell_capability_failure(shell_capability, graph):
     graph.add((invocation, RDF.type, NT.Invocation))
 
     with pytest.raises(ValueError) as exc_info:
-        await shell_capability.execute(None, invocation, graph)
+        await shell_capability.execute(graph, invocation, None, [])
     assert "No shell command provided" in str(exc_info.value)
 
 
@@ -69,6 +67,7 @@ async def test_art_generation_capability(art_capability, graph):
     invocation = URIRef("https://test.example/invocation")
 
     # Add a prompt to the graph
+    graph.add((parameter, RDF.type, NT.ImagePrompt))
     graph.add((parameter, NT.prompt, Literal("a test prompt")))
 
     # Mock replicate.async_run to avoid actual API calls
@@ -76,20 +75,20 @@ async def test_art_generation_capability(art_capability, graph):
 
     original_run = replicate.async_run
 
-    async def mock_run(*args, **kwargs):
-        class MockResult:
-            async def aread(self):
-                return b"mock image data"
+    # async def mock_run(*args, **kwargs):
+    #     class MockResult:
+    #         async def aread(self):
+    #             return b"mock image data"
 
-        return [MockResult()]
+    #     return MockResult()
 
-    replicate.async_run = mock_run
+    # replicate.async_run = mock_run
 
     try:
-        await art_capability.execute(parameter, invocation, graph)
+        await art_capability.execute(graph, invocation, None, [parameter])
 
         # Verify results
-        result_node = next(graph.objects(invocation, SWA.result))
+        result_node = next(graph.objects(invocation, NT.result))
         assert result_node is not None
 
         # Check file path exists and ends with .webp
@@ -108,8 +107,10 @@ async def test_art_generation_no_prompt(art_capability, graph):
     invocation = URIRef("https://test.example/invocation")
 
     with pytest.raises(ValueError) as exc_info:
-        await art_capability.execute(parameter, invocation, graph)
+        await art_capability.execute(graph, invocation, None, [parameter])
     assert "No prompt found" in str(exc_info.value)
+
+
 async def test_shell_capability_with_stdin(shell_capability, graph):
     """Test shell command with standard input"""
     invocation = URIRef("https://test.example/invocation")
@@ -124,10 +125,12 @@ async def test_shell_capability_with_stdin(shell_capability, graph):
     graph.add((stdin_node, RDF.type, NT.StandardInput))
     graph.add((stdin_node, NT.value, Literal("test input")))
 
-    await shell_capability.execute(None, invocation, graph)
+    await shell_capability.execute(
+        graph, invocation, None, [command_node, stdin_node]
+    )
 
     # Verify results
-    result_node = next(graph.objects(invocation, SWA.result))
+    result_node = next(graph.objects(invocation, NT.result))
     assert result_node is not None
 
     # Check file path exists

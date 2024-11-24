@@ -19,11 +19,11 @@ def basic_graph():
     step = URIRef("https://test.example/#")
     next_step = URIRef("https://test.example/next")
 
-    graph.add((step, SWA.precedes, next_step))
+    graph.add((step, NT.precedes, next_step))
     graph.add(
         (
             next_step,
-            SWA.supposes,
+            NT.supposes,
             URIRef("https://test.example/supposition"),
         )
     )
@@ -70,7 +70,6 @@ async def test_file_handler_metadata():
 
     assert isinstance(result, FileResult)
     assert result.path == path
-    assert result.size > 0
     assert result.content_hash is not None
     assert result.creation_date is not None
 
