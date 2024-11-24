@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 import trio
 import typer
@@ -11,7 +12,7 @@ from rdflib import Graph
 
 from bubble.n3 import N3Processor
 
-DEFAULT_N3_PATH = "./priv/main.n3"
+DEFAULT_N3_PATH = os.environ.get("BUBBLE_N3_PATH", "./priv/main.n3")
 console = Console(width=80)
 
 app = typer.Typer(add_completion=False)
