@@ -1,7 +1,8 @@
 from typing import Annotated
 import typer
+from pathlib import Path
 
-from rdflib import Namespace
+from rdflib import Graph, Namespace
 
 from bubble.id import Mint
 
@@ -34,6 +35,23 @@ def fresh(
         iri = mint.fresh_secure_iri(ns)
     typer.echo(iri)
 
+
+@app.command()
+def show(
+    file: Annotated[
+        Path,
+        typer.Argument(
+            help="N3 file to display",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ]
+) -> None:
+    """Load and display an N3 file."""
+    g = Graph()
+    g.parse(file, format="n3") 
+    print(g.serialize(format="n3"))
 
 if __name__ == "__main__":
     app()
