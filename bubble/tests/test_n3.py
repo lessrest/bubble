@@ -64,7 +64,8 @@ async def test_file_handler_metadata(tmp_path):
     import trio
 
     test_file = tmp_path / "test.txt"
-    await test_file.write_text("test content")
+    async with await trio.open_file(str(test_file), "w") as f:
+        await f.write("test content")
 
     result = await FileHandler.get_file_metadata(str(test_file))
 
