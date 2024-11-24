@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 import trio
 import typer
 from typer import Option, Argument
@@ -15,6 +15,31 @@ from bubble.n3 import N3Processor
 app = typer.Typer()
 mint = Mint()
 console = Console(width=80)
+
+def print_graph(g: Graph) -> None:
+    """Print a graph with syntax highlighting"""
+    content = g.serialize(format="n3")
+    syntax = Syntax(content, "turtle", theme="coffee", word_wrap=True)
+    console.print(syntax)
+
+def handle_output(g: Graph, output_path: Optional[str], message: str) -> None:
+    """Handle graph output to file or stdout"""
+    content = g.serialize(format="n3")
+    if output_path:
+        with open(output_path, "w") as f:
+            f.write(content)
+        console.print(f"\n{message}: {output_path}")
+    else:
+        print_graph(g)
+
+def handle_error(e: Exception, context: str = "") -> None:
+    """Handle and print errors consistently"""
+    if isinstance(e, FileNotFoundError):
+        console.print(f"[red]Error:[/red] File '{context}' not found")
+    elif isinstance(e, subprocess.CalledProcessError):
+        console.print(f"[red]EYE reasoner error:[/red]\n{e.stderr}")
+    else:
+        console.print(f"[red]Error:[/red] {str(e)}")
 
 
 @app.command()
@@ -41,14 +66,9 @@ def show(path: str):
     try:
         processor = N3Processor()
         g = processor.show(path)
-
-        content = g.serialize(format="n3")
-        syntax = Syntax(content, "turtle", theme="coffee", word_wrap=True)
-        console.print(syntax)
-    except FileNotFoundError:
-        console.print(f"[red]Error:[/red] File '{path}' not found")
+        print_graph(g)
     except Exception as e:
-        console.print(f"[red]Error:[/red] {str(e)}")
+        handle_error(e, path)
 
 
 @app.command()
@@ -66,26 +86,9 @@ def skolemize(
     try:
         processor = N3Processor()
         g = processor.skolemize(input_path, namespace)
-
-        content = g.serialize(format="n3")
-
-        if output_path:
-            with open(output_path, "w") as f:
-                f.write(content)
-            console.print(f"\nSkolemized graph written to: {output_path}")
-        else:
-            syntax = Syntax(
-                content,
-                "turtle",
-                theme="coffee",
-                word_wrap=True,
-            )
-            console.print(syntax)
-
-    except FileNotFoundError:
-        console.print(f"[red]Error:[/red] File '{input_path}' not found")
+        handle_output(g, output_path, "Skolemized graph written to")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {str(e)}")
+        handle_error(e, input_path)
 
 
 @app.command()
@@ -98,34 +101,11 @@ def reason(
 ):
     """Run the EYE reasoner on an N3 file"""
     try:
-        # Create processor and run reasoning
         processor = N3Processor()
         g = trio.run(processor.reason, input_path)
-
-        # Serialize the result
-        content = g.serialize(format="n3")
-
-        if output_path:
-            # Write to file if output path specified
-            with open(output_path, "w") as f:
-                f.write(content)
-            console.print(f"\nReasoning output written to: {output_path}")
-        else:
-            # Print to stdout with syntax highlighting
-            syntax = Syntax(
-                content,
-                "turtle",
-                theme="coffee",
-                word_wrap=True,
-            )
-            console.print(syntax)
-
-    except FileNotFoundError:
-        console.print(f"[red]Error:[/red] File '{input_path}' not found")
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]EYE reasoner error:[/red]\n{e.stderr}")
+        handle_output(g, output_path, "Reasoning output written to")
     except Exception as e:
-        console.print(f"[red]Error:[/red] {str(e)}")
+        handle_error(e, input_path)
 
 
 if __name__ == "__main__":
