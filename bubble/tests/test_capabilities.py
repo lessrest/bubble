@@ -26,12 +26,18 @@ def art_capability():
 
 async def test_shell_capability_success(shell_capability, graph):
     """Test successful shell command execution"""
-    # Create a simple echo command
-    command = 'echo "test" > $out'
+    # Create invocation with command
     invocation = URIRef("https://test.example/invocation")
+    command_node = BNode()
+    stdin_node = BNode()
+
+    graph.add((invocation, RDF.type, NT.Invocation))
+    graph.add((invocation, NT.provides, command_node))
+    graph.add((command_node, RDF.type, NT.ShellCommand))
+    graph.add((command_node, NT.value, Literal('echo "test" > $out')))
 
     # Execute the command
-    await shell_capability.execute(command, invocation, graph)
+    await shell_capability.execute(None, invocation, graph)
 
     # Verify results
     result_node = next(graph.objects(invocation, SWA.result))
@@ -104,3 +110,31 @@ async def test_art_generation_no_prompt(art_capability, graph):
     with pytest.raises(ValueError) as exc_info:
         await art_capability.execute(parameter, invocation, graph)
     assert "No prompt found" in str(exc_info.value)
+async def test_shell_capability_with_stdin(shell_capability, graph):
+    """Test shell command with standard input"""
+    invocation = URIRef("https://test.example/invocation")
+    command_node = BNode()
+    stdin_node = BNode()
+
+    graph.add((invocation, RDF.type, NT.Invocation))
+    graph.add((invocation, NT.provides, command_node))
+    graph.add((invocation, NT.provides, stdin_node))
+    graph.add((command_node, RDF.type, NT.ShellCommand))
+    graph.add((command_node, NT.value, Literal("cat > $out")))
+    graph.add((stdin_node, RDF.type, NT.StandardInput))
+    graph.add((stdin_node, NT.value, Literal("test input")))
+
+    await shell_capability.execute(None, invocation, graph)
+
+    # Verify results
+    result_node = next(graph.objects(invocation, SWA.result))
+    assert result_node is not None
+
+    # Check file path exists
+    path = next(graph.objects(result_node, NT.path))
+    assert Path(path).exists()
+
+    # Verify content
+    with open(path) as f:
+        content = f.read().strip()
+        assert content == "test input"

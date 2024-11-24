@@ -26,21 +26,41 @@ class ShellCapability(Capability):
     """Handles shell command execution"""
 
     async def execute(
-        self, parameter: str, invocation: URIRef, graph: Graph
+        self, parameter: URIRef, invocation: URIRef, graph: Graph
     ) -> None:
+        """Execute shell command with optional standard input"""
+        from bubble.n3 import NT
+
         temp_dir = tempfile.mkdtemp()
         output_file = f"{temp_dir}/out"
 
-        print(f"Running shell command: {parameter}")
+        # Get command and stdin values
+        command = None
+        stdin = None
+        
+        for provided in graph.objects(invocation, NT.provides):
+            ptype = next(graph.objects(provided, RDF.type))
+            if ptype == NT.ShellCommand:
+                command = str(next(graph.objects(provided, NT.value)))
+            elif ptype == NT.StandardInput:
+                stdin = str(next(graph.objects(provided, NT.value)))
+
+        if not command:
+            raise ValueError("No shell command provided")
+
+        print(f"Running shell command: {command}")
         print(f"Working directory: {temp_dir}")
+        if stdin:
+            print(f"With standard input: {stdin[:50]}...")
         console.rule()
 
         result = await trio.run_process(
-            parameter,
+            command,
             shell=True,
             cwd=temp_dir,
             env={"out": f"{temp_dir}/out"},
             capture_stderr=True,
+            input=stdin.encode() if stdin else None,
         )
         if result.returncode != 0:
             print(f"Command failed: {result.returncode}")
