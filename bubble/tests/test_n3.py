@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
 from bubble import StepExecution, FileHandler, FileResult
@@ -25,8 +27,11 @@ def basic_graph():
 
 def test_get_next_step(basic_graph):
     """Test getting the next step from a graph"""
-    processor = StepExecution(base="https://test.example/")
-    processor.graph = basic_graph
+    graph_file_tmp = Path(tempfile.mktemp())
+    basic_graph.serialize(graph_file_tmp, format="n3")
+    processor = StepExecution(
+        base="https://test.example/", step=graph_file_tmp.as_posix()
+    )
     step = URIRef("https://test.example/#")
     next_step = processor.get_next_step(step)
 
@@ -35,8 +40,11 @@ def test_get_next_step(basic_graph):
 
 def test_get_supposition(basic_graph):
     """Test getting the supposition for a step"""
-    processor = StepExecution(base="https://test.example/")
-    processor.graph = basic_graph
+    graph_file_tmp = Path(tempfile.mktemp())
+    basic_graph.serialize(graph_file_tmp, format="n3")
+    processor = StepExecution(
+        base="https://test.example/", step=graph_file_tmp.as_posix()
+    )
     next_step = URIRef("https://test.example/next")
     supposition = processor.get_supposition(next_step)
 

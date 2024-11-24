@@ -1,9 +1,8 @@
 """N3 processor for handling N3 files and invocations."""
 
-import sys
 import hashlib
 import datetime
-from typing import Sequence, Tuple, Optional
+from typing import Tuple, Optional
 from dataclasses import dataclass
 import trio
 from rich import pretty
@@ -82,11 +81,13 @@ class FileHandler:
 class StepExecution:
     """Engine for processing N3 files and applying rules"""
 
-    def __init__(self, base: str = DEFAULT_BASE):
+    def __init__(self, step: str, base: str = DEFAULT_BASE):
+        self.step = step
         self.base = base
         self.graph = Graph(base=base)
         self.file_handler = FileHandler()
         self.graph.parse(CORE_RULES_PATH, format="n3")
+        self.graph.parse(step, format="n3")
 
     def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""
@@ -96,11 +97,11 @@ class StepExecution:
         """Get the supposition for a step"""
         return get_single_object(self.graph, step, NT.supposes)
 
-    async def reason(self, input_paths: Sequence[str]) -> None:
+    async def reason(self) -> None:
         """Run the EYE reasoner on N3 files and update the processor's graph"""
         from bubble.n3_utils import reason
 
-        self.graph = await reason(input_paths)
+        self.graph = await reason([self.step, CORE_RULES_PATH.as_posix()])
 
     def get_invocation_details(
         self, invocation: _SubjectType
@@ -141,14 +142,9 @@ class StepExecution:
                         provides,
                     )
 
-    async def process(self, n3_content: Optional[str] = None) -> None:
+    async def process(self) -> None:
         """Main processing method"""
         try:
-            if n3_content:
-                self.graph.parse(data=n3_content, format="n3")
-            else:
-                self.graph.parse(sys.stdin, format="n3")
-
             step = URIRef(f"{self.base}#")
             next_step = self.get_next_step(step)
             if not next_step:
@@ -165,13 +161,3 @@ class StepExecution:
         except Exception as e:
             console.print(f"[red]Error processing N3:[/red] {str(e)}")
             raise
-
-
-def main() -> None:
-    """Entry point for the N3 processor"""
-    processor = StepExecution()
-    trio.run(processor.process)
-
-
-if __name__ == "__main__":
-    main()

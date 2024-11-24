@@ -1,3 +1,4 @@
+import tempfile
 import pytest
 from pathlib import Path
 from rdflib import URIRef, Namespace
@@ -40,14 +41,17 @@ nt:nonce nt:ranks 1 .
 
 async def test_n3_processing_basic(basic_n3, tmp_path):
     """Test basic N3 processing with a shell command"""
-    rules_file = Path(__file__).parent.parent / "rules" / "core.n3"
     # Create a temporary file with N3 content
     n3_file = tmp_path / "test.n3"
     n3_file.write_text(basic_n3)
 
     # Process and reason over the N3 file
-    processor = StepExecution(base="https://test.example/")
-    await processor.reason([rules_file.as_posix(), n3_file.as_posix()])
+    graph_file_tmp = Path(tempfile.mktemp())
+    graph_file_tmp.write_text(basic_n3)
+    processor = StepExecution(
+        base="https://test.example/", step=graph_file_tmp.as_posix()
+    )
+    await processor.reason()
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
