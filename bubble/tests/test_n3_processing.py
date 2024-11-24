@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 from rdflib import URIRef, Namespace
 from bubble import N3Processor
+from bubble.n3_utils import print_n3
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
@@ -16,12 +17,15 @@ def processor():
 @pytest.fixture
 def basic_n3():
     return """
+@base <https://test.example/> .
 @prefix : <#> .
 @prefix nt: <https://node.town/2024/> .
-@base <https://test.example/> .
+
+nt:nonce nt:ranks 1 .
 
 # Test step
 <#> a nt:Step ;
+    nt:ranks 1 ;
     nt:supposes {
         nt:nonce nt:ranks 1
     } ;
@@ -33,6 +37,9 @@ def basic_n3():
             nt:value "echo 'test' > $out"
         ]
     ] .
+
+<#next> a nt:Step ;
+    nt:succeeds <#> .
 """
 
 
@@ -48,6 +55,9 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
+
+    # Print the graph
+    print_n3(processor.graph)
 
     next_step = processor.get_next_step(step)
     supposition = processor.get_supposition(next_step)
