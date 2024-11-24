@@ -155,5 +155,9 @@ async def test_process_invalid_invocation(processor):
     processor.graph.add((step, NT.invokes, invocation))
     processor.graph.add((invocation, NT.invokes, BNode()))
 
-    # Process should complete without error
+    # Process should complete without error, skipping invalid invocation
     await processor.process_invocations(step)
+    
+    # Verify no results were added for invalid invocation
+    results = list(processor.graph.objects(invocation, NT.result))
+    assert len(results) == 0

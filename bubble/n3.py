@@ -106,11 +106,14 @@ class StepExecution:
 
     def get_invocation_details(
         self, invocation: _SubjectType
-    ) -> Tuple[_ObjectType, _ObjectType]:
+    ) -> Optional[Tuple[_ObjectType, _ObjectType]]:
         """Get the parameter and target type for an invocation"""
-        target = get_single_object(self.graph, invocation, NT.invokes)
-        target_type = get_single_object(self.graph, target, RDF.type)
-        return target, target_type
+        try:
+            target = get_single_object(self.graph, invocation, NT.invokes)
+            target_type = get_single_object(self.graph, target, RDF.type)
+            return target, target_type
+        except ValueError:
+            return None
 
     async def process_invocations(self, step: _SubjectType) -> None:
         """Process all invocations for a step"""
@@ -130,18 +133,20 @@ class StepExecution:
 
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                target, target_type = self.get_invocation_details(invocation)
-                provides = get_objects(self.graph, invocation, NT.provides)
+                details = self.get_invocation_details(invocation)
+                if details:
+                    target, target_type = details
+                    provides = get_objects(self.graph, invocation, NT.provides)
 
-                if target_type in capability_map:
-                    capability = capability_map[target_type]
-                    nursery.start_soon(
-                        capability.execute,
-                        self.graph,
-                        invocation,
-                        target,
-                        provides,
-                    )
+                    if target_type in capability_map:
+                        capability = capability_map[target_type]
+                        nursery.start_soon(
+                            capability.execute,
+                            self.graph,
+                            invocation,
+                            target,
+                            provides,
+                        )
 
     async def process(self) -> None:
         """Main processing method"""
