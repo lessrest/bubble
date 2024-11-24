@@ -17,10 +17,10 @@ def fresh(
         help="Base namespace for the IRI",
     ),
     secure: bool = typer.Option(
-        False, "--secure", help="Generate a secure IRI"
+        False, "--secure", help="Generate a secure IRI", is_flag=True
     ),
 ) -> None:
-    """Generate a new IRI using XID."""
+    """Generate a unique IRI, either secure or casual (the default)."""
     ns = Namespace(namespace)
     if secure:
         iri = mint.fresh_secure_iri(ns)
