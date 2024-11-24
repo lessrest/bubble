@@ -9,7 +9,7 @@ class Mint:
 
     def fresh_token(self) -> str:
         """Generate a secure token encoded in base32."""
-        raw_token = secrets.token_bytes(20)
+        raw_token = secrets.token_bytes(8)
         # Convert to base32 and remove padding
         encoded = (
             base64.b32encode(raw_token).decode("ascii").rstrip("=").upper()

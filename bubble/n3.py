@@ -193,7 +193,7 @@ class N3Processor:
 
     def skolemize(
         self,
-        input_graph: Graph,
+        g: Graph,
         namespace: str = "https://swa.sh/.well-known/genid/",
     ) -> Graph:
         """Convert blank nodes in a graph to fresh IRIs"""
@@ -212,7 +212,7 @@ class N3Processor:
             g_sk.bind(prefix, namespace)
 
         # Bind swa to the Skolem namespace
-        g_sk.bind("swa", ns)
+        g_sk.bind("id", ns)
 
         # Create mapping of blank nodes to IRIs
         bnode_map = {}
