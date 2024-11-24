@@ -17,14 +17,45 @@ def processor():
 @pytest.fixture
 def basic_n3():
     return """
+@prefix : <#> .
+@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/eye#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+@prefix nt: <https://node.town/2024/#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix swa: <https://swa.sh/> .
-@prefix nt: <https://node.town/2024/> .
 @base <https://test.example/> .
 
+# Core axioms
+swa:succeeds owl:inverseOf swa:precedes .
+
+# Step succession rule
+{
+   ?s1 a swa:Step .
+   ?s2 swa:succeeds ?s1 .
+   [] eye:findall (
+       ?g1
+       {
+           ?s1 swa:supposes ?g1 
+       }
+       ?gs1
+   ) .
+   ?gs1 log:conjunction ?g1m .
+}
+=> 
+{
+   ?s2 swa:supposes ?g1m 
+} .
+
+# Test step
 <#> a swa:Step ;
     swa:invokes [
-        nt:target [ a nt:ShellCapability ] ;
-        nt:parameter "echo 'test' > $out"
+        a nt:Invocation ;
+        nt:invokes [ a nt:ShellCapability ] ;
+        nt:provides [
+            a nt:ShellCommand ;
+            nt:value "echo 'test' > $out"
+        ]
     ] ;
     swa:precedes _:next .
 
