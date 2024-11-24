@@ -84,6 +84,11 @@ class N3Processor:
         """Get the supposition for a step"""
         return get_single_object(self.graph, step, NT.supposes)
 
+    async def reason(self, input_paths: Sequence[str]) -> None:
+        """Run the EYE reasoner on N3 files and update the processor's graph"""
+        from bubble.n3_utils import reason
+        self.graph = await reason(input_paths)
+
     def get_invocation_details(self, invocation: URIRef) -> Tuple[URIRef, URIRef]:
         """Get the parameter and target type for an invocation"""
         target = get_single_object(self.graph, invocation, NT.invokes)
