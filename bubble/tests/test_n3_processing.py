@@ -41,8 +41,8 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
     n3_file = tmp_path / "test.n3"
     n3_file.write_text(basic_n3)
 
-    # Process the N3 file
-    processor.graph.parse(n3_file, format="n3")
+    # Process and reason over the N3 file
+    await processor.reason(n3_file)
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")

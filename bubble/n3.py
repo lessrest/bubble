@@ -184,16 +184,15 @@ class N3Processor:
             console.print(f"[red]Error processing N3:[/red] {str(e)}")
             raise
 
-    async def reason(self, input_path: str) -> Graph:
-        """Run the EYE reasoner on an N3 file and return the resulting graph"""
+    async def reason(self, input_path: str) -> None:
+        """Run the EYE reasoner on an N3 file and update the processor's graph"""
         # Run EYE reasoner
         cmd = ["eye", "--quiet", "--nope", "--pass-all", input_path]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
-        # Parse the output into a new graph
-        g = Graph()
-        g.parse(data=result.stdout, format="n3")
-        return g
+        # Clear existing graph and parse the reasoner output
+        self.graph = Graph()
+        self.graph.parse(data=result.stdout, format="n3")
 
     def show(self, input_path: str) -> Graph:
         """Load and normalize an N3 file"""
