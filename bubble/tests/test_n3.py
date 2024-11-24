@@ -1,5 +1,3 @@
-from pathlib import Path
-import tempfile
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
 from bubble import StepExecution, FileHandler, FileResult
@@ -23,11 +21,13 @@ def basic_n3():
 
 
 @pytest.fixture
-def processor(basic_n3, tmp_path):
+def processor(basic_n3):
     """Creates a StepExecution instance with basic N3 content"""
-    n3_file = tmp_path / "test.n3"
-    n3_file.write_text(basic_n3)
-    return StepExecution(base="https://test.example/", step=n3_file.as_posix())
+    graph = Graph(base="https://test.example/")
+    graph.parse(data=basic_n3, format="n3")
+    processor = StepExecution(base="https://test.example/", step=None)
+    processor.graph = graph
+    return processor
 
 
 def test_get_next_step(processor):
@@ -59,19 +59,17 @@ def test_get_objects(processor):
     assert objects[0] == URIRef("https://test.example/next")
 
 
-async def test_file_handler_metadata():
+async def test_file_handler_metadata(tmp_path):
     """Test FileHandler metadata collection"""
-    import tempfile
     import trio
 
-    async with await trio.open_file(tempfile.mktemp(), "w") as f:
-        await f.write("test content")
-        path = f.name
+    test_file = tmp_path / "test.txt"
+    await test_file.write_text("test content")
 
-    result = await FileHandler.get_file_metadata(path)
+    result = await FileHandler.get_file_metadata(str(test_file))
 
     assert isinstance(result, FileResult)
-    assert result.path == path
+    assert result.path == str(test_file)
     assert result.size is not None
     assert result.content_hash is not None
     assert result.creation_date is not None

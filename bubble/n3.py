@@ -81,13 +81,14 @@ class FileHandler:
 class StepExecution:
     """Engine for processing N3 files and applying rules"""
 
-    def __init__(self, step: str, base: str = DEFAULT_BASE):
+    def __init__(self, step: Optional[str] = None, base: str = DEFAULT_BASE):
         self.step = step
         self.base = base
         self.graph = Graph(base=base)
         self.file_handler = FileHandler()
         self.graph.parse(CORE_RULES_PATH, format="n3")
-        self.graph.parse(step, format="n3")
+        if step:
+            self.graph.parse(step, format="n3")
 
     def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""
