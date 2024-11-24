@@ -3,6 +3,9 @@ import trio
 import typer
 from typer import Option, Argument
 from pathlib import Path
+
+DEFAULT_N3_PATH = "./priv/main.n3"
+from pathlib import Path
 from rich.console import Console
 from rich.syntax import Syntax
 import subprocess
@@ -61,7 +64,11 @@ def fresh(
 
 
 @app.command()
-def show(path: str):
+def show(
+    path: Annotated[
+        str, Argument(help="Input N3 file path")
+    ] = DEFAULT_N3_PATH
+):
     """Show the contents of an N3 file with syntax highlighting"""
     try:
         processor = N3Processor()
@@ -73,7 +80,9 @@ def show(path: str):
 
 @app.command()
 def skolemize(
-    input_path: Annotated[str, Argument(help="Input N3 file path")],
+    input_path: Annotated[
+        str, Argument(help="Input N3 file path")
+    ] = DEFAULT_N3_PATH,
     output_path: Annotated[
         str | None,
         Option(help="Optional output file path (defaults to stdout)"),
@@ -93,7 +102,9 @@ def skolemize(
 
 @app.command()
 def reason(
-    input_path: Annotated[str, Argument(help="Input N3 file path")],
+    input_path: Annotated[
+        str, Argument(help="Input N3 file path")
+    ] = DEFAULT_N3_PATH,
     output_path: Annotated[
         str | None,
         Option(help="Optional output file path (defaults to stdout)"),
