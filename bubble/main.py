@@ -59,7 +59,7 @@ def main(
     try:
         processor = N3Processor()
         
-        # Load the input graph
+        # Load and process the input graph
         g = processor.show(input_path)
         
         # Apply reasoning if requested
@@ -68,7 +68,7 @@ def main(
             
         # Apply skolemization if requested
         if skolem:
-            g = processor.skolemize(input_path, namespace)
+            g = processor.skolemize(g, namespace)
             
         # Output the result
         handle_output(g, output_path, "Output written to")

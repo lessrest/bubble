@@ -193,17 +193,13 @@ class N3Processor:
 
     def skolemize(
         self,
-        input_path: str,
+        input_graph: Graph,
         namespace: str = "https://swa.sh/.well-known/genid/",
     ) -> Graph:
-        """Convert blank nodes in an N3 file to fresh IRIs"""
+        """Convert blank nodes in a graph to fresh IRIs"""
         from bubble.id import Mint
 
         mint = Mint()
-
-        # Create input graph and parse file
-        g = Graph()
-        g.parse(input_path, format="n3")
 
         # Create namespace for new IRIs
         ns = Namespace(namespace)
