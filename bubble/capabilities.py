@@ -37,7 +37,7 @@ class ShellCapability(Capability):
         # Get command and stdin values
         command = None
         stdin = None
-        
+
         for provided in graph.objects(invocation, NT.provides):
             ptype = next(graph.objects(provided, RDF.type))
             if ptype == NT.ShellCommand:
@@ -60,7 +60,7 @@ class ShellCapability(Capability):
             cwd=temp_dir,
             env={"out": f"{temp_dir}/out"},
             capture_stderr=True,
-            input=stdin.encode() if stdin else None,
+            stdin=stdin.encode() if stdin else None,
         )
         if result.returncode != 0:
             print(f"Command failed: {result.returncode}")
@@ -95,32 +95,30 @@ class ArtGenerationCapability(Capability):
         if not prompt:
             raise ValueError("No prompt found for art generation")
 
-        print(f"Generating art for prompt: {prompt.value}")
+        print(f"Generating art for prompt: {prompt}")
         console.rule()
 
         result = await replicate.async_run(
             "black-forest-labs/flux-schnell",
             input={
-                "prompt": prompt.value,
+                "prompt": prompt,
                 "num_outputs": 1,
                 "output_format": "webp",
             },
         )
 
-        if isinstance(result, list):
-            blob = await result[0].aread()
-        else:
-            blob = await result.aread()
+        async for blob in result:
+            temp_file = tempfile.mktemp(suffix=self.WEBP_SUFFIX)
+            async with await trio.open_file(temp_file, "wb") as f:
+                await f.write(blob)
 
-        temp_file = tempfile.mktemp(suffix=self.WEBP_SUFFIX)
-        async with await trio.open_file(temp_file, "wb") as f:
-            await f.write(blob)
+            from bubble.n3 import FileResult
 
-        from bubble.n3 import FileResult
+            file_result = FileResult(path=temp_file)
+            result_node = await FileHandler.create_result_node(
+                graph, file_result
+            )
+            graph.add((invocation, SWA.result, result_node))
 
-        file_result = FileResult(path=temp_file)
-        result_node = await FileHandler.create_result_node(graph, file_result)
-        graph.add((invocation, SWA.result, result_node))
-
-        print(f"Art generated and saved to: {temp_file}")
-        console.rule()
+            print(f"Art generated and saved to: {temp_file}")
+            console.rule()

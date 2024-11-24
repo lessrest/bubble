@@ -7,19 +7,30 @@ readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
-    "trio==0.27.*", # structured concurrency
-    "rich==13.*", # pretty terminal output
-    "httpx==0.*", # async HTTP client
-    "rdflib==7.*", # RDF data access
-    "pytest==8.*", # testing framework
-    "pytest-trio==0.*", # async testing with structured concurrency
-    "pytest-md-report==0.6.*", # reporting for continuous integration
-    "replicate==1.*", # Replicate SDK (various AI models)
-    "openai==1.55.*", # OpenAI SDK (GPT-4o, o1, etc)
-    "anthropic==0.39.*", # Anthropic SDK (Claude, Sonnet, etc)
+    "trio==0.27.*",
+    # structured concurrency
+    "rich==13.*",
+    # pretty terminal output
+    "httpx==0.*",
+    # async HTTP client
+    "rdflib==7.*",
+    # RDF data access
+    "pytest==8.*",
+    # testing framework
+    "pytest-trio==0.*",
+    # async testing with structured concurrency
+    "pytest-md-report==0.6.*",
+    # reporting for continuous integration
+    "replicate==1.*",
+    # Replicate SDK (various AI models)
+    "openai==1.55.*",
+    # OpenAI SDK (GPT-4o, o1, etc)
+    "anthropic==0.39.*",
+    # Anthropic SDK (Claude, Sonnet, etc)
     "py-xid>=1.0.0",
     "py-machineid>=0.6.0",
     "typer>=0.13.1",
+    "pyright>=1.1.389",
 ]
 
 [tool.uv.sources]

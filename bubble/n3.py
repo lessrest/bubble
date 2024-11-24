@@ -3,13 +3,14 @@ import hashlib
 import datetime
 import subprocess
 
-from typing import List, Tuple, Optional
+from typing import Sequence, Tuple, Optional
 from dataclasses import dataclass
 
 import trio
 
 from rich import print, pretty
 from rdflib import RDF, BNode, Graph, URIRef, Literal, Namespace
+from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.console import Console
@@ -97,36 +98,43 @@ class N3Processor:
         print(Panel(Syntax(n3, "turtle"), title="N3"))
 
     def get_single_object(
-        self, subject: URIRef, predicate: URIRef
-    ) -> Optional[URIRef]:
+        self, subject: _SubjectType, predicate: _PredicateType
+    ) -> _ObjectType:  # noqa: F821
         """Get a single object for a subject-predicate pair"""
         objects = list(self.graph.objects(subject, predicate))
         if len(objects) != 1:
-            return None
+            raise ValueError(f"Expected 1 object, got {len(objects)}")
         return objects[0]
 
-    def get_next_step(self, step: URIRef) -> Optional[URIRef]:
+    def get_objects(
+        self, subject: _SubjectType, predicate: _PredicateType
+    ) -> Sequence[_ObjectType]:
+        """Get all objects for a subject-predicate pair"""
+        return list(self.graph.objects(subject, predicate))
+
+    def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""
         return self.get_single_object(step, SWA.precedes)
 
-    def get_supposition(self, step: URIRef) -> Optional[URIRef]:
+    def get_supposition(self, step: _SubjectType) -> _ObjectType:
         """Get the supposition for a step"""
         return self.get_single_object(step, SWA.supposes)
 
     def get_invocation_details(
-        self, invocation: URIRef
-    ) -> Tuple[Optional[URIRef], Optional[URIRef]]:
+        self, invocation: _SubjectType
+    ) -> Tuple[_ObjectType, _ObjectType]:
         """Get the parameter and target type for an invocation"""
-        target = self.get_single_object(invocation, NT.target)
+        target = self.get_single_object(invocation, NT.invokes)
         target_type = self.get_single_object(target, RDF.type)
-        parameter = self.get_single_object(invocation, NT.parameter)
-        return parameter, target_type
+        return target, target_type
 
-    async def process_invocations(self, step: URIRef) -> None:
+    async def process_invocations(self, step: _SubjectType) -> None:
         """Process all invocations for a step"""
         from bubble.capabilities import ShellCapability, ArtGenerationCapability
 
-        invocations: List[URIRef] = list(self.graph.objects(step, SWA.invokes))
+        invocations: Sequence[_SubjectType] = list(
+            self.graph.objects(step, SWA.invokes)
+        )
         if not invocations:
             return
 
@@ -140,18 +148,20 @@ class N3Processor:
 
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                parameter, target_type = self.get_invocation_details(invocation)
+                target, target_type = self.get_invocation_details(invocation)
+                provides = self.get_objects(invocation, NT.provides)
 
                 if target_type in capability_map:
                     capability = capability_map[target_type]
                     nursery.start_soon(
                         capability.execute,
-                        parameter,
-                        invocation,
                         self.graph,
+                        invocation,
+                        target,
+                        provides,
                     )
 
-    async def process(self, n3_content: str = None) -> None:
+    async def process(self, n3_content: Optional[str] = None) -> None:
         """Main processing method"""
         try:
             if n3_content:
