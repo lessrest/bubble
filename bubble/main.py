@@ -1,23 +1,20 @@
-from typing import Annotated, Optional
+from typing import Optional
 import trio
 import typer
-from typer import Option, Argument
-from pathlib import Path
-
-DEFAULT_N3_PATH = "./priv/main.n3"
+from typer import Option
 from pathlib import Path
 from rich.console import Console
 from rich.syntax import Syntax
 import subprocess
 
-from rdflib import Graph, Namespace, BNode, URIRef
+from rdflib import Graph
 
-from bubble.id import Mint
 from bubble.n3 import N3Processor
 
-app = typer.Typer()
-mint = Mint()
+DEFAULT_N3_PATH = "./priv/main.n3"
 console = Console(width=80)
+
+app = typer.Typer(add_completion=False)
 
 def print_graph(g: Graph) -> None:
     """Print a graph with syntax highlighting"""
@@ -46,75 +43,35 @@ def handle_error(e: Exception, context: str = "") -> None:
 
 
 @app.command()
-def fresh(
-    namespace: Annotated[
-        str, Option(help="Base namespace for the IRI")
-    ] = "https://swa.sh/.well-known/genid/",
-    casual: Annotated[
-        bool, Option(help="Generate a casual IRI (default is secure)")
-    ] = False,
+def main(
+    input_path: str = Option(DEFAULT_N3_PATH, "--input", "-i", help="Input N3 file path"),
+    output_path: Optional[str] = Option(None, "--output", "-o", help="Output file path (defaults to stdout)"),
+    reason: bool = Option(False, "--reason", "-r", help="Run the EYE reasoner on the input"),
+    skolem: bool = Option(False, "--skolem", "-s", help="Convert blank nodes to IRIs"),
+    namespace: str = Option(
+        "https://swa.sh/.well-known/genid/",
+        "--namespace", "-n",
+        help="Base namespace for skolemized IRIs"
+    ),
 ) -> None:
-    """Generate a unique IRI, either secure (default) or casual."""
-    ns = Namespace(namespace)
-    if casual:
-        iri = mint.fresh_casual_iri(ns)
-    else:
-        iri = mint.fresh_secure_iri(ns)
-    typer.echo(iri)
-
-
-@app.command()
-def show(
-    path: Annotated[
-        str, Argument(help="Input N3 file path")
-    ] = DEFAULT_N3_PATH
-):
-    """Show the contents of an N3 file with syntax highlighting"""
+    """Process N3 files with optional reasoning and skolemization."""
     try:
         processor = N3Processor()
-        g = processor.show(path)
-        print_graph(g)
-    except Exception as e:
-        handle_error(e, path)
-
-
-@app.command()
-def skolemize(
-    input_path: Annotated[
-        str, Argument(help="Input N3 file path")
-    ] = DEFAULT_N3_PATH,
-    output_path: Annotated[
-        str | None,
-        Option(help="Optional output file path (defaults to stdout)"),
-    ] = None,
-    namespace: Annotated[
-        str, Option(help="Base namespace for skolemized IRIs")
-    ] = "https://swa.sh/.well-known/genid/",
-):
-    """Convert blank nodes in an N3 file to fresh IRIs"""
-    try:
-        processor = N3Processor()
-        g = processor.skolemize(input_path, namespace)
-        handle_output(g, output_path, "Skolemized graph written to")
-    except Exception as e:
-        handle_error(e, input_path)
-
-
-@app.command()
-def reason(
-    input_path: Annotated[
-        str, Argument(help="Input N3 file path")
-    ] = DEFAULT_N3_PATH,
-    output_path: Annotated[
-        str | None,
-        Option(help="Optional output file path (defaults to stdout)"),
-    ] = None,
-):
-    """Run the EYE reasoner on an N3 file"""
-    try:
-        processor = N3Processor()
-        g = trio.run(processor.reason, input_path)
-        handle_output(g, output_path, "Reasoning output written to")
+        
+        # Load the input graph
+        g = processor.show(input_path)
+        
+        # Apply reasoning if requested
+        if reason:
+            g = trio.run(processor.reason, input_path)
+            
+        # Apply skolemization if requested
+        if skolem:
+            g = processor.skolemize(input_path, namespace)
+            
+        # Output the result
+        handle_output(g, output_path, "Output written to")
+            
     except Exception as e:
         handle_error(e, input_path)
 
