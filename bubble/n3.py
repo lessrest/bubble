@@ -224,7 +224,7 @@ class N3Processor:
         # Helper function to get or create IRI for a blank node
         def get_iri_for_bnode(bnode):
             if bnode not in bnode_map:
-                bnode_map[bnode] = mint.fresh_casual_iri(ns)
+                bnode_map[bnode] = mint.fresh_secure_iri(ns)
             return bnode_map[bnode]
 
         # Copy all triples, consistently replacing blank nodes
