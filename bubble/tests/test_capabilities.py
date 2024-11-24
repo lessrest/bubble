@@ -1,7 +1,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import Graph, URIRef, Literal, Namespace, BNode, RDF
 from bubble import ShellCapability, ArtGenerationCapability
 
 # Test namespaces
@@ -55,12 +55,12 @@ async def test_shell_capability_success(shell_capability, graph):
 
 async def test_shell_capability_failure(shell_capability, graph):
     """Test shell command failure handling"""
-    command = "nonexistent-command"
     invocation = URIRef("https://test.example/invocation")
+    graph.add((invocation, RDF.type, NT.Invocation))
 
-    with pytest.raises(Exception) as exc_info:
-        await shell_capability.execute(command, invocation, graph)
-    assert "returned non-zero exit status" in str(exc_info.value)
+    with pytest.raises(ValueError) as exc_info:
+        await shell_capability.execute(None, invocation, graph)
+    assert "No shell command provided" in str(exc_info.value)
 
 
 async def test_art_generation_capability(art_capability, graph):
