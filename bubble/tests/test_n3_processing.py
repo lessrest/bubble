@@ -1,7 +1,6 @@
 import pytest
 from pathlib import Path
 from rdflib import URIRef, Namespace
-from rich import inspect
 from bubble import N3Processor
 
 # Test namespaces
@@ -132,14 +131,14 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
 
     # Process and reason over the N3 file
     await processor.reason(n3_file)
-    processor.print_n3()
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
+
     next_step = processor.get_next_step(step)
-    inspect(next_step)
     supposition = processor.get_supposition(next_step)
-    print(supposition)
+
+    assert supposition is not None
 
     # Process invocations
     await processor.process_invocations(step)
@@ -147,9 +146,6 @@ async def test_n3_processing_basic(processor, basic_n3, tmp_path):
     # Verify results
     invocations = list(processor.graph.objects(step, NT.invokes))
     assert len(invocations) == 1
-
-    processor.print_n3()
-    inspect(invocations[0])
 
     # Check if result was added to graph
     result = next(processor.graph.objects(invocations[0], NT.result), None)

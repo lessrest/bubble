@@ -70,6 +70,7 @@ async def test_file_handler_metadata():
 
     assert isinstance(result, FileResult)
     assert result.path == path
+    assert result.size is not None
     assert result.content_hash is not None
     assert result.creation_date is not None
 
