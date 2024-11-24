@@ -19,19 +19,19 @@ def fresh(
             help="Base namespace for the IRI",
         ),
     ] = "https://swa.sh/",
-    secure: Annotated[
+    casual: Annotated[
         bool,
         typer.Option(
-            help="Generate a secure IRI",
+            help="Generate a casual IRI (default is secure)",
         ),
     ] = False,
 ) -> None:
-    """Generate a unique IRI, either secure or casual (the default)."""
+    """Generate a unique IRI, either secure (default) or casual."""
     ns = Namespace(namespace)
-    if secure:
-        iri = mint.fresh_secure_iri(ns)
-    else:
+    if casual:
         iri = mint.fresh_casual_iri(ns)
+    else:
+        iri = mint.fresh_secure_iri(ns)
     typer.echo(iri)
 
 
