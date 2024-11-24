@@ -1,7 +1,7 @@
 import pytest
 from rdflib import Graph, URIRef, Literal, Namespace
-from bubble import N3Processor, FileHandler, FileResult
-from bubble.n3_utils import get_single_object, get_objects, show, reason, skolemize
+from bubble import RuleEngine, FileHandler, FileResult
+from bubble.n3_utils import get_single_object, get_objects
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
@@ -10,7 +10,7 @@ NT = Namespace("https://node.town/2024/")
 
 @pytest.fixture
 def processor():
-    return N3Processor(base="https://test.example/")
+    return RuleEngine(base="https://test.example/")
 
 
 @pytest.fixture
@@ -21,7 +21,9 @@ def basic_graph():
     next_step = URIRef("https://test.example/next")
 
     graph.add((step, NT.precedes, next_step))
-    graph.add((next_step, NT.supposes, URIRef("https://test.example/supposition")))
+    graph.add(
+        (next_step, NT.supposes, URIRef("https://test.example/supposition"))
+    )
 
     return graph
 

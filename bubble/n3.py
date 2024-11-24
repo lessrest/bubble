@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import trio
 from rich import pretty
 from rdflib import RDF, BNode, Graph, URIRef, Literal, Namespace
+from rdflib.graph import _SubjectType, _ObjectType
 from rich.console import Console
 from pathlib import Path
 
@@ -28,6 +29,7 @@ CORE_RULES_PATH = Path(__file__).parent / "rules" / "core.n3"
 @dataclass
 class FileResult:
     """Represents the result of a file operation"""
+
     path: str
     size: Optional[int] = None
     creation_date: Optional[datetime.datetime] = None
@@ -38,17 +40,27 @@ class FileHandler:
     """Handles file operations and metadata collection"""
 
     @staticmethod
-    async def create_result_node(graph: Graph, file_result: FileResult) -> BNode:
+    async def create_result_node(
+        graph: Graph, file_result: FileResult
+    ) -> BNode:
         result_node = BNode()
         graph.add((result_node, RDF.type, NT.LocalFile))
         graph.add((result_node, NT.path, Literal(file_result.path)))
 
         if file_result.creation_date:
-            graph.add((result_node, NT.creationDate, Literal(file_result.creation_date)))
+            graph.add(
+                (
+                    result_node,
+                    NT.creationDate,
+                    Literal(file_result.creation_date),
+                )
+            )
         if file_result.size:
             graph.add((result_node, NT.size, Literal(file_result.size)))
         if file_result.content_hash:
-            graph.add((result_node, NT.contentHash, Literal(file_result.content_hash)))
+            graph.add(
+                (result_node, NT.contentHash, Literal(file_result.content_hash))
+            )
 
         return result_node
 
@@ -60,42 +72,45 @@ class FileHandler:
         return FileResult(
             path=path,
             size=stat.st_size,
-            creation_date=datetime.datetime.fromtimestamp(stat.st_ctime, tz=datetime.timezone.utc),
+            creation_date=datetime.datetime.fromtimestamp(
+                stat.st_ctime, tz=datetime.timezone.utc
+            ),
             content_hash=hashlib.sha256(content).hexdigest(),
         )
 
 
-class N3Processor:
-    """Processes N3 files and handles invocations"""
+class RuleEngine:
+    """Engine for processing N3 files and applying rules"""
 
     def __init__(self, base: str = DEFAULT_BASE):
         self.base = base
         self.graph = Graph(base=base)
         self.file_handler = FileHandler()
-        # Load core rules
-        if CORE_RULES_PATH.exists():
-            self.graph.parse(CORE_RULES_PATH, format="n3")
+        self.graph.parse(CORE_RULES_PATH, format="n3")
 
-    def get_next_step(self, step: URIRef) -> URIRef:
+    def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""
         return get_single_object(self.graph, step, NT.precedes)
 
-    def get_supposition(self, step: URIRef) -> URIRef:
+    def get_supposition(self, step: _SubjectType) -> _ObjectType:
         """Get the supposition for a step"""
         return get_single_object(self.graph, step, NT.supposes)
 
     async def reason(self, input_paths: Sequence[str]) -> None:
         """Run the EYE reasoner on N3 files and update the processor's graph"""
         from bubble.n3_utils import reason
+
         self.graph = await reason(input_paths)
 
-    def get_invocation_details(self, invocation: URIRef) -> Tuple[URIRef, URIRef]:
+    def get_invocation_details(
+        self, invocation: _SubjectType
+    ) -> Tuple[_ObjectType, _ObjectType]:
         """Get the parameter and target type for an invocation"""
         target = get_single_object(self.graph, invocation, NT.invokes)
         target_type = get_single_object(self.graph, target, RDF.type)
         return target, target_type
 
-    async def process_invocations(self, step: URIRef) -> None:
+    async def process_invocations(self, step: _SubjectType) -> None:
         """Process all invocations for a step"""
         from bubble.capabilities import ShellCapability, ArtGenerationCapability
 
@@ -154,7 +169,7 @@ class N3Processor:
 
 def main() -> None:
     """Entry point for the N3 processor"""
-    processor = N3Processor()
+    processor = RuleEngine()
     trio.run(processor.process)
 
 

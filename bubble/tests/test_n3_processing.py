@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from rdflib import URIRef, Namespace
-from bubble import N3Processor
+from bubble import RuleEngine
 from bubble.n3_utils import print_n3
 
 # Test namespaces
@@ -11,7 +11,7 @@ NT = Namespace("https://node.town/2024/")
 
 @pytest.fixture
 def processor():
-    return N3Processor(base="https://test.example/")
+    return RuleEngine(base="https://test.example/")
 
 
 @pytest.fixture
