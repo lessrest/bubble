@@ -14,6 +14,7 @@ from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.console import Console
+from pathlib import Path
 
 console = Console()
 pretty.install()
@@ -24,6 +25,7 @@ NT = Namespace("https://node.town/2024/")
 
 # Constants
 DEFAULT_BASE = "https://swa.sh/2024/11/22/step/1"
+CORE_RULES_PATH = Path(__file__).parent / "rules" / "core.n3"
 
 
 @dataclass
@@ -90,6 +92,9 @@ class N3Processor:
         self.base = base
         self.graph = Graph(base=base)
         self.file_handler = FileHandler()
+        # Load core rules
+        if CORE_RULES_PATH.exists():
+            self.graph.parse(CORE_RULES_PATH, format="n3")
 
     def print_n3(self) -> None:
         """Print the graph in N3 format"""
@@ -186,10 +191,10 @@ class N3Processor:
             console.print(f"[red]Error processing N3:[/red] {str(e)}")
             raise
 
-    async def reason(self, input_path: str) -> None:
+    async def reason(self, input_paths: Sequence[str]) -> None:
         """Run the EYE reasoner on an N3 file and update the processor's graph"""
         # Run EYE reasoner
-        cmd = ["eye", "--quiet", "--nope", "--pass", input_path]
+        cmd = ["eye", "--quiet", "--nope", "--pass", *input_paths]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # Clear existing graph and parse the reasoner output

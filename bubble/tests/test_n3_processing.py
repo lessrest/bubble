@@ -17,94 +17,8 @@ def processor():
 def basic_n3():
     return """
 @prefix : <#> .
-@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
-@prefix log: <http://www.w3.org/2000/10/swap/log#> .
-@prefix math: <http://www.w3.org/2000/10/swap/math#> .
 @prefix nt: <https://node.town/2024/> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix swa: <https://swa.sh/> .
 @base <https://test.example/> .
-
-#
-nt:owns owl:inverseOf nt:isOwnedBy .
-nt:succeeds owl:inverseOf nt:precedes .
-nt:isPartOf owl:inverseOf nt:hasPart .
-owl:inverseOf owl:inverseOf owl:inverseOf .
-
-#
-{
-   ?p owl:inverseOf ?q .
-   ?a ?p ?b
-}
-=>
-{
-   ?b ?q ?a
-} .
-
-#
-{
-   <#> nt:supposes ?g
-}
-=> ?g .
-
-#
-_:next a nt:Step ;
-   nt:succeeds <#> .
-
-
-# next = current + decisions - revocations
-{
-   ?s1 a nt:Step .
-   ?s2 nt:succeeds ?s1 .
-   [] eye:findall (
-       ?g1
-       {
-           ?s1 nt:supposes ?g1
-       }
-       ?gs1
-   ) ;
-       eye:findall (
-           ?g2
-           {
-               ?s1 nt:decides ?g2
-           }
-           ?gs2
-       ) ;
-       eye:findall (
-           ?g3
-           {
-               ?s1 nt:revokes ?g3
-           }
-           ?gs3
-       ) .
-   ?gs1 log:conjunction ?g1m .
-   ?gs2 log:conjunction ?g2m .
-   ?gs3 log:conjunction ?g3m .
-   ( ?g1m ?g3m ) eye:graphDifference ?tmp .
-   ( ?tmp ?g2m ) log:conjunction ?result .
-}
-=>
-{
-   ?s2 nt:supposes ?result
-} .
-
-
-#
-{
-   nt:nonce nt:ranks ?rank .
-   ( ?rank 1 ) math:sum ?next
-}
-=>
-{
-   <#> nt:decides
-   {
-       nt:nonce nt:ranks ?next
-   } .
-   <#> nt:revokes
-   {
-       nt:nonce nt:ranks ?rank
-   } .
-} .
 
 # Test step
 <#> a nt:Step ;
@@ -119,18 +33,18 @@ _:next a nt:Step ;
             nt:value "echo 'test' > $out"
         ]
     ] .
-
 """
 
 
 async def test_n3_processing_basic(processor, basic_n3, tmp_path):
     """Test basic N3 processing with a shell command"""
+    rules_file = Path(__file__).parent.parent / "rules" / "core.n3"
     # Create a temporary file with N3 content
     n3_file = tmp_path / "test.n3"
     n3_file.write_text(basic_n3)
 
     # Process and reason over the N3 file
-    await processor.reason(n3_file)
+    await processor.reason([rules_file, n3_file])
 
     # Verify basic graph structure
     step = URIRef("https://test.example/#")
