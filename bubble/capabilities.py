@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import trio
 import replicate
 
-from rdflib import Graph, URIRef
+from rdflib import Graph, URIRef, RDF
 from rich.console import Console
 
 console = Console()
