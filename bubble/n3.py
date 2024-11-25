@@ -37,47 +37,43 @@ class FileResult:
     content_hash: Optional[str] = None
 
 
-class FileHandler:
-    """Handles file operations and metadata collection"""
+async def create_result_node(
+    graph: Graph, file_result: FileResult
+) -> BNode:
+    result_node = BNode()
+    graph.add((result_node, RDF.type, NT.LocalFile))
+    graph.add((result_node, NT.path, Literal(file_result.path)))
 
-    @staticmethod
-    async def create_result_node(
-        graph: Graph, file_result: FileResult
-    ) -> BNode:
-        result_node = BNode()
-        graph.add((result_node, RDF.type, NT.LocalFile))
-        graph.add((result_node, NT.path, Literal(file_result.path)))
-
-        if file_result.creation_date:
-            graph.add(
-                (
-                    result_node,
-                    NT.creationDate,
-                    Literal(file_result.creation_date),
-                )
+    if file_result.creation_date:
+        graph.add(
+            (
+                result_node,
+                NT.creationDate,
+                Literal(file_result.creation_date),
             )
-        if file_result.size:
-            graph.add((result_node, NT.size, Literal(file_result.size)))
-        if file_result.content_hash:
-            graph.add(
-                (result_node, NT.contentHash, Literal(file_result.content_hash))
-            )
-
-        return result_node
-
-    @staticmethod
-    async def get_file_metadata(path: str) -> FileResult:
-        stat = await trio.Path(path).stat()
-        content = await trio.Path(path).read_bytes()
-
-        return FileResult(
-            path=path,
-            size=stat.st_size,
-            creation_date=datetime.datetime.fromtimestamp(
-                stat.st_ctime, tz=datetime.timezone.utc
-            ),
-            content_hash=hashlib.sha256(content).hexdigest(),
         )
+    if file_result.size:
+        graph.add((result_node, NT.size, Literal(file_result.size)))
+    if file_result.content_hash:
+        graph.add(
+            (result_node, NT.contentHash, Literal(file_result.content_hash))
+        )
+
+    return result_node
+
+
+async def get_file_metadata(path: str) -> FileResult:
+    stat = await trio.Path(path).stat()
+    content = await trio.Path(path).read_bytes()
+
+    return FileResult(
+        path=path,
+        size=stat.st_size,
+        creation_date=datetime.datetime.fromtimestamp(
+            stat.st_ctime, tz=datetime.timezone.utc
+        ),
+        content_hash=hashlib.sha256(content).hexdigest(),
+    )
 
 
 class StepExecution:
@@ -87,7 +83,6 @@ class StepExecution:
         self.step = step
         self.base = base
         self.graph = Graph(base=base)
-        self.file_handler = FileHandler()
 
         # Load all core rules from the rules directory
         core_rule_files = glob(str(CORE_RULES_DIR / "*.n3"))
