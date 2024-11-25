@@ -7,7 +7,7 @@ from .n3_utils import (
     reason,
     skolemize,
 )
-from .capabilities import Capability, ShellCapability, ArtGenerationCapability
+from .capabilities import Capability, ShellCapability
 
 __all__ = [
     "StepExecution",
@@ -15,7 +15,6 @@ __all__ = [
     "FileResult",
     "Capability",
     "ShellCapability",
-    "ArtGenerationCapability",
     "print_n3",
     "get_single_object",
     "get_objects",
