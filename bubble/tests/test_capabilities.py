@@ -2,6 +2,12 @@ import pytest
 from pathlib import Path
 from rdflib import Graph, URIRef, Literal, Namespace, BNode, RDF
 from bubble import ShellCapability
+from bubble.capabilities import (
+    FileResult,
+    create_result_node,
+    get_file_metadata,
+)
+from bubble.tests.test_n3 import NT
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
@@ -86,3 +92,32 @@ async def test_shell_capability_with_stdin(shell_capability, graph):
     with open(path) as f:
         content = f.read().strip()
         assert content == "test input"
+
+
+async def test_file_handler_metadata(tmp_path):
+    """Test FileHandler metadata collection"""
+    import trio
+
+    test_file = tmp_path / "test.txt"
+    async with await trio.open_file(str(test_file), "w") as f:
+        await f.write("test content")
+
+    result = await get_file_metadata(str(test_file))
+
+    assert isinstance(result, FileResult)
+    assert result.path == str(test_file)
+    assert result.size is not None
+    assert result.content_hash is not None
+    assert result.creation_date is not None
+
+
+async def test_create_result_node():
+    """Test creating a result node in the graph"""
+    graph = Graph()
+    file_result = FileResult(path="/test/path", size=100, content_hash="abc123")
+
+    result_node = await create_result_node(graph, file_result)
+
+    assert (result_node, NT.path, Literal("/test/path")) in graph
+    assert (result_node, NT.size, Literal(100)) in graph
+    assert (result_node, NT.contentHash, Literal("abc123")) in graph

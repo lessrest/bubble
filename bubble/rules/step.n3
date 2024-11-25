@@ -1,0 +1,76 @@
+@prefix : <#> .
+@prefix ai: <https://node.town/2024/ai/#> .
+@prefix eye: <http://eulersharp.sourceforge.net/2003/03swap/log-rules#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+@prefix math: <http://www.w3.org/2000/10/swap/math#> .
+@prefix nt: <https://node.town/2024/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@prefix swa: <https://swa.sh/> .
+
+# Rule: Apply suppositions
+{
+   nt:nonce nt:ranks ?rank .
+   ?step nt:ranks ?rank .
+   ?step nt:supposes ?graph .
+}
+=> ?graph .
+
+# Rule: Calculate next state from current state
+# next = current + decisions - revocations
+{
+   ?s1 a nt:Step .
+   ?s2 nt:succeeds ?s1 .
+   [] eye:findall (
+       ?g1
+       {
+           ?s1 nt:supposes ?g1 
+       }
+       ?gs1
+   ) ;
+       eye:findall (
+           ?g2
+           {
+               ?s1 nt:decides ?g2 
+           }
+           ?gs2
+       ) ;
+       eye:findall (
+           ?g3
+           {
+               ?s1 nt:revokes ?g3 
+           }
+           ?gs3
+       ) .
+   ?gs1 log:conjunction ?g1m .
+   ?gs2 log:conjunction ?g2m .
+   ?gs3 log:conjunction ?g3m .
+   ( ?g1m ?g3m ) eye:graphDifference ?tmp .
+   ( ?tmp ?g2m ) log:conjunction ?result .
+}
+=> 
+{
+   ?s2 nt:supposes ?result 
+} .
+
+# Rule: Increment nonce
+{
+   nt:nonce nt:ranks ?rank .
+   ?step nt:ranks ?rank .
+   ?next nt:succeeds ?step .
+   ( ?rank 1 ) math:sum ?incr 
+}
+=> 
+{
+   ?step nt:decides 
+   {
+       nt:nonce nt:ranks ?incr .
+       ?next nt:ranks ?incr .
+   } .
+   ?step nt:revokes 
+   {
+       nt:nonce nt:ranks ?rank 
+   } .
+} .
