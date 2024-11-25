@@ -1,79 +1,24 @@
 """N3 processor for handling N3 files and invocations."""
 
-import hashlib
-import datetime
 from typing import Tuple, Optional
-from dataclasses import dataclass
 import trio
 from rich import pretty
-from rdflib import RDF, BNode, Graph, URIRef, Literal, Namespace
+from rdflib import RDF, Graph, URIRef
 from rdflib.graph import _SubjectType, _ObjectType
 from rich.console import Console
 from pathlib import Path
 from glob import glob
 
+from bubble.ns import NT
 from bubble.capabilities import HTTPRequestCapability
 from bubble.n3_utils import print_n3, get_single_object, get_objects
 
 console = Console()
 pretty.install()
 
-# Namespaces
-SWA = Namespace("https://swa.sh/")
-NT = Namespace("https://node.town/2024/")
-
 # Constants
 DEFAULT_BASE = "https://swa.sh/2024/11/22/step/1"
 CORE_RULES_DIR = Path(__file__).parent / "rules"
-
-
-@dataclass
-class FileResult:
-    """Represents the result of a file operation"""
-
-    path: str
-    size: Optional[int] = None
-    creation_date: Optional[datetime.datetime] = None
-    content_hash: Optional[str] = None
-
-
-async def create_result_node(
-    graph: Graph, file_result: FileResult
-) -> BNode:
-    result_node = BNode()
-    graph.add((result_node, RDF.type, NT.LocalFile))
-    graph.add((result_node, NT.path, Literal(file_result.path)))
-
-    if file_result.creation_date:
-        graph.add(
-            (
-                result_node,
-                NT.creationDate,
-                Literal(file_result.creation_date),
-            )
-        )
-    if file_result.size:
-        graph.add((result_node, NT.size, Literal(file_result.size)))
-    if file_result.content_hash:
-        graph.add(
-            (result_node, NT.contentHash, Literal(file_result.content_hash))
-        )
-
-    return result_node
-
-
-async def get_file_metadata(path: str) -> FileResult:
-    stat = await trio.Path(path).stat()
-    content = await trio.Path(path).read_bytes()
-
-    return FileResult(
-        path=path,
-        size=stat.st_size,
-        creation_date=datetime.datetime.fromtimestamp(
-            stat.st_ctime, tz=datetime.timezone.utc
-        ),
-        content_hash=hashlib.sha256(content).hexdigest(),
-    )
 
 
 class StepExecution:

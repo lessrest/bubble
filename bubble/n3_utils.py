@@ -1,7 +1,7 @@
 """Utility functions for N3 processing."""
 
-from typing import Sequence, Optional
-from rdflib import RDF, Graph, IdentifiedNode, Literal, URIRef, BNode, Namespace
+from typing import Sequence
+from rdflib import RDF, Graph, IdentifiedNode, Literal, BNode, Namespace
 from rdflib.graph import _SubjectType
 import subprocess
 from bubble.id import Mint
@@ -108,7 +108,7 @@ def skolemize(
 # we need to recursively convert these to python values
 def get_json_value(graph: Graph, node: _SubjectType) -> dict:
     nodetype = get_single_object(graph, node, RDF.type)
-    from bubble.n3 import NT
+    from bubble.NT import NT
 
     if nodetype != NT.JSONObject:
         raise ValueError(f"Expected nt:JSONObject, got {nodetype}")
@@ -129,7 +129,7 @@ def get_json_value(graph: Graph, node: _SubjectType) -> dict:
 
 def json_to_n3(graph: Graph, value: dict) -> BNode:
     """Convert a python dictionary to an N3 graph"""
-    from bubble.n3 import NT
+    from bubble.NT import NT
 
     bn = BNode()
     graph.add((bn, RDF.type, NT.JSONObject))

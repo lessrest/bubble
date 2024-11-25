@@ -1,8 +1,9 @@
-import tempfile
 import pytest
 from pathlib import Path
 from rdflib import Graph, URIRef, Literal, Namespace, BNode
-from bubble import StepExecution, FileHandler, FileResult
+from bubble import StepExecution
+from bubble.capabilities import FileResult, create_result_node
+from bubble.capabilities import get_file_metadata
 from bubble.n3_utils import get_single_object, get_objects
 
 # Test namespaces
@@ -21,6 +22,7 @@ def basic_n3():
 <#> nt:precedes <next> .
 <next> nt:supposes <supposition> .
 """
+
 
 @pytest.fixture
 def shell_command_n3():
@@ -50,6 +52,7 @@ nt:nonce nt:ranks 1 .
     nt:succeeds <#> .
 """
 
+
 @pytest.fixture
 def processor(basic_n3):
     """Creates a StepExecution instance with basic N3 content"""
@@ -58,6 +61,7 @@ def processor(basic_n3):
     processor = StepExecution(base="https://test.example/", step=None)
     processor.graph = graph
     return processor
+
 
 @pytest.fixture
 def shell_processor(shell_command_n3, tmp_path):
@@ -74,17 +78,20 @@ def test_get_next_step(processor):
     next_step = processor.get_next_step(step)
     assert next_step == URIRef("https://test.example/next")
 
+
 def test_get_supposition(processor):
     """Test getting the supposition for a step"""
     next_step = URIRef("https://test.example/next")
     supposition = processor.get_supposition(next_step)
     assert supposition == URIRef("https://test.example/supposition")
 
+
 def test_get_single_object(processor):
     """Test get_single_object utility function"""
     step = URIRef("https://test.example/#")
     next_step = get_single_object(processor.graph, step, NT.precedes)
     assert next_step == URIRef("https://test.example/next")
+
 
 def test_get_objects(processor):
     """Test get_objects utility function"""
@@ -103,7 +110,7 @@ async def test_file_handler_metadata(tmp_path):
     async with await trio.open_file(str(test_file), "w") as f:
         await f.write("test content")
 
-    result = await FileHandler.get_file_metadata(str(test_file))
+    result = await get_file_metadata(str(test_file))
 
     assert isinstance(result, FileResult)
     assert result.path == str(test_file)
@@ -111,12 +118,13 @@ async def test_file_handler_metadata(tmp_path):
     assert result.content_hash is not None
     assert result.creation_date is not None
 
+
 async def test_create_result_node():
     """Test creating a result node in the graph"""
     graph = Graph()
     file_result = FileResult(path="/test/path", size=100, content_hash="abc123")
 
-    result_node = await FileHandler.create_result_node(graph, file_result)
+    result_node = await create_result_node(graph, file_result)
 
     assert (result_node, NT.path, Literal("/test/path")) in graph
     assert (result_node, NT.size, Literal(100)) in graph
@@ -127,7 +135,7 @@ async def test_create_result_node():
 async def test_process_shell_command(shell_processor):
     """Test processing a shell command invocation"""
     step = URIRef("https://test.example/#")
-    
+
     # Process invocations
     await shell_processor.process_invocations(step)
 
@@ -146,10 +154,11 @@ async def test_process_shell_command(shell_processor):
         content = f.read().strip()
         assert content == "test"
 
+
 async def test_process_invalid_invocation(processor):
     """Test handling invalid invocation"""
     step = URIRef("https://test.example/#")
-    
+
     # Add invalid invocation
     invocation = BNode()
     processor.graph.add((step, NT.invokes, invocation))
@@ -157,7 +166,7 @@ async def test_process_invalid_invocation(processor):
 
     # Process should complete without error, skipping invalid invocation
     await processor.process_invocations(step)
-    
+
     # Verify no results were added for invalid invocation
     results = list(processor.graph.objects(invocation, NT.result))
     assert len(results) == 0
