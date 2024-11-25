@@ -1,0 +1,75 @@
+@prefix ai: <https://node.town/2024/ai/#> .
+@prefix json: <https://node.town/2024/json/#> .
+@prefix nt: <https://node.town/2024/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+
+#
+{
+   ?field json:field ?key .
+   ?object ?field ?value 
+}
+=> 
+{
+   ?object json:has [
+       json:key ?key ;
+       json:val ?value 
+   ] 
+} .
+
+#
+ai:RecraftV3 a ai:ImageModel ;
+   rdfs:label "Recraft V3"@en ;
+   ai:hasReplicateID "recraft-ai/recraft-v3" .
+
+#
+ai:ReplicateWebService a nt:WebService ;
+   rdfs:label "Replicate.com"@en .
+
+
+#
+:prompt json:field "prompt" .
+:size json:field "size" .
+:style json:field "style" .
+:input json:field "input" .
+
+#
+{
+   ?account a nt:ServiceAccount ;
+       nt:forService ?service ;
+       nt:hasPart ?token .
+   ?token a nt:BearerToken 
+}
+=> 
+{
+   ?token nt:authorizes ?service 
+} .
+
+#
+{
+   ( "https://api.replicate.com/v1/models/%s/predictions" ?id ) string:format ?url .
+   ( "Token %s" ?secret ) string:format ?auth .
+   ?token nt:authorizes ai:ReplicateWebService ;
+       nt:hasValue ?secret .
+   ?model ai:hasReplicateID ?id .
+   ?img a nt:Image ;
+       nt:hasSize ?size ;
+       nt:hasStyle ?style ;
+       nt:hasContent ?content ;
+       nt:generatedBy ?model .
+}
+=> 
+{
+   ?request a nt:POSTRequest ;
+       nt:hasURL ?url ;
+       nt:hasAuthorizationHeader ?auth ;
+       nt:posts [
+           a json:Object ;
+           :input [
+               :prompt ?content ;
+               :size ?size ;
+               :style ?style 
+           ] 
+       ] 
+} .

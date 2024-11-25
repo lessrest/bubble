@@ -4,24 +4,17 @@ import trio
 import typer
 from typer import Option
 from rich.console import Console
-from rich.syntax import Syntax
 import subprocess
 
 from rdflib import Graph
 
 from bubble.n3 import StepExecution
+from bubble.n3_utils import print_n3
 
 DEFAULT_N3_PATH = os.environ["BUBBLE_N3_PATH"]
 console = Console(width=80)
 
 app = typer.Typer(add_completion=False)
-
-
-def print_graph(g: Graph) -> None:
-    """Print a graph with syntax highlighting"""
-    content = g.serialize(format="n3")
-    syntax = Syntax(content, "turtle", theme="coffee", word_wrap=True)
-    console.print(syntax)
 
 
 def handle_output(g: Graph, output_path: Optional[str], message: str) -> None:
@@ -32,7 +25,7 @@ def handle_output(g: Graph, output_path: Optional[str], message: str) -> None:
             f.write(content)
         console.print(f"\n{message}: {output_path}")
     else:
-        print_graph(g)
+        print_n3(g)
 
 
 def handle_error(e: Exception, context: str = "") -> None:
@@ -61,18 +54,10 @@ def main(
         False, "--skolem", "-s", help="Convert blank nodes to IRIs"
     ),
     invoke: bool = Option(False, "--invoke", help="Invoke capabilities"),
-    namespace: str = Option(
-        "https://swa.sh/.well-known/genid/",
-        "--namespace",
-        "-n",
-        help="Base namespace for skolemized IRIs",
-    ),
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
     try:
         processor = StepExecution(input_path)
-
-        print_graph(processor.graph)
 
         # Apply reasoning if requested
         if reason:

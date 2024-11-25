@@ -13,7 +13,7 @@ from rdflib import BNode, Graph, Literal, URIRef, RDF
 from rich.console import Console
 
 from bubble.ns import NT
-from bubble.n3_utils import get_json_value, json_to_n3, print_n3
+from bubble.n3_utils import get_json_value, json_to_n3
 
 console = Console()
 
@@ -157,21 +157,11 @@ class HTTPRequestCapability(Capability):
             raise ValueError("No request provided")
 
         request = requests[0]
-        inspect(request)
 
-        # get the url
         url = get_single_object(graph, request, NT.hasURL)
-        inspect(url)
-
-        # get the post
         post = get_single_object(graph, request, NT.posts)
-        inspect(post)
-
         post_value = get_json_value(graph, post)
-        inspect(post_value)
-
         bearer = get_single_object(graph, request, NT.hasAuthorizationHeader)
-        inspect(bearer)
 
         client = httpx.AsyncClient()
         response = await client.request(
@@ -186,6 +176,4 @@ class HTTPRequestCapability(Capability):
         inspect(response_value)
 
         result_node = json_to_n3(graph, response_value)
-        inspect(result_node)
         graph.add((invocation, NT.result, result_node))
-        print_n3(graph)

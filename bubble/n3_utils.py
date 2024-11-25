@@ -5,6 +5,7 @@ from rdflib import RDF, Graph, IdentifiedNode, Literal, BNode, Namespace
 from rdflib.graph import _SubjectType
 import subprocess
 from bubble.id import Mint
+from bubble.ns import JSON
 
 
 def print_n3(graph: Graph) -> None:
@@ -15,7 +16,9 @@ def print_n3(graph: Graph) -> None:
 
     n3 = graph.serialize(format="n3")
     n3 = n3.replace("    ", "  ")  # Replace 4 spaces with 2 spaces globally
-    print(Panel(Syntax(n3, "turtle"), title="N3"))
+    print(
+        Panel(Syntax(n3, "turtle", theme="coffee", word_wrap=True), title="N3")
+    )
 
 
 def get_single_object(graph: Graph, subject, predicate):
@@ -79,44 +82,41 @@ def skolemize(
     return g_sk
 
 
-# we represent json in rdf using the nt:JSONObject class
-# # example:
-# # nt:posts [
-#            a nt:JSONObject ;
-#            nt:hasProperty [
-#                a nt:Property ;
-#                nt:key "input" ;
-#                nt:value [
-#                    a nt:JSONObject ;
-#                    nt:hasProperty [
-#                        a nt:Property ;
-#                        nt:key "prompt" ;
-#                        nt:value ?content
-#                    ] ;
-#                    nt:hasProperty [
-#                        a nt:Property ;
-#                        nt:key "size" ;
-#                        nt:value ?size
-#                    ] ;
-#                    nt:hasProperty [
-#                        a nt:Property ;
-#                        nt:key "style" ;
-#                        nt:value ?style
-#                    ]
-#                ]
-#            ]
-# we need to recursively convert these to python values
+"""Functions for converting between JSON and RDF representations.
+
+The RDF representation uses a custom JSON ontology with the following structure:
+
+    [
+        a json:Object ;
+        json:has [
+            json:property "name" ;
+            json:value "John"
+        ] ;
+        json:has [
+            json:property "age" ;
+            json:value 30
+        ]
+    ]
+"""
+
+
 def get_json_value(graph: Graph, node: _SubjectType) -> dict:
-    nodetype = get_single_object(graph, node, RDF.type)
-    from bubble.NT import NT
+    """Convert an RDF JSON object node to a Python dictionary.
 
-    if nodetype != NT.JSONObject:
-        raise ValueError(f"Expected nt:JSONObject, got {nodetype}")
+    Args:
+        graph: The RDF graph containing the JSON structure
+        node: The root node of the JSON object to convert
 
+    Returns:
+        A Python dictionary representing the JSON structure
+
+    Raises:
+        ValueError: If an unexpected value type is encountered
+    """
     result = {}
-    for prop in get_objects(graph, node, NT.hasProperty):
-        key = get_single_object(graph, prop, NT.key).toPython()
-        value = get_single_object(graph, prop, NT.value)
+    for prop in get_objects(graph, node, JSON.has):
+        key = get_single_object(graph, prop, JSON.key).toPython()
+        value = get_single_object(graph, prop, JSON.val)
         # if value is a literal, add it to the result
         if isinstance(value, Literal):
             result[key] = value.toPython()
@@ -128,17 +128,23 @@ def get_json_value(graph: Graph, node: _SubjectType) -> dict:
 
 
 def json_to_n3(graph: Graph, value: dict) -> BNode:
-    """Convert a python dictionary to an N3 graph"""
-    from bubble.NT import NT
+    """Convert a Python dictionary to an RDF JSON object representation.
 
+    Args:
+        graph: The RDF graph to add the JSON structure to
+        value: The Python dictionary to convert
+
+    Returns:
+        A blank node representing the root of the JSON object in RDF
+    """
     bn = BNode()
-    graph.add((bn, RDF.type, NT.JSONObject))
+    graph.add((bn, RDF.type, JSON.Object))
     for key, value in value.items():
         prop = BNode()
-        graph.add((bn, NT.hasProperty, prop))
-        graph.add((prop, NT.key, Literal(key)))
+        graph.add((bn, JSON["has"], prop))
+        graph.add((prop, JSON["key"], Literal(key)))
         if isinstance(value, dict):
-            graph.add((prop, NT.value, json_to_n3(graph, value)))
+            graph.add((prop, JSON["val"], json_to_n3(graph, value)))
         else:
-            graph.add((prop, NT.value, Literal(value)))
+            graph.add((prop, JSON["val"], Literal(value)))
     return bn

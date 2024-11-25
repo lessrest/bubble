@@ -11,7 +11,7 @@ from glob import glob
 
 from bubble.ns import NT
 from bubble.capabilities import HTTPRequestCapability
-from bubble.n3_utils import print_n3, get_single_object, get_objects
+from bubble.n3_utils import get_single_object, get_objects
 
 console = Console()
 pretty.install()
@@ -125,8 +125,6 @@ class StepExecution:
             next_step = self.get_next_step(step)
             if not next_step:
                 raise ValueError("No next step found in the graph")
-
-            print_n3(self.graph)
 
             supposition = self.get_supposition(next_step)
             if not supposition:
