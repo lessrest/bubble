@@ -10,6 +10,8 @@ import replicate
 from rdflib import Graph, URIRef, RDF
 from rich.console import Console
 
+from bubble.n3_utils import get_json_value, json_to_n3, print_n3
+
 console = Console()
 
 
@@ -118,11 +120,9 @@ class ArtGenerationCapability(Capability):
         console.rule()
 
         blob = await replicate.async_run(
-            "black-forest-labs/flux-schnell",
+            "recraft-ai/recraft-v3",
             input={
                 "prompt": prompt,
-                "num_outputs": 1,
-                "output_format": "webp",
             },
         )
 
@@ -143,3 +143,58 @@ class ArtGenerationCapability(Capability):
 
         print(f"Art generated and saved to: {temp_file}")
         console.rule()
+
+
+class HTTPRequestCapability(Capability):
+    """Handles HTTP requests"""
+
+    async def execute(
+        self,
+        graph: Graph,
+        invocation: URIRef,
+        target: URIRef,
+        provides: Iterable[URIRef],
+    ) -> None:
+        # we'll use httpx to do the request
+        import httpx
+        from bubble.n3 import NT
+
+        from bubble.n3_utils import get_single_object
+
+        requests = list(provides)
+        if len(requests) != 1:
+            raise ValueError("No request provided")
+
+        request = requests[0]
+        inspect(request)
+
+        # get the url
+        url = get_single_object(graph, request, NT.hasURL)
+        inspect(url)
+
+        # get the post
+        post = get_single_object(graph, request, NT.posts)
+        inspect(post)
+
+        post_value = get_json_value(graph, post)
+        inspect(post_value)
+
+        bearer = get_single_object(graph, request, NT.hasAuthorizationHeader)
+        inspect(bearer)
+
+        client = httpx.AsyncClient()
+        response = await client.request(
+            method="POST",
+            url=url,
+            json=post_value,
+            headers={"Authorization": bearer},
+        )
+
+        response_value = response.json()
+
+        inspect(response_value)
+
+        result_node = json_to_n3(graph, response_value)
+        inspect(result_node)
+        graph.add((invocation, NT.result, result_node))
+        print_n3(graph)

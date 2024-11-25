@@ -11,6 +11,7 @@ from rdflib.graph import _SubjectType, _ObjectType
 from rich.console import Console
 from pathlib import Path
 
+from bubble.capabilities import HTTPRequestCapability
 from bubble.n3_utils import print_n3, get_single_object, get_objects
 
 console = Console()
@@ -102,6 +103,9 @@ class StepExecution:
         """Run the EYE reasoner on N3 files and update the processor's graph"""
         from bubble.n3_utils import reason
 
+        if not self.step:
+            raise ValueError("No step file provided")
+
         self.graph = await reason([self.step, CORE_RULES_PATH.as_posix()])
 
     def get_invocation_details(
@@ -129,6 +133,7 @@ class StepExecution:
         capability_map = {
             NT.ShellCapability: ShellCapability(),
             NT.ArtGenerationCapability: ArtGenerationCapability(),
+            NT.POSTCapability: HTTPRequestCapability(),
         }
 
         async with trio.open_nursery() as nursery:
@@ -164,6 +169,7 @@ class StepExecution:
 
             await self.process_invocations(step)
 
-        except Exception as e:
-            console.print(f"[red]Error processing N3:[/red] {str(e)}")
-            raise
+        except* Exception as e:
+            for error in e.exceptions:
+                console.print(f"[red]Error processing N3:[/red] {str(error)}")
+                raise error

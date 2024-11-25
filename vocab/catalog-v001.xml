@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<catalog prefer="public" xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+    <uri id="Imports Wizard Entry" name="http://purl.obolibrary.org/obo/iao/dev/import_UO.owl" uri="https://raw.githubusercontent.com/information-artifact-ontology/IAO/refs/heads/master/src/ontology/imports/import_UO.owl"/>
+    <uri id="Imports Wizard Entry" name="http://purl.obolibrary.org/obo/iao/dev/import_PATO.owl" uri="https://raw.githubusercontent.com/information-artifact-ontology/IAO/refs/heads/master/src/ontology/imports/import_PATO.owl"/>
+    <uri id="Imports Wizard Entry" name="http://purl.obolibrary.org/obo/iao/dev/import_OBI.owl" uri="https://raw.githubusercontent.com/information-artifact-ontology/IAO/refs/heads/master/src/ontology/imports/import_OBI.owl"/>
+    <uri id="Imports Wizard Entry" name="http://purl.obolibrary.org/obo/iao/dev/iao-edit.owl" uri="https://raw.githubusercontent.com/information-artifact-ontology/IAO/master/src/ontology/iao-edit.owl"/>
+    <uri id="Imports Wizard Entry" name="http://purl.obolibrary.org/obo/bfo/2020/notime/bfo.ttl" uri="https://raw.githubusercontent.com/BFO-ontology/BFO-2020/refs/heads/master/src/owl/profiles/atemporal/bfo-2020-without-some-all-times.ttl"/>
+    <group id="Folder Repository, directory=, recursive=true, Auto-Update=true, version=2" prefer="public" xml:base=""/>
+</catalog>

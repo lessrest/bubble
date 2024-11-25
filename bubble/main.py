@@ -43,6 +43,7 @@ def handle_error(e: Exception, context: str = "") -> None:
         console.print(f"[red]EYE reasoner error:[/red]\n{e.stderr}")
     else:
         console.print(f"[red]Error:[/red] {str(e)}")
+    raise e
 
 
 @app.command()
@@ -59,6 +60,7 @@ def main(
     skolem: bool = Option(
         False, "--skolem", "-s", help="Convert blank nodes to IRIs"
     ),
+    invoke: bool = Option(False, "--invoke", help="Invoke capabilities"),
     namespace: str = Option(
         "https://swa.sh/.well-known/genid/",
         "--namespace",
@@ -68,24 +70,26 @@ def main(
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
     try:
-        processor = StepExecution()
+        processor = StepExecution(input_path)
 
-        # Load and process the input graph
-        g = processor.show(input_path)
+        print_graph(processor.graph)
 
         # Apply reasoning if requested
         if reason:
-            trio.run(processor.reason, input_path)
+            trio.run(processor.reason)
+
+        if invoke:
+            trio.run(processor.process)
 
         # Apply skolemization if requested
         if skolem:
-            processor.skolemize(processor.graph, namespace)
+            raise NotImplementedError("Skolemization not implemented")
 
         # Output the result
-        handle_output(g, output_path, "Output written to")
+        handle_output(processor.graph, output_path, "Output written to")
 
-    except Exception as e:
-        handle_error(e, input_path)
+    finally:
+        pass
 
 
 if __name__ == "__main__":
