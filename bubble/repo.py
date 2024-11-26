@@ -70,6 +70,14 @@ class Bubble:
                 case _:
                     raise ValueError(f"Unknown architecture: {arch}")
 
+            # find operating system
+            os = platform.system()
+            match os:
+                case "Darwin":
+                    graph.add((machine, NT.os, NT.MacOS))
+                case _:
+                    raise ValueError(f"Unknown operating system: {os}")
+
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
