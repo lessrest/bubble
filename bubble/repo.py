@@ -7,29 +7,35 @@
 # If the repository is empty, it will be initialized as a new bubble.
 # Each bubble has a unique IRI minted on creation.
 
-from datetime import UTC, datetime
-import getpass
-import pathlib
-import platform
+import os
 import pwd
 import socket
+import getpass
+import logging
+import platform
+import tempfile
+
+from typing import Optional
+from datetime import UTC, datetime
+
 import trio
+import psutil
 
 from trio import Path
-from rdflib import OWL, RDF, XSD, Graph, Literal, URIRef
+from rdflib import OWL, RDF, RDFS, XSD, Graph, URIRef, Literal, Namespace
+from rdflib.graph import QuotedGraph, _ObjectType, _TripleType
 
 from bubble.id import Mint
 from bubble.ns import AS, NT, SWA
-from bubble.n3_utils import get_single_subject
-from bubble.mac import computer_serial_number, get_disk_info
-import psutil
-import os
-import logging
+from bubble.mac import get_disk_info, computer_serial_number
+from bubble.n3_utils import get_single_subject, print_n3
 
 logger = logging.getLogger(__name__)
 
+UUID = Namespace("urn:uuid:")
 
-class Bubble:
+
+class Bubbler:
     """A repository of RDF/N3 documents"""
 
     # The path to the bubble's root directory
@@ -54,176 +60,310 @@ class Bubble:
         self.bubble = base
         self.graph = Graph()
 
+    async def load_many(
+        self,
+        directory: Path,
+        pattern: str,
+        kind: str,
+    ) -> None:
+        """Load files into the graph
+
+        Args:
+            directory: Directory to glob from
+            pattern: Glob pattern to match
+            kind: Description of what's being loaded for logging
+        """
+        paths = list(await directory.glob(pattern))
+
+        for path in paths:
+            logger.info(f"Loading {kind} from {path}")
+            self.graph.parse(path)
+
     async def load(self, path: Path) -> None:
         """Load the graph from a file"""
-        logger.info(f"Loading graph from {path}")
-        self.graph.parse(path)
+        await self.load_many(path.parent, path.name, "graph")
 
     async def load_ontology(self) -> None:
         """Load the ontology into the graph"""
-        vocab = Path(__file__).parent.parent / "vocab" / "nt.ttl"
-        logger.info(f"Loading ontology from {vocab}")
-        self.graph.parse(vocab, format="turtle")
+        vocab_dir = Path(__file__).parent.parent / "vocab"
+        await self.load_many(vocab_dir, "*.ttl", "ontology")
 
     async def load_surfaces(self) -> None:
         """Load all surfaces from the bubble into the graph"""
-        for path in await self.workdir.glob("*.n3"):
-            logger.info(f"Loading surface from {path}")
-            self.graph.parse(path, format="n3")
+        await self.load_many(self.workdir, "*.n3", "surface")
 
     async def load_rules(self) -> None:
         """Load all rules from the system rules directory"""
-        rules = Path(__file__).parent / "rules"
-        for path in await rules.glob("*.n3"):
-            logger.info(f"Loading rules from {path}")
-            self.graph.parse(path, format="n3")
+        rules_dir = Path(__file__).parent / "rules"
+        await self.load_many(rules_dir, "*.n3", "rules")
+
+    async def reason(self) -> Graph:
+        """Reason over the graph"""
+        from bubble.n3_utils import reason
+
+        tmpfile = Path(tempfile.gettempdir()) / "bubble.n3"
+        self.graph.serialize(destination=tmpfile, format="n3")
+        logger.info(f"Reasoning over {tmpfile}")
+        conclusion = await reason([str(tmpfile)])
+        logger.info(f"Conclusion has {len(conclusion)} triples")
+        return conclusion
 
     @staticmethod
-    async def open(path: Path, mint: Mint) -> "Bubble":
+    async def open(path: Path, mint: Mint) -> "Bubbler":
+        def fresh_iri() -> URIRef:
+            return mint.fresh_secure_iri(SWA)
+
         if not await path.exists():
             raise ValueError(f"Bubble not found at {path}")
 
         if not await (path / "root.n3").exists():
-            bubble = mint.fresh_secure_iri(SWA)
-            surface = URIRef(f"{bubble.toPython()}/root.n3")
+            BUBBLE = Namespace(fresh_iri().toPython())
+            g = Graph(base=BUBBLE)
+            Bubbler.bind_prefixes(g)
 
-            g = Graph(base=surface.toPython())
-            g.bind("swa", SWA)
-            g.bind("nt", NT)
-            g.bind("as", AS)
+            def new(
+                type: URIRef,
+                properties: dict[URIRef, _ObjectType | list[_ObjectType]],
+                subject: Optional[URIRef] = None,
+            ) -> URIRef:
+                if subject is None:
+                    subject = fresh_iri()
+                g.add((subject, RDF.type, type))
+                if properties is not None:
+                    for predicate, object in properties.items():
+                        if isinstance(object, list):
+                            for item in object:
+                                g.add((subject, predicate, item))
+                        else:
+                            g.add((subject, predicate, object))
+                return subject
 
-            g.add((bubble, RDF.type, NT.Bubble))
-            g.add((surface, RDF.type, NT.Surface))
-            g.add((surface, NT.partOf, bubble))
+            (
+                computer_serial,
+                machine_id,
+                now,
+                hostname,
+                architecture,
+                system_type,
+                system_version,
+                byte_size,
+                gigabyte_size,
+                user_info,
+                person_name,
+                disk_info,
+                disk_uuid,
+            ) = await Bubbler.get_a_bunch_of_info(mint)
 
-            machine_id = mint.machine_id()
             machine = SWA[machine_id]
-            computer_serial = await computer_serial_number()
+            disk_urn = UUID[disk_uuid]
 
-            g.add((machine, RDF.type, NT.ComputerMachine))
-            g.add((machine, NT.serialNumber, Literal(computer_serial)))
-
-            posixenv = mint.fresh_secure_iri(SWA)
-            g.add((posixenv, RDF.type, NT.PosixEnvironment))
-            g.add((machine, NT.hosts, posixenv))
-
-            user_info = pwd.getpwuid(os.getuid())
-            person_name = user_info.pw_gecos
-
-            person = mint.fresh_secure_iri(SWA)
-            g.add((person, RDF.type, AS.Person))
-            g.add((person, NT.name, Literal(person_name)))
-
-            user = mint.fresh_secure_iri(SWA)
-            g.add((user, RDF.type, NT.Account))
-            g.add((user, NT.owner, person))
-            g.add((user, NT.username, Literal(getpass.getuser())))
-            g.add((user, NT.uid, Literal(user_info.pw_uid)))
-            g.add((user, NT.gid, Literal(user_info.pw_gid)))
-            g.add((posixenv, NT.account, user))
-
-            hostname = socket.gethostname()
-            g.add((posixenv, NT.hostname, Literal(hostname)))
-
-            cpu_part = mint.fresh_secure_iri(SWA)
-            g.add((machine, NT.part, cpu_part))
-            g.add((cpu_part, RDF.type, NT.CentralProcessingUnit))
-
-            arch = platform.machine()
-            match arch:
-                case "x86_64":
-                    g.add((cpu_part, NT.architecture, NT.AMD64))
-                case "arm64":
-                    g.add((cpu_part, NT.architecture, NT.ARM64))
-                case _:
-                    raise ValueError(f"Unknown architecture: {arch}")
-
-            system = platform.system()
-            match system:
-                case "Darwin":
-                    system_part = mint.fresh_secure_iri(SWA)
-                    g.add((system_part, RDF.type, NT.macOSEnvironment))
-                    g.add(
-                        (
-                            system_part,
-                            NT.version,
-                            Literal(platform.mac_ver()[0]),
-                        )
-                    )
-                    g.add((machine, NT.hosts, system_part))
-
-                case _:
-                    raise ValueError(f"Unknown operating system: {system}")
-
-            # find amount of memory
-            memory_info = psutil.virtual_memory()
-            memory_part = mint.fresh_secure_iri(SWA)
-            g.add((machine, NT.part, memory_part))
-            g.add((memory_part, RDF.type, NT.RandomAccessMemory))
-            g.add((memory_part, NT.byteSize, Literal(memory_info.total)))
-            g.add(
-                (
-                    memory_part,
-                    NT.gigabyteSize,
-                    Literal(
-                        round(memory_info.total / 1024 / 1024 / 1024, 2),
-                        datatype=XSD.decimal,
+            filesystem = new(
+                NT.Filesystem,
+                {
+                    NT.byteSize: Literal(disk_info["Size"]),
+                    OWL.sameAs: disk_urn,
+                    RDFS.label: Literal(
+                        f"disk {disk_info['VolumeName']}", lang="en"
                     ),
-                )
+                },
+                subject=SWA[disk_uuid],
             )
 
-            disk_info = await get_disk_info("/System/Volumes/Data")
-            disk_uuid = disk_info["DiskUUID"]
-            disk_urn = URIRef(f"urn:uuid:{disk_uuid}")
+            home_dir = new(
+                NT.Directory,
+                {
+                    NT.filesystem: filesystem,
+                    NT.path: Literal(await Path.home()),
+                    RDFS.label: Literal(
+                        f"home directory of {person_name}", lang="en"
+                    ),
+                },
+            )
 
-            assert isinstance(disk_uuid, str)
+            bubble = new(
+                NT.Bubble,
+                {
+                    RDFS.label: Literal(
+                        f"a bubble for {person_name}", lang="en"
+                    ),
+                },
+                subject=BUBBLE["#bubble"],
+            )
 
-            filesystem = SWA[disk_uuid]
-            g.add((filesystem, OWL.sameAs, disk_urn))
-            g.add((filesystem, RDF.type, NT.Filesystem))
-            g.add((filesystem, NT.byteSize, Literal(disk_info["Size"])))
-            g.add((posixenv, NT.filesystem, filesystem))
+            new(
+                NT.Repository,
+                {
+                    NT.tracks: bubble,
+                    NT.worktree: new(
+                        NT.Directory,
+                        {
+                            NT.filesystem: filesystem,
+                            NT.parent: home_dir,
+                            NT.path: Literal(path),
+                            RDFS.label: Literal(
+                                f"worktree directory at {path}", lang="en"
+                            ),
+                        },
+                        subject=BUBBLE["#worktree"],
+                    ),
+                    RDFS.label: Literal(
+                        f"bubble repository at {path}", lang="en"
+                    ),
+                },
+                subject=BUBBLE["#origin"],
+            )
 
-            home_dir = mint.fresh_secure_iri(SWA)
-            g.add((user, NT.homeDirectory, home_dir))
-            g.add((home_dir, RDF.type, NT.Directory))
-            g.add((home_dir, NT.path, Literal(await Path.home())))
-            g.add((home_dir, NT.filesystem, filesystem))
+            user = new(
+                NT.Account,
+                {
+                    NT.gid: Literal(user_info.pw_gid),
+                    NT.homeDirectory: home_dir,
+                    NT.owner: new(AS.Person, {NT.name: Literal(person_name)}),
+                    NT.uid: Literal(user_info.pw_uid),
+                    NT.username: Literal(getpass.getuser()),
+                    RDFS.label: Literal(
+                        f"user account for {person_name}", lang="en"
+                    ),
+                },
+            )
 
-            worktree = mint.fresh_secure_iri(SWA)
-            g.add((worktree, RDF.type, NT.Directory))
-            g.add((worktree, NT.path, Literal(path)))
-            g.add((worktree, NT.filesystem, filesystem))
-            g.add((worktree, NT.parent, home_dir))
+            new(
+                NT.ComputerMachine,
+                {
+                    RDFS.label: Literal(
+                        f"{person_name}'s {system_type} computer", lang="en"
+                    ),
+                    NT.hosts: [
+                        new(
+                            NT.PosixEnvironment,
+                            {
+                                NT.account: user,
+                                NT.filesystem: filesystem,
+                                NT.hostname: Literal(hostname),
+                                RDFS.label: Literal(
+                                    f"POSIX environment on {hostname}",
+                                    lang="en",
+                                ),
+                            },
+                        ),
+                        new(
+                            NT.OperatingSystem,
+                            {
+                                NT.type: system_type,
+                                NT.version: Literal(system_version),
+                                RDFS.label: Literal(
+                                    f"the {system_type} operating system installed on {hostname}",
+                                    lang="en",
+                                ),
+                            },
+                        ),
+                    ],
+                    NT.part: [
+                        new(
+                            NT.CentralProcessingUnit,
+                            {
+                                NT.architecture: architecture,
+                                RDFS.label: Literal(
+                                    f"the CPU of {person_name}'s {system_type} computer",
+                                    lang="en",
+                                ),
+                            },
+                        ),
+                        new(
+                            NT.RandomAccessMemory,
+                            {
+                                NT.byteSize: Literal(byte_size),
+                                NT.gigabyteSize: Literal(gigabyte_size),
+                                RDFS.label: Literal(
+                                    f"the RAM of {person_name}'s {system_type} computer",
+                                    lang="en",
+                                ),
+                            },
+                        ),
+                    ],
+                    NT.serialNumber: Literal(computer_serial),
+                },
+                subject=machine,
+            )
 
-            repo = mint.fresh_secure_iri(SWA)
-            g.add((repo, RDF.type, NT.Repository))
-            g.add((repo, NT.tracks, bubble))
-            g.add((repo, NT.worktree, worktree))
+            new(
+                AS.Create,
+                {
+                    AS.actor: user,
+                    AS.object: bubble,
+                    AS.published: now,
+                    RDFS.label: Literal(
+                        f"creation of the bubble at {path}", lang="en"
+                    ),
+                },
+                subject=BUBBLE["#creation"],
+            )
 
-            head = mint.fresh_secure_iri(SWA)
-            creation = mint.fresh_secure_iri(SWA)
-            g.add((creation, RDF.type, AS.Create))
-            g.add((creation, AS.actor, user))
-            g.add((creation, AS.object, bubble))
+            def quote(triples: list[_TripleType]) -> QuotedGraph:
+                quoted = QuotedGraph(g.store, fresh_iri())
+                for subject, predicate, object in triples:
+                    quoted.add((subject, predicate, object))
+                return quoted
 
-            surface_addition = mint.fresh_secure_iri(SWA)
-            g.add((surface_addition, RDF.type, AS.Add))
-            g.add((surface_addition, AS.actor, user))
-            g.add((surface_addition, AS.object, surface))
-            g.add((surface_addition, AS.target, bubble))
+            surface = BUBBLE["root.n3"]
+            step = BUBBLE["#first"]
+            head = BUBBLE["#second"]
 
-            now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
-            g.add((creation, AS.published, now))
+            new(
+                NT.Step,
+                {
+                    NT.supposes: quote([(surface, NT.head, step)]),
+                    RDFS.label: Literal(
+                        f"the first step of the bubble at {path}", lang="en"
+                    ),
+                },
+                subject=step,
+            )
 
-            g.add((bubble, NT.head, head))
-            g.add((head, RDF.type, NT.Step))
-            g.add((head, NT.rank, Literal(1)))
+            new(
+                NT.Step,
+                {
+                    NT.supposes: quote([(surface, NT.head, head)]),
+                    NT.succeeds: step,
+                    RDFS.label: Literal(
+                        f"the second step of the bubble at {path}", lang="en"
+                    ),
+                },
+                subject=head,
+            )
+
+            new(
+                AS.Add,
+                {
+                    AS.actor: user,
+                    AS.object: new(
+                        NT.Surface,
+                        {
+                            NT.partOf: bubble,
+                            NT.head: step,
+                            RDFS.label: Literal(
+                                f"the root surface of the bubble at {path}",
+                                lang="en",
+                            ),
+                        },
+                        subject=surface,
+                    ),
+                    AS.target: bubble,
+                    RDFS.label: Literal(
+                        f"addition of the root surface to the bubble at {path}",
+                        lang="en",
+                    ),
+                },
+                subject=BUBBLE["#add"],
+            )
+
+            print_n3(g)
 
             g.serialize(destination=path / "root.n3", format="n3")
-            bubble = Bubble(path, mint, bubble)
-            await bubble.commit()
-            return bubble
+
+            bubbler = Bubbler(path, mint, bubble)
+            await bubbler.commit()
+            return bubbler
 
         else:
             g = Graph()
@@ -232,7 +372,89 @@ class Bubble:
             bubble = get_single_subject(g, RDF.type, NT.Bubble)
 
             assert isinstance(bubble, URIRef)
-            return Bubble(path, mint, URIRef(bubble))
+            return Bubbler(path, mint, URIRef(bubble))
+
+    @staticmethod
+    async def get_a_bunch_of_info(mint):
+        computer_serial = await computer_serial_number()
+        machine_id = mint.machine_id()
+
+        now = Bubbler.get_timestamp()
+        hostname, arch, system = Bubbler.get_system_info()
+        architecture = Bubbler.resolve_architecture(arch)
+        system_type, system_version = Bubbler.resolve_system(system)
+        byte_size, gigabyte_size = Bubbler.get_memory_size()
+        user_info, person_name = Bubbler.get_user_info()
+
+        disk_info = await get_disk_info("/System/Volumes/Data")
+        disk_uuid = disk_info["DiskUUID"]
+        return (
+            computer_serial,
+            machine_id,
+            now,
+            hostname,
+            architecture,
+            system_type,
+            system_version,
+            byte_size,
+            gigabyte_size,
+            user_info,
+            person_name,
+            disk_info,
+            disk_uuid,
+        )
+
+    @staticmethod
+    def get_timestamp():
+        return Literal(datetime.now(UTC), datatype=XSD.dateTime)
+
+    @staticmethod
+    def get_system_info():
+        hostname = socket.gethostname()
+        arch = platform.machine()
+        system = platform.system()
+        return hostname, arch, system
+
+    @staticmethod
+    def get_memory_size():
+        memory_info = psutil.virtual_memory()
+        byte_size = memory_info.total
+        gigabyte_size = round(byte_size / 1024 / 1024 / 1024, 2)
+        return byte_size, gigabyte_size
+
+    @staticmethod
+    def get_user_info():
+        user_info = pwd.getpwuid(os.getuid())
+        person_name = user_info.pw_gecos
+        return user_info, person_name
+
+    @staticmethod
+    def resolve_system(system):
+        match system:
+            case "Darwin":
+                system_type = NT.macOSEnvironment
+                system_version = platform.mac_ver()[0]
+
+            case _:
+                raise ValueError(f"Unknown operating system: {system}")
+        return system_type, system_version
+
+    @staticmethod
+    def resolve_architecture(arch):
+        match arch:
+            case "x86_64":
+                architecture = NT.AMD64
+            case "arm64":
+                architecture = NT.ARM64
+            case _:
+                raise ValueError(f"Unknown architecture: {arch}")
+        return architecture
+
+    @staticmethod
+    def bind_prefixes(g):
+        g.bind("swa", SWA)
+        g.bind("nt", NT)
+        g.bind("as", AS)
 
     async def commit(self) -> None:
         """Commit the bubble"""

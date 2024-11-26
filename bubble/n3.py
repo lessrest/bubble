@@ -12,7 +12,7 @@ from rdflib.graph import _ObjectType, _SubjectType
 from rich.console import Console
 
 from bubble.ns import NT
-from bubble.n3_utils import get_objects, get_single_object
+from bubble.n3_utils import get_objects, get_single_object, print_n3
 from bubble.capabilities import HTTPRequestCapability
 
 console = Console()
@@ -72,6 +72,8 @@ class StepExecution:
         """Process all invocations for a step"""
         from bubble.capabilities import ShellCapability
 
+        print_n3(self.graph)
+
         invocations = list(self.graph.objects(step, NT.invokes))
         if not invocations:
             return
@@ -104,7 +106,8 @@ class StepExecution:
     async def process(self) -> None:
         """Main processing method"""
         try:
-            step = URIRef(f"{self.base}#")
+            step = URIRef(f"{self.base}#step")
+            print(f"Processing step: {step}")
             next_step = self.get_next_step(step)
             if not next_step:
                 raise ValueError("No next step found in the graph")

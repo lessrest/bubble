@@ -12,8 +12,7 @@
 
 # Rule: Apply suppositions
 {
-   nt:nonce nt:ranks ?rank .
-   ?step nt:ranks ?rank .
+   ?surface nt:head ?step .
    ?step nt:supposes ?graph .
 }
 => ?graph .
@@ -55,22 +54,19 @@
    ?s2 nt:supposes ?result 
 } .
 
-# Rule: Increment nonce
+# Rule: advance the head step
 {
-   nt:nonce nt:ranks ?rank .
-   ?step nt:ranks ?rank .
+   ?surface nt:head ?step .
    ?next nt:succeeds ?step .
-   ( ?rank 1 ) math:sum ?incr 
 }
 => 
 {
    ?step nt:decides 
    {
-       nt:nonce nt:ranks ?incr .
-       ?next nt:ranks ?incr .
+       ?surface nt:head ?next .
    } .
    ?step nt:revokes 
    {
-       nt:nonce nt:ranks ?rank 
+       ?surface nt:head ?step .
    } .
 } .

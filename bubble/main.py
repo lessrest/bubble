@@ -10,7 +10,8 @@ from typer import Option
 from rich.console import Console
 
 from bubble.id import Mint
-from bubble.repo import Bubble
+from bubble.n3_utils import print_n3
+from bubble.repo import Bubbler
 import logging
 
 from rich.logging import RichHandler
@@ -92,46 +93,78 @@ def show(
 
     async def run():
         mint = Mint()
-        bubble = await Bubble.open(trio.Path(input_path), mint)
+        bubble = await Bubbler.open(trio.Path(input_path), mint)
         await bubble.load_surfaces()
         await bubble.load_rules()
+        await bubble.load_ontology()
+        conclusion = await bubble.reason()
+        print_n3(conclusion)
 
         n3_representation = bubble.graph.serialize(format="n3")
         message = initial_message(n3_representation)
-
-        client = anthropic.Client(api_key=os.environ["ANTHROPIC_API_KEY"])
 
         history: list[MessageParam] = [
             {"role": "user", "content": message},
         ]
 
-        while True:
+        while False:
             messages = history
-            with client.messages.stream(
-                messages=messages,
-                model="claude-3-5-sonnet-latest",
-                max_tokens=1000,
-            ) as stream:
+            with claude(messages) as stream:
                 reply = await stream_normally(stream)
                 history.append({"role": "assistant", "content": reply})
 
                 # prompt user for chat message
                 user_message = console.input("> ")
-                history.append({"role": "user", "content": user_message})
-
-    def initial_message(n3_representation):
-        return f"""
-        <graph>
-        {n3_representation}
-        </graph>
-        Your task is to describe this knowledge graph in prose.
-        The prose should use short sentences. It should accurately convey the contents of the graph.
-        The reader is the person whose user is described in the graph, so use "you" to refer to them.
-        Prefer single-sentence paragraphs.
-        Avoid using RDF identifiers; use the human-readable names, like good crisp technical prose.
-        """
+                if user_message == "/reason":
+                    conclusion = await bubble.reason()
+                    serialized = conclusion.serialize(format="n3")
+                    history.append(
+                        {
+                            "role": "user",
+                            "content": f"Reasoning over the graph has produced the following triples:\n\n{serialized}",
+                        }
+                    )
+                else:
+                    history.append({"role": "user", "content": user_message})
 
     trio.run(run)
+
+
+def claude(messages):
+    client = anthropic.Client(api_key=get_anthropic_credential())
+    return client.messages.stream(
+        messages=messages,
+        model="claude-3-5-sonnet-latest",
+        max_tokens=1000,
+    )
+
+
+def get_anthropic_credential():
+    return os.environ["ANTHROPIC_API_KEY"]
+
+
+def initial_message(n3_representation):
+    instructions = [
+        "Your task is to describe this knowledge graph in prose.",
+        "The prose should use short sentences.",
+        "It should accurately convey the contents of the graph.",
+        "The reader is the person whose user is described in the graph, so use 'you' to refer to them.",
+        "Prefer single-sentence paragraphs.",
+        "Avoid using RDF identifiers; use the human-readable names, like good crisp technical prose.",
+    ]
+
+    return join_sentences(
+        wrap_with_tag("graph", n3_representation),
+        *instructions,
+    )
+
+
+def join_sentences(*sentences):
+    return "\n\n".join(sentences)
+
+
+def wrap_with_tag(tag, content):
+    return "".join([f"<{tag}>", content, f"</{tag}>"])
 
 
 if __name__ == "__main__":

@@ -63,8 +63,16 @@ def show(input_path: str) -> Graph:
 
 async def reason(input_paths: Sequence[str]) -> Graph:
     """Run the EYE reasoner on N3 files and return the resulting graph"""
-    cmd = ["eye", "--quiet", "--nope", "--pass", *input_paths]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    cmd = ["eye", "--nope", "--pass", *input_paths]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=1
+        )
+    except subprocess.TimeoutExpired as e:
+        # print the captured output and stderr
+        print(e.stdout)
+        print(e.stderr)
+        raise TimeoutError("The EYE reasoner timed out after 1 second")
 
     g = Graph()
     g.parse(data=result.stdout, format="n3")

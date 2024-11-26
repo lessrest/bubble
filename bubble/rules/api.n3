@@ -5,18 +5,10 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix recraft: <https://node.town/2024/ai/recraft/#> .
 @prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@base <https://swa.sh/2024/api/> .
+
+
 #
-{
-   ?field json:field ?key .
-   ?object ?field ?value 
-}
-=> 
-{
-   ?object json:has [
-       json:key ?key ;
-       json:val ?value 
-   ] 
-} .
 {
    ?style a ai:RecraftV3Style 
 }
@@ -85,12 +77,6 @@ ai:ReplicateWebService a nt:WebService ;
 
 
 #
-:prompt json:field "prompt" .
-:size json:field "size" .
-:style json:field "style" .
-:input json:field "input" .
-
-#
 {
    ?account a nt:ServiceAccount ;
        nt:forService ?service ;
@@ -102,7 +88,7 @@ ai:ReplicateWebService a nt:WebService ;
    ?token nt:authorizes ?service 
 } .
 
-#
+# #
 {
    ( "https://api.replicate.com/v1/models/%s/predictions" ?id ) string:format ?url .
    ( "Token %s" ?secret ) string:format ?auth .
@@ -129,10 +115,21 @@ ai:ReplicateWebService a nt:WebService ;
        nt:hasAuthorizationHeader ?auth ;
        nt:posts [
            a json:Object ;
-           :input [
-               :prompt ?text ;
-               :size ?size ;
-               :style ?style 
+           json:has [
+               json:key "input" ;
+               json:val [
+                   a json:Object ;
+                   json:has [
+                       json:key "prompt" ;
+                       json:val ?text 
+                   ] , [
+                       json:key "size" ;
+                       json:val ?size 
+                   ] , [
+                       json:key "style" ;
+                       json:val ?style 
+                   ] 
+               ] 
            ] 
        ] 
 } .
@@ -171,8 +168,7 @@ ai:ReplicateWebService a nt:WebService ;
        nt:hasURL ?url ;
        nt:posts ?body .
    ?post a nt:POSTCapability .
-   nt:nonce nt:ranks ?rank .
-   ?step nt:ranks ?rank 
+   ?surface nt:head ?step .
 }
 => 
 {

@@ -34,12 +34,10 @@ def shell_command_n3():
 @prefix : <#> .
 @prefix nt: <https://node.town/2024/> .
 
-nt:nonce nt:ranks 1 .
-
-<#> a nt:Step ;
-    nt:ranks 1 ;
+:surface a nt:Surface ; nt:head :step .
+ :step a nt:Step ;
     nt:supposes {
-        nt:nonce nt:ranks 1
+        :surface nt:head :step
     } ;
     nt:invokes [
         a nt:Invocation ;
@@ -50,8 +48,8 @@ nt:nonce nt:ranks 1 .
         ]
     ] .
 
-<#next> a nt:Step ;
-    nt:succeeds <#> .
+:next a nt:Step ;
+    nt:succeeds :step .
 """
 
 
@@ -106,7 +104,7 @@ def test_get_objects(processor: StepExecution):
 
 async def test_process_shell_command(shell_processor: StepExecution):
     """Test processing a shell command invocation"""
-    step = URIRef("https://test.example/#")
+    step = URIRef("https://test.example/#step")
 
     # Process invocations
     await shell_processor.process_invocations(step)
