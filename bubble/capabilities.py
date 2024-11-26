@@ -8,15 +8,14 @@ from dataclasses import dataclass
 
 import trio
 
-from rdflib import Graph, Literal
+from rdflib import Literal
 from rdflib.graph import _SubjectType
 from rdflib.query import ResultRow
 from rich.console import Console
 
 from bubble.ns import NT
 from bubble.rdfjson import json_from_rdf
-from bubble.rdfutil import New, select_one_row
-from bubble.graphvar import using_graph
+from bubble.rdfutil import new, select_one_row
 
 console = Console()
 
@@ -26,7 +25,6 @@ capability_map = {}
 
 @dataclass
 class InvocationContext:
-    graph: Graph
     invocation: _SubjectType
 
     def select_one_row(
@@ -35,8 +33,7 @@ class InvocationContext:
         bindings = bindings.copy()
         bindings["invocation"] = self.invocation
 
-        with using_graph(self.graph):
-            return select_one_row(query, bindings)
+        return select_one_row(query, bindings)
 
 
 def capability(capability_type: _SubjectType):
@@ -58,11 +55,9 @@ class FileResult:
 
 
 async def create_result_node(
-    graph: Graph,
     file_result: FileResult,
     invocation: Optional[_SubjectType] = None,
 ) -> _SubjectType:
-    new = New(graph)
     node = new(
         NT.LocalFile,
         {
@@ -134,7 +129,7 @@ async def do_shell(ctx: InvocationContext) -> None:
     try:
         # Get metadata about output file and create result node in graph
         file_result = await get_file_metadata(output_file)
-        await create_result_node(ctx.graph, file_result, ctx.invocation)
+        await create_result_node(file_result, ctx.invocation)
 
     except FileNotFoundError:
         # Command may not have created output file - that's ok
@@ -162,7 +157,7 @@ async def do_post(ctx: InvocationContext) -> None:
     if bearer:
         headers["Authorization"] = bearer
 
-    json = json_from_rdf(ctx.graph, post)
+    json = json_from_rdf(post)
 
     await http_client.get().request(
         method="POST",

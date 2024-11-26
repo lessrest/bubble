@@ -51,7 +51,6 @@ class StepExecution:
 
     async def process_invocations(self, step: _SubjectType) -> None:
         rows = select_rows(
-            self.graph,
             """
             SELECT ?invocation ?capability_type
             WHERE {
@@ -69,7 +68,7 @@ class StepExecution:
         async with trio.open_nursery() as nursery:
             for invocation, capability_type in rows:
                 cap = capability_map[capability_type]
-                ctx = InvocationContext(self.graph, invocation)
+                ctx = InvocationContext(invocation)
                 nursery.start_soon(cap, ctx)
 
     async def process(self) -> None:

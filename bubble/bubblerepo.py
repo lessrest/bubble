@@ -117,7 +117,7 @@ class BubbleRepo:
             g = Graph()
             g.parse(path / "root.n3", format="n3")
 
-            bubble = get_single_subject(g, RDF.type, NT.Bubble)
+            bubble = get_single_subject(RDF.type, NT.Bubble)
 
             assert isinstance(bubble, URIRef)
             return BubbleRepo(path, URIRef(bubble))

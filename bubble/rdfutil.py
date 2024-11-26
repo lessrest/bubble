@@ -9,7 +9,7 @@ from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
 from bubble.gensym import fresh_uri
-from bubble.graphvar import graphvar
+from bubble.graphvar import graphvar, using_graph
 from bubble.ns import NT, SWA, JSON
 
 
@@ -63,7 +63,12 @@ def print_n3() -> None:
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    n3 = graphvar.get().serialize(format="n3").replace("    ", "  ").strip()
+    n3 = (
+        graphvar.get()
+        .serialize(format="n3")
+        .replace("    ", "  ")
+        .strip()
+    )
 
     print(
         Panel(
@@ -74,7 +79,7 @@ def print_n3() -> None:
 
 def get_single_subject(predicate, object):
     """Get a single subject for a predicate-object pair from the current graph"""
-    subjects = get_subjects(graphvar.get(), predicate, object)
+    subjects = get_subjects(predicate, object)
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
@@ -85,7 +90,7 @@ def get_subjects(predicate, object):
     return list(graphvar.get().subjects(predicate, object))
 
 
-async def reason(input_paths: Sequence[str]) -> None:
+async def reason(input_paths: Sequence[str]) -> Graph:
     """Run the EYE reasoner on N3 files and update the current graph"""
     cmd = ["eye", "--nope", "--pass", *input_paths]
 
@@ -94,7 +99,9 @@ async def reason(input_paths: Sequence[str]) -> None:
             cmd, capture_stdout=True, capture_stderr=True, check=True
         )
 
-    graphvar.get().parse(data=result.stdout.decode(), format="n3")
+    g = Graph()
+    g.parse(data=result.stdout.decode(), format="n3")
+    return g
 
 
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
@@ -113,10 +120,12 @@ def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
     return [row for row in results if isinstance(row, ResultRow)]
 
 
-def turtle(src: str) -> None:
+def turtle(src: str) -> Graph:
     """Parse turtle data into the current graph"""
-    graphvar.get().parse(data=src, format="turtle")
-    graphvar.get().bind("nt", NT)
+    with using_graph(Graph()) as graph:
+        graph.parse(data=src, format="turtle")
+        graph.bind("nt", NT)
+        return graph
 
 
 def new(*args, **kwargs):

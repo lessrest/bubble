@@ -1,65 +1,60 @@
-from typing import Any, Union
+from typing import Any
 
-from rdflib import RDF, BNode, Graph, URIRef, Literal, IdentifiedNode
+from rdflib import Literal, IdentifiedNode
 from rdflib.graph import _SubjectType
 
 from bubble.ns import JSON
-from bubble.rdfutil import select_rows
-from bubble.graphvar import using_graph
+from bubble.rdfutil import O, S, new, select_rows
 
 
-def json_from_rdf(graph: Graph, node: _SubjectType) -> dict:
-    with using_graph(graph):
-        return {
-            row.key.toPython(): convert_json_value(graph, row.value)
-            for row in select_rows(
-                """
-                SELECT ?key ?value WHERE {
-                    ?node json:has ?prop .
-                    ?prop json:key ?key .
-                    ?prop json:val ?value .
-                }
-                """,
-                {"node": node},
-            )
-        }
+def json_from_rdf(node: _SubjectType) -> dict:
+    return {
+        row.key.toPython(): convert_json_value(row.value)
+        for row in select_rows(
+            """
+            SELECT ?key ?value WHERE {
+                ?node json:has ?prop .
+                ?prop json:key ?key .
+                ?prop json:val ?value .
+            }
+            """,
+            {"node": node},
+        )
+    }
 
 
-def convert_json_value(graph: Graph, value: _SubjectType) -> str | dict:
+def convert_json_value(value: _SubjectType) -> str | dict:
     if isinstance(value, Literal):
         return value.toPython()
     elif isinstance(value, IdentifiedNode):
-        return json_from_rdf(graph, value)
+        return json_from_rdf(value)
     else:
         raise ValueError(f"Unexpected value type: {type(value)}")
 
 
-def rdf_from_json(graph: Graph, value: dict) -> BNode:
+def rdf_from_json(value: dict) -> S:
     """Convert a Python dictionary to an RDF JSON object representation.
 
     Args:
-        graph: The RDF graph to add the JSON structure to
         value: The Python dictionary to convert
 
     Returns:
         A blank node representing the root of the JSON object in RDF
     """
 
-    def convert_value(val: Any) -> Union[BNode, Literal, URIRef]:
+    def convert_value(val: Any) -> O:
         if isinstance(val, dict):
-            return rdf_from_json(graph, val)
+            return rdf_from_json(val)
         elif val is None:
             return JSON.null
         else:
             return Literal(val)
 
-    root = BNode()
-    graph.add((root, RDF.type, JSON.Object))
-
+    props = []
     for key, val in value.items():
-        property_node = BNode()
-        graph.add((root, JSON["has"], property_node))
-        graph.add((property_node, JSON["key"], Literal(key)))
-        graph.add((property_node, JSON["val"], convert_value(val)))
+        prop = new(
+            JSON.Property, {JSON.key: key, JSON.val: convert_value(val)}
+        )
+        props.append(prop)
 
-    return root
+    return new(JSON.Object, {JSON.has: props})
