@@ -6,15 +6,15 @@ import socket
 import psutil
 from rdflib import XSD, Literal
 
-from bubble.macsysinfo import computer_serial_number, get_disk_info
-from bubble.ns import NT
-from bubble.gensym import mintvar
+from bubble.macs import computer_serial_number, get_disk_info
+from bubble.prfx import NT
+from bubble.mint import mintvar
 
 from typing import TypedDict
 from pwd import struct_passwd
 from rdflib import URIRef
 
-from bubble.macsysinfo import DiskInfo
+from bubble.macs import DiskInfo
 
 
 class SystemInfo(TypedDict):

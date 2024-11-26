@@ -21,10 +21,10 @@ from rdflib import (
 )
 from rdflib.graph import _SubjectType
 
-from bubble.bubbleboot import describe_new_bubble
-from bubble.gensym import Mint, mintvar
-from bubble.ns import NT
-from bubble.rdfutil import get_single_subject
+from bubble.boot import describe_new_bubble
+from bubble.mint import Mint, mintvar
+from bubble.prfx import NT
+from bubble.util import get_single_subject
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class BubbleRepo:
 
     async def reason(self) -> Graph:
         """Reason over the graph"""
-        from bubble.rdfutil import reason
+        from bubble.util import reason
 
         tmpfile = Path(tempfile.gettempdir()) / "bubble.n3"
         self.graph.serialize(destination=tmpfile, format="n3")

@@ -7,11 +7,11 @@ from rdflib import Graph, Literal
 
 from contextvars import ContextVar
 
-from bubble.gensym import fresh_iri
+from bubble.mint import fresh_iri
 
 from rdflib.graph import _TripleType, QuotedGraph
 
-from bubble.ns import AS, NT, SWA
+from bubble.prfx import AS, NT, SWA
 
 
 graphvar = ContextVar("graph", default=Graph())

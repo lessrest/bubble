@@ -2,14 +2,14 @@ import pytest
 
 from rdflib import Graph, Literal, Variable
 
-from bubble.graphvar import using_graph
-from bubble.ns import JSON
-from bubble.rdfjson import (
+from bubble.vars import using_graph
+from bubble.prfx import JSON
+from bubble.json import (
     rdf_from_json,
     json_from_rdf,
     convert_json_value,
 )
-from bubble.rdfutil import new, select_rows
+from bubble.util import new, select_rows
 
 
 @pytest.fixture

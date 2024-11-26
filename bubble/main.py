@@ -11,8 +11,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from anthropic.types import MessageParam
 
-from bubble.gensym import Mint
-from bubble.bubblerepo import BubbleRepo
+from bubble.mint import Mint
+from bubble.repo import BubbleRepo
 
 FORMAT = "%(message)s"
 logging.basicConfig(

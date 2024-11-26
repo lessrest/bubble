@@ -8,9 +8,9 @@ from rdflib import RDF, Graph, Literal
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
-from bubble.gensym import fresh_uri
-from bubble.graphvar import graphvar, using_graph
-from bubble.ns import NT, SWA, JSON
+from bubble.mint import fresh_uri
+from bubble.vars import graphvar, using_graph
+from bubble.prfx import NT, SWA, JSON
 
 
 S = _SubjectType

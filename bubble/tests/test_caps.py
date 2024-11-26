@@ -6,10 +6,10 @@ import pytest
 from rdflib import Graph, URIRef, Literal
 from pytest_httpx import HTTPXMock
 
-from bubble.graphvar import using_graph
-from bubble.ns import NT
-from bubble.rdfutil import turtle
-from bubble.capabilities import (
+from bubble.vars import using_graph
+from bubble.prfx import NT
+from bubble.util import turtle
+from bubble.caps import (
     InvocationContext,
     FileResult,
     http_client,

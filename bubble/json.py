@@ -3,8 +3,8 @@ from typing import Any
 from rdflib import Literal, IdentifiedNode
 from rdflib.graph import _SubjectType
 
-from bubble.ns import JSON
-from bubble.rdfutil import O, S, new, select_rows
+from bubble.prfx import JSON
+from bubble.util import O, S, new, select_rows
 
 
 def json_from_rdf(node: _SubjectType) -> dict:

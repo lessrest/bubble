@@ -1,8 +1,8 @@
 import platform
 import pytest
 
-from bubble.sysinfo import gather_system_info
-from bubble.ns import NT
+from bubble.stat import gather_system_info
+from bubble.prfx import NT
 
 
 @pytest.mark.skipif(

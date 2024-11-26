@@ -13,9 +13,9 @@ from rdflib.graph import _SubjectType
 from rdflib.query import ResultRow
 from rich.console import Console
 
-from bubble.ns import NT
-from bubble.rdfjson import json_from_rdf
-from bubble.rdfutil import new, select_one_row
+from bubble.prfx import NT
+from bubble.json import json_from_rdf
+from bubble.util import new, select_one_row
 
 console = Console()
 

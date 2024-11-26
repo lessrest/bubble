@@ -11,3 +11,6 @@ priv   # put secrets here
 .DS_Store
 build
 **/build
+/htmlcov
+.coverage
+

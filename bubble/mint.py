@@ -5,7 +5,7 @@ import secrets
 from xid import XID
 from rdflib import BNode, URIRef, Namespace
 
-from bubble.ns import SWA
+from bubble.prfx import SWA
 
 
 class Mint:
