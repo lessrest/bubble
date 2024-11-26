@@ -75,13 +75,56 @@ async def test_shell_capability_failure(graph, shell_capability):
     @prefix nt: <https://node.town/2024/> .
     @base <https://test.example/> .
 
-    <invocation> a nt:Invocation .
+    <invocation> a nt:Invocation ;
+        nt:provides [ a nt:ShellCommand ;
+            nt:value 'exit 1' ] .
     """
 
     graph.parse(data=turtle_data, format="turtle")
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(Exception) as exc_info:
         await do_shell(shell_capability)
-    assert "No" in str(exc_info.value)
+    assert "Command failed: 1" in str(exc_info.value)
+
+
+@pytest.mark.trio
+async def test_shell_no_output_file(graph, shell_capability):
+    """Test handling when command doesn't create output file"""
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @base <https://test.example/> .
+
+    <invocation> a nt:Invocation ;
+        nt:provides [ a nt:ShellCommand ;
+            nt:value 'true' ] .
+    """
+
+    graph.parse(data=turtle_data, format="turtle")
+    await do_shell(shell_capability)
+    
+    # Verify no result node was created
+    result = shell_capability.select_one_row(
+        "SELECT ?result WHERE { ?invocation nt:result ?result }",
+        raise_on_empty=False
+    )
+    assert result is None
+
+
+@pytest.mark.trio 
+async def test_shell_invalid_command(graph, shell_capability):
+    """Test handling of invalid shell command"""
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @base <https://test.example/> .
+
+    <invocation> a nt:Invocation ;
+        nt:provides [ a nt:ShellCommand ;
+            nt:value 'nonexistentcommand' ] .
+    """
+
+    graph.parse(data=turtle_data, format="turtle")
+    with pytest.raises(Exception) as exc_info:
+        await do_shell(shell_capability)
+    assert "Command failed" in str(exc_info.value)
 
 
 async def test_shell_capability_with_stdin():
