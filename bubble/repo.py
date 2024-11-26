@@ -68,9 +68,8 @@ class BubbleRepo:
             kind: Description of what's being loaded for logging
         """
         paths = []
-        async with trio.Path(directory).glob(pattern) as aiter:
-            async for p in aiter:
-                paths.append(p)
+        files = await trio.Path(directory).glob(pattern)
+        paths.extend(files)
 
         for path in paths:
             logger.info(f"Loading {kind} from {path}")
