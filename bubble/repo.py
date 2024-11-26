@@ -74,9 +74,13 @@ class Bubble:
             os = platform.system()
             match os:
                 case "Darwin":
-                    graph.add((machine, NT.os, NT.MacOS))
+                    graph.add((machine, NT.os, NT.macOS))
                 case _:
                     raise ValueError(f"Unknown operating system: {os}")
+
+            # find kernel version
+            kernel = platform.release()
+            graph.add((machine, NT.kernel, Literal(kernel)))
 
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
