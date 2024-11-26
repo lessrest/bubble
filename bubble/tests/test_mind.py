@@ -6,7 +6,6 @@ These tests verify that:
 3. The reasoner can process standard N3 inference patterns
 """
 
-from pathlib import Path
 import pytest
 from rdflib import URIRef, Namespace, Graph
 from rdflib.namespace import RDF, RDFS
@@ -15,47 +14,41 @@ from bubble.mind import reason
 
 
 @pytest.fixture
-def test_data():
-    """Test data for N3 reasoning"""
+def test_graphs():
+    """Test graphs for N3 reasoning"""
     EX = Namespace("http://example.org/")
     
-    return {
-        "facts": f"""
-        @prefix : <{EX}> .
-        @prefix rdfs: <{RDFS}> .
-        
-        :Socrates a :Human .
-        :Human rdfs:subClassOf :Mortal .
-        """.strip(),
-        
-        "rules": f"""
-        @prefix : <{EX}> .
-        @prefix rdfs: <{RDFS}> .
+    # Create facts graph
+    facts = Graph()
+    facts.bind('', EX)
+    facts.bind('rdfs', RDFS)
+    
+    facts.add((EX.Socrates, RDF.type, EX.Human))
+    facts.add((EX.Human, RDFS.subClassOf, EX.Mortal))
+    
+    # Create rules graph
+    rules = Graph()
+    rules.bind('', EX)
+    rules.bind('rdfs', RDFS)
+    rules.parse(data="""
+        @prefix : <http://example.org/> .
+        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
         @prefix log: <http://www.w3.org/2000/10/swap/log#> .
         
-        {{?A rdfs:subClassOf ?B . ?X a ?A}} => {{?X a ?B}} .
-        """.strip()
-    }
+        {?A rdfs:subClassOf ?B . ?X a ?A} => {?X a ?B} .
+    """, format='n3')
+    
+    return [facts, rules]
 
-@pytest.fixture
-async def test_files(tmp_path, test_data):
-    """Fixture providing temporary N3 test files"""
-    facts_file = tmp_path / "facts.n3" 
-    rules_file = tmp_path / "rules.n3"
-    
-    facts_file.write_text(test_data["facts"])
-    rules_file.write_text(test_data["rules"])
-    
-    return [str(facts_file), str(rules_file)]
 
 @pytest.mark.trio
-async def test_basic_reasoning(test_files):
+async def test_basic_reasoning(test_graphs):
     """Verify that basic RDFS reasoning works.
     
     Tests that the reasoner can infer Socrates is Mortal
     using RDFS subclass reasoning.
     """
-    result = await reason(test_files)
+    result = await reason(test_graphs)
     
     # Verify inference
     socrates = URIRef("http://example.org/Socrates")
@@ -64,14 +57,9 @@ async def test_basic_reasoning(test_files):
     assert (socrates, RDF.type, mortal) in result, \
         "Failed to infer that Socrates is Mortal"
 
+
 @pytest.mark.trio
 async def test_empty_input():
     """Verify that empty input is handled properly."""
-    with pytest.raises(ValueError, match="No input files provided"):
+    with pytest.raises(ValueError, match="No input graphs provided"):
         await reason([])
-
-@pytest.mark.trio
-async def test_invalid_file():
-    """Verify that invalid file paths are handled properly."""
-    with pytest.raises(FileNotFoundError):
-        await reason(["nonexistent.n3"])
