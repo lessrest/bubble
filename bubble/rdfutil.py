@@ -80,13 +80,13 @@ def get_single_subject(predicate, object):
     return subjects[0]
 
 
-def get_subjects(graph: Graph, predicate, object):
-    """Get all subjects for a predicate-object pair"""
-    return list(graph.subjects(predicate, object))
+def get_subjects(predicate, object):
+    """Get all subjects for a predicate-object pair from the current graph"""
+    return list(graphvar.get().subjects(predicate, object))
 
 
-async def reason(input_paths: Sequence[str]) -> Graph:
-    """Run the EYE reasoner on N3 files and return the resulting graph"""
+async def reason(input_paths: Sequence[str]) -> None:
+    """Run the EYE reasoner on N3 files and update the current graph"""
     cmd = ["eye", "--nope", "--pass", *input_paths]
 
     with trio.move_on_after(1):
@@ -94,9 +94,7 @@ async def reason(input_paths: Sequence[str]) -> Graph:
             cmd, capture_stdout=True, capture_stderr=True, check=True
         )
 
-    g = Graph()
-    g.parse(data=result.stdout.decode(), format="n3")
-    return g
+    graphvar.get().parse(data=result.stdout.decode(), format="n3")
 
 
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
@@ -108,22 +106,17 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
 
 
 def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
-    """Select multiple rows from a query"""
+    """Select multiple rows from a query on the current graph"""
     results = graphvar.get().query(
         query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
     )
-    rows = []
-    for row in results:
-        assert isinstance(row, ResultRow)
-        rows.append(row)
-    return rows
+    return [row for row in results if isinstance(row, ResultRow)]
 
 
-def turtle(src: str) -> Graph:
-    graph = Graph()
-    graph.parse(data=src, format="turtle")
-    graph.bind("nt", NT)
-    return graph
+def turtle(src: str) -> None:
+    """Parse turtle data into the current graph"""
+    graphvar.get().parse(data=src, format="turtle")
+    graphvar.get().bind("nt", NT)
 
 
 def new(*args, **kwargs):
