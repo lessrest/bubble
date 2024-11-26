@@ -108,7 +108,7 @@ def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
 def turtle(src: str) -> Graph:
     """Parse turtle data into the current graph"""
     with using_graph(Graph()) as graph:
-        graph.parse(data=src, format="turtle")
+        graph.parse(data=src, format="n3")
         graph.bind("nt", NT)
         return graph
 
