@@ -128,28 +128,6 @@ def skolemize(
     return g_sk
 
 
-"""Functions for converting between JSON and RDF representations.
-
-The RDF representation uses a custom JSON ontology with the following structure:
-
-    [
-        a json:Object ;
-        json:has [
-            json:property "name" ;
-            json:value "John"
-        ] ;
-        json:has [
-            json:property "age" ;
-            json:value 30
-        ] ;
-        json:has [
-            json:property "children" ;
-            json:value json:null
-        ]
-    ]
-"""
-
-
 def select_one_row(graph: Graph, query: str, bindings: dict = {}) -> ResultRow:
     """Select a single row from a query"""
     rows = select_rows(graph, query, bindings)
