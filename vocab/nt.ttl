@@ -1,17 +1,16 @@
 @prefix : <https://node.town/2024//> .
+@prefix as: <http://www.w3.org/ns/activitystreams#> .
+@prefix nt: <https://node.town/2024/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@base <https://node.town/2024//> .
+@base <https://node.town/2024/> .
 
 <https://node.town/2024/> rdf:type owl:Ontology ;
-                           owl:imports <http://purl.obolibrary.org/obo/iao/dev/iao-edit.owl> ,
-                                       <http://purl.obolibrary.org/obo/iao/dev/import_OBI.owl> ,
-                                       <http://purl.obolibrary.org/obo/iao/dev/import_PATO.owl> ,
-                                       <http://purl.obolibrary.org/obo/iao/dev/import_UO.owl> ;
-                           rdfs:label "Node.Town Ontology of Computer Systems"@en .
+   owl:imports <http://purl.obolibrary.org/obo/iao/dev/iao-edit.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_OBI.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_PATO.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_UO.owl> ;
+   rdfs:label "Node.Town Ontology of Computer Systems"@en .
 
 #################################################################
 #    Annotation properties
@@ -24,14 +23,158 @@
 #################################################################
 #    Classes
 #################################################################
+nt:Step a owl:Class ;
+   rdfs:label "step"@en ;
+   rdfs:comment "a step is a transaction that changes the state of a bubble"@en ;
+   rdfs:subClassOf nt:PlanSpecification .
+nt:Bubble a owl:Class ;
+   rdfs:label "bubble"@en ;
+   rdfs:comment "a bubble is a versioned knowledge graph dataset that evolves in steps that reason with rules"@en .
+nt:Repository a owl:Class ;
+   rdfs:label "repository"@en ;
+   rdfs:comment "a repository is a Git repository that tracks the history of a bubble"@en ;
+   rdfs:subClassOf nt:InformationContentEntity .
+nt:EngineeredObject a owl:Class ;
+   rdfs:label "engineered object"@en ;
+   rdfs:comment "an engineered object is a cohesive material object made to fulfill a specification"@en ;
+   rdfs:subClassOf nt:Object .
+nt:Object a owl:Class ;
+   rdfs:label "object"@en ;
+   rdfs:comment "an object is a material entity with coherence and integrity"@en .
+nt:ComputerMachine a owl:Class ;
+   rdfs:label "computer machine"@en ;
+   rdfs:subClassOf nt:EngineeredObject ;
+   rdfs:comment "a computer machine is a non-virtual computer"@en .
+nt:Directory a owl:Class ;
+   rdfs:label "directory"@en ;
+   rdfs:comment "a directory is a filesystem container that organizes files and other directories in a hierarchical structure"@en .
+nt:Account a owl:Class ;
+   rdfs:label "account"@en ;
+   rdfs:comment "an account is a user identity in a computer system with associated permissions and resources"@en .
+nt:BoundedStore a owl:Class ;
+   rdfs:label "bounded store"@en ;
+   rdfs:comment "a bounded store is a computer memory that has a limited capacity"@en .
+nt:RandomAccessMemory a owl:Class ;
+   rdfs:label "memory"@en ;
+   rdfs:subClassOf nt:BoundedStore ;
+   rdfs:comment "random access memory is a hardware component that provides temporary high-speed data storage for running programs"@en .
+nt:CentralProcessingUnit a owl:Class ;
+   rdfs:label "cpu"@en ;
+   rdfs:subClassOf nt:EngineeredObject ;
+   rdfs:comment "a central processing unit is a hardware component that executes instructions of computer programs"@en .
+nt:Filesystem a owl:Class ;
+   rdfs:label "filesystem"@en ;
+   rdfs:subClassOf nt:BoundedStore ;
+   rdfs:comment "a filesystem is a method for storing and organizing computer files and their data"@en .
+nt:ComputingEnvironment a owl:Class ;
+   rdfs:label "computing environment"@en ;
+   rdfs:comment "a computing environment is a software environment that provides system services and interfaces"@en .
+nt:macOSEnvironment a owl:Class ;
+   rdfs:label "macos environment"@en ;
+   rdfs:subClassOf nt:ComputingEnvironment ;
+   rdfs:comment "an Apple macOS operating system environment"@en .
+nt:PosixEnvironment a owl:Class ;
+   rdfs:label "posix environment"@en ;
+   rdfs:subClassOf nt:ComputingEnvironment ;
+   rdfs:comment "a POSIX-compliant operating system environment"@en .
+nt:Person a owl:Class ;
+   rdfs:subClassOf as:Actor ;
+   rdfs:label "person"@en ;
+   rdfs:comment "a human being who can own and operate computer accounts"@en .
 
-###  https://node.town/2024/0001
-<https://node.town/2024/0001> rdf:type owl:Class ;
-                              rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000033> ;
-                              <http://purl.obolibrary.org/obo/IAO_0000115> "a service specification is a specification of how a service operates" ;
-                              <http://purl.org/dc/elements/1.1/creator> "Mikael Brockman" ;
-                              <http://purl.org/dc/elements/1.1/date> "2024-11-25T12:09:30Z"^^xsd:dateTime ;
-                              rdfs:label "service specification"@en .
-
-
-###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi
+#################################################################
+#    Properties
+#################################################################
+nt:hosts a owl:ObjectProperty ;
+   rdfs:label "hosts"@en ;
+   rdfs:comment "relates a computer machine to the software environments it provides"@en ;
+   rdfs:domain nt:ComputerMachine ;
+   rdfs:range nt:ComputingEnvironment .
+nt:part a owl:ObjectProperty ;
+   rdfs:label "part"@en ;
+   rdfs:comment "relates a whole to its constituent components"@en .
+nt:tracks a owl:ObjectProperty ;
+   rdfs:label "tracks"@en ;
+   rdfs:comment "relates a repository to the bubble whose history it maintains"@en ;
+   rdfs:domain nt:Repository ;
+   rdfs:range nt:Bubble .
+nt:head a owl:ObjectProperty ;
+   rdfs:label "head"@en ;
+   rdfs:comment "relates a bubble to its current step"@en ;
+   rdfs:domain nt:Bubble ;
+   rdfs:range nt:Step .
+nt:worktree a owl:ObjectProperty ;
+   rdfs:label "worktree"@en ;
+   rdfs:comment "relates a repository to the directory containing its working files"@en ;
+   rdfs:domain nt:Repository ;
+   rdfs:range nt:Directory .
+nt:owner a owl:ObjectProperty ;
+   rdfs:label "owner"@en ;
+   rdfs:comment "relates a continuant to the agent that owns it"@en ;
+   rdfs:domain nt:Continuant ;
+   rdfs:range as:Agent .
+nt:username a owl:DatatypeProperty ;
+   rdfs:label "username"@en ;
+   rdfs:comment "the login name identifying an account in a system"@en ;
+   rdfs:domain nt:Account ;
+   rdfs:range xsd:string .
+nt:uid a owl:DatatypeProperty ;
+   rdfs:label "uid"@en ;
+   rdfs:comment "the numeric user identifier of an account in a POSIX system"@en ;
+   rdfs:domain nt:Account ;
+   rdfs:range xsd:string .
+nt:gid a owl:DatatypeProperty ;
+   rdfs:label "gid"@en ;
+   rdfs:comment "the numeric primary group identifier of an account in a POSIX system"@en ;
+   rdfs:domain nt:Account ;
+   rdfs:range xsd:string .
+nt:homeDirectory a owl:ObjectProperty ;
+   rdfs:label "home directory"@en ;
+   rdfs:comment "relates an account to its primary storage directory"@en ;
+   rdfs:domain nt:Account ;
+   rdfs:range nt:Directory .
+nt:filesystem a owl:ObjectProperty ;
+   rdfs:label "filesystem"@en ;
+   rdfs:comment "relates a directory to the filesystem that contains it"@en ;
+   rdfs:domain nt:Directory ;
+   rdfs:range nt:Filesystem .
+nt:path a owl:DatatypeProperty ;
+   rdfs:label "path"@en ;
+   rdfs:comment "the absolute pathname of a directory in a filesystem"@en ;
+   rdfs:domain nt:Directory ;
+   rdfs:range xsd:string .
+nt:byteSize a owl:DatatypeProperty ;
+   rdfs:label "byte size"@en ;
+   rdfs:comment "the storage capacity or size in bytes"@en ;
+   rdfs:domain nt:BoundedStore ;
+   rdfs:range xsd:integer .
+nt:gigabyteSize a owl:DatatypeProperty ;
+   rdfs:label "gigabyte size"@en ;
+   rdfs:comment "the storage capacity or size in gigabytes"@en ;
+   rdfs:domain nt:BoundedStore ;
+   rdfs:range xsd:integer .
+nt:version a owl:DatatypeProperty ;
+   rdfs:label "version"@en ;
+   rdfs:comment "the version identifier of an information content entity"@en ;
+   rdfs:domain nt:InformationContentEntity ;
+   rdfs:range xsd:string .
+nt:architecture a owl:ObjectProperty ;
+   rdfs:label "architecture"@en ;
+   rdfs:comment "relates a CPU to its instruction set architecture"@en ;
+   rdfs:domain nt:CentralProcessingUnit ;
+   rdfs:range xsd:string .
+nt:hostname a owl:DatatypeProperty ;
+   rdfs:label "hostname"@en ;
+   rdfs:comment "the network name identifying a computer system"@en ;
+   rdfs:domain nt:PosixEnvironment ;
+   rdfs:range xsd:string .
+nt:rank a owl:DatatypeProperty ;
+   rdfs:label "rank"@en ;
+   rdfs:comment "the sequential position of a step in a bubble's history"@en ;
+   rdfs:domain nt:Step ;
+   rdfs:range xsd:integer .
+nt:name a owl:DatatypeProperty ;
+   rdfs:label "name"@en ;
+   rdfs:comment "the full name of a person"@en ;
+   rdfs:domain nt:Person ;
+   rdfs:range xsd:string .

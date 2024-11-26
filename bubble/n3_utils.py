@@ -20,7 +20,12 @@ def print_n3(graph: Graph) -> None:
     n3 = graph.serialize(format="n3")
     n3 = n3.replace("    ", "  ")  # Replace 4 spaces with 2 spaces globally
     n3 = n3.strip()  # strip leading and trailing whitespace
-    print(Panel(Syntax(n3, "turtle", theme="coffee", word_wrap=True), width=80))
+    print(
+        Panel(
+            Syntax(n3, "turtle", theme="friendly_grayscale"),
+            title="Bubble Graph",
+        )
+    )
 
 
 def get_single_object(graph: Graph, subject, predicate):
