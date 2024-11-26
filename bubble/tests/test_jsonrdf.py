@@ -9,6 +9,7 @@ from bubble.rdfjson import (
     convert_json_value,
 )
 from bubble.rdfutil import New, select_rows
+from bubble.graphvar import using_graph
 
 
 @pytest.fixture
@@ -76,35 +77,35 @@ def test_convert_json_value_invalid():
 def test_json_to_n3_simple(graph):
     """Test converting simple Python dict to RDF"""
     root = rdf_from_json(graph, {"key": "value"})
-    rows = select_rows(
-        graph,
-        """
-        SELECT ?key ?value
-        WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
-        """,
-        {"root": root},
-    )
+    with using_graph(graph):
+        rows = select_rows(
+            """
+            SELECT ?key ?value
+            WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
+            """,
+            {"root": root},
+        )
     assert rows == [(Literal("key"), Literal("value"))]
 
 
 def test_json_to_n3_nested(graph):
     """Test converting nested dict structures"""
     root = rdf_from_json(graph, {"outer": {"inner": "value"}})
-    rows = select_rows(
-        graph,
-        """
-        SELECT ?outer_key ?inner_key ?inner_value WHERE {
-            ?root json:has ?outer_prop .
-            ?outer_prop json:key ?outer_key ;
-                       json:val ?inner_obj .
-            ?inner_obj a json:Object ;
-                      json:has ?inner_prop .
-            ?inner_prop json:key ?inner_key ;
-                        json:val ?inner_value .
-        }
-        """,
-        {"root": root},
-    )
+    with using_graph(graph):
+        rows = select_rows(
+            """
+            SELECT ?outer_key ?inner_key ?inner_value WHERE {
+                ?root json:has ?outer_prop .
+                ?outer_prop json:key ?outer_key ;
+                           json:val ?inner_obj .
+                ?inner_obj a json:Object ;
+                          json:has ?inner_prop .
+                ?inner_prop json:key ?inner_key ;
+                            json:val ?inner_value .
+            }
+            """,
+            {"root": root},
+        )
 
     assert len(rows) == 1
     assert rows[0] == (
@@ -118,12 +119,12 @@ def test_json_to_n3_null(graph):
     """Test handling null values"""
     root = rdf_from_json(graph, {"key": None})
 
-    rows = select_rows(
-        graph,
-        """
-        SELECT ?key ?value
-        WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
-        """,
-        {"root": root},
-    )
+    with using_graph(graph):
+        rows = select_rows(
+            """
+            SELECT ?key ?value
+            WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
+            """,
+            {"root": root},
+        )
     assert rows == [(Literal("key"), JSON.null)]
