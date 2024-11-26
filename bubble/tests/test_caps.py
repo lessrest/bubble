@@ -83,7 +83,7 @@ async def test_shell_capability_failure(graph, shell_capability):
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(Exception) as exc_info:
         await do_shell(shell_capability)
-    assert "Command failed: 1" in str(exc_info.value)
+    assert "Command 'exit 1' returned non-zero exit status 1" in str(exc_info.value)
 
 
 @pytest.mark.trio
@@ -102,9 +102,8 @@ async def test_shell_no_output_file(graph, shell_capability):
     await do_shell(shell_capability)
     
     # Verify no result node was created
-    result = shell_capability.select_one_row(
-        "SELECT ?result WHERE { ?invocation nt:result ?result }",
-        raise_on_empty=False
+    results = shell_capability.select_one_row(
+        "SELECT ?result WHERE { ?invocation nt:result ?result }"
     )
     assert result is None
 
@@ -124,7 +123,7 @@ async def test_shell_invalid_command(graph, shell_capability):
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(Exception) as exc_info:
         await do_shell(shell_capability)
-    assert "Command failed" in str(exc_info.value)
+    assert "Command 'nonexistentcommand' returned non-zero exit status 127" in str(exc_info.value)
 
 
 async def test_shell_capability_with_stdin():
