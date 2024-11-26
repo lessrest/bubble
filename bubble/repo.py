@@ -78,10 +78,6 @@ class Bubble:
                 case _:
                     raise ValueError(f"Unknown operating system: {os}")
 
-            # find kernel version
-            kernel = platform.release()
-            graph.add((machine, NT.kernel, Literal(kernel)))
-
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
