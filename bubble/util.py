@@ -1,8 +1,7 @@
 """Utility functions for N3 processing."""
 
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
-import trio
 
 from rdflib import RDF, Graph, Literal
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
@@ -88,20 +87,6 @@ def get_single_subject(predicate, object):
 def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
     return list(graphvar.get().subjects(predicate, object))
-
-
-async def reason(input_paths: Sequence[str]) -> Graph:
-    """Run the EYE reasoner on N3 files and update the current graph"""
-    cmd = ["eye", "--nope", "--pass", *input_paths]
-
-    with trio.move_on_after(1):
-        result = await trio.run_process(
-            cmd, capture_stdout=True, capture_stderr=True, check=True
-        )
-
-    g = Graph()
-    g.parse(data=result.stdout.decode(), format="n3")
-    return g
 
 
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:

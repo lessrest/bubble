@@ -93,7 +93,7 @@ class BubbleRepo:
 
     async def reason(self) -> Graph:
         """Reason over the graph"""
-        from bubble.util import reason
+        from bubble.reason import reason
 
         tmpfile = Path(tempfile.gettempdir()) / "bubble.n3"
         self.graph.serialize(destination=tmpfile, format="n3")
