@@ -25,6 +25,9 @@ async def stream_sentences(stream, initial_sentence="") -> str:
                         "<sentence>", 1
                     )
 
+                # Remove trailing period if present
+                sentence_content = sentence_content.rstrip('.')
+
                 # Only process if there's actual content
                 if sentence_content.strip():
                     # Handle multiline content by joining with spaces
@@ -44,6 +47,17 @@ async def stream_sentences(stream, initial_sentence="") -> str:
                 # Keep remainder for next iteration
                 current_sentence = parts[1]
 
+    # Handle any final incomplete sentence
+    if current_sentence.strip():
+        if "<sentence>" in current_sentence:
+            _, sentence_content = current_sentence.rsplit("<sentence>", 1)
+            sentence_content = sentence_content.rstrip('.')
+            if sentence_content.strip():
+                cleaned_sentence = " ".join(
+                    line.strip() for line in sentence_content.splitlines()
+                )
+                sentences.append(cleaned_sentence)
+
     return "\n\n".join(sentences)
 
 
@@ -56,6 +70,10 @@ async def stream_normally(stream) -> str:
             text += chunk.text
             console.print(chunk.text, end="")
     console.print()
+
+    # Ensure we have complete XML tags
+    if text.count("<sentence>") != text.count("</sentence>"):
+        text += "</sentence>"
 
     return text
 
