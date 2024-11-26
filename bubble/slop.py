@@ -5,9 +5,8 @@ from rich.console import Console
 console = Console()
 
 
-async def stream_sentences(stream, initial_sentence="") -> str:
-    """Stream sentences from an Anthropic response, printing each complete sentence."""
-    sentences: list[str] = []
+async def stream_sentences(stream, initial_sentence=""):
+    """Stream sentences from an Anthropic response, yielding each complete sentence."""
     current_sentence = initial_sentence
     for chunk in stream:
         if isinstance(chunk, anthropic.TextEvent):
@@ -35,14 +34,7 @@ async def stream_sentences(stream, initial_sentence="") -> str:
                         line.strip()
                         for line in sentence_content.splitlines()
                     )
-
-                    # Print the complete sentence
-                    console.print(
-                        cleaned_sentence,
-                        width=72,
-                        end="\n\n",
-                    )
-                    sentences.append(cleaned_sentence)
+                    yield cleaned_sentence
 
                 # Keep remainder for next iteration
                 current_sentence = parts[1]
@@ -56,9 +48,7 @@ async def stream_sentences(stream, initial_sentence="") -> str:
                 cleaned_sentence = " ".join(
                     line.strip() for line in sentence_content.splitlines()
                 )
-                sentences.append(cleaned_sentence)
-
-    return "\n\n".join(sentences)
+                yield cleaned_sentence
 
 
 async def stream_normally(stream) -> str:
