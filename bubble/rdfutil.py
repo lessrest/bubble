@@ -1,53 +1,21 @@
 """Utility functions for N3 processing."""
 
-from contextlib import contextmanager
-from contextvars import ContextVar
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import trio
 
-from rdflib import RDF, BNode, Graph, Namespace
+from rdflib import RDF, BNode, Graph, Literal, Namespace
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
 from bubble.gensym import fresh_uri
+from bubble.graphvar import graphvar
 from bubble.ns import NT, SWA, JSON
 
 
 S = _SubjectType
 P = _PredicateType
 O = _ObjectType
-
-
-# A global context variable for dependency injection of the current RDF graph.
-# This enables a form of dynamic scoping where code can access the "current graph"
-# without explicitly passing it through all function calls.
-graphvar = ContextVar("graph", default=Graph())
-
-
-@contextmanager
-def using_graph(graph: Graph):
-    """Temporarily set the current graph within a context.
-
-    This is a convenience wrapper around using() for the common case
-    of injecting a graph dependency.
-    """
-    with using(graphvar, graph):
-        yield
-
-
-@contextmanager
-def using(var: ContextVar, value):
-    """Context manager for temporarily setting a context variable.
-
-    Implements the dynamic scoping pattern - sets the value within the context
-    and restores the previous value when exiting, even if an exception occurs.
-    """
-    try:
-        token = var.set(value)
-        yield
-    finally:
-        var.reset(token)
 
 
 class New:
@@ -59,7 +27,7 @@ class New:
     def __call__(
         self,
         type: Optional[S] = None,
-        properties: dict[P, O | list[O]] = {},
+        properties: dict[P, Any] = {},
         subject: Optional[S] = None,
     ) -> S:
         if subject is None:
@@ -72,9 +40,19 @@ class New:
             for predicate, object in properties.items():
                 if isinstance(object, list):
                     for item in object:
-                        self.graph.add((subject, predicate, item))
+                        o = (
+                            item
+                            if isinstance(item, O)
+                            else Literal(item)
+                        )
+                        self.graph.add((subject, predicate, o))
                 else:
-                    self.graph.add((subject, predicate, object))
+                    o = (
+                        object
+                        if isinstance(object, O)
+                        else Literal(object)
+                    )
+                    self.graph.add((subject, predicate, o))
 
         return subject
 

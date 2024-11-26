@@ -21,7 +21,7 @@ from rdflib import (
 )
 from rdflib.graph import _SubjectType
 
-from bubble.bubbleboot import create_new_bubble
+from bubble.bubbleboot import describe_new_bubble
 from bubble.gensym import Mint, mintvar
 from bubble.ns import NT
 from bubble.rdfutil import get_single_subject
@@ -108,7 +108,7 @@ class BubbleRepo:
             await path.mkdir(parents=True)
 
         if not await (path / "root.n3").exists():
-            bubble = await create_new_bubble(path)
+            bubble = await describe_new_bubble(path)
             repo = BubbleRepo(path, bubble)
             await repo.commit()
             return repo
