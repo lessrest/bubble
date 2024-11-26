@@ -4,7 +4,7 @@ from typing import Any, Optional, Sequence
 
 import trio
 
-from rdflib import RDF, BNode, Graph, Literal, Namespace
+from rdflib import RDF, Graph, Literal
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
@@ -99,39 +99,7 @@ async def reason(input_paths: Sequence[str]) -> Graph:
     return g
 
 
-def skolemize(
-    g: Graph,
-    namespace: str = "https://swa.sh/.well-known/genid/",
-) -> Graph:
-    """Convert blank nodes in a graph to fresh IRIs"""
-    ns = Namespace(namespace)
-    g_sk = Graph()
-
-    # Copy namespace bindings
-    for prefix, namespace in g.namespaces():
-        g_sk.bind(prefix, namespace)
-    g_sk.bind("id", ns)
-
-    # Create mapping of blank nodes to IRIs
-    bnode_map = {}
-
-    def get_iri_for_bnode(bnode):
-        if bnode not in bnode_map:
-            bnode_map[bnode] = fresh_uri(ns)
-        return bnode_map[bnode]
-
-    # Copy all triples, consistently replacing blank nodes
-    for s, p, o in g:
-        s_new = get_iri_for_bnode(s) if isinstance(s, BNode) else s
-        o_new = get_iri_for_bnode(o) if isinstance(o, BNode) else o
-        g_sk.add((s_new, p, o_new))
-
-    return g_sk
-
-
-def select_one_row(
-    query: str, bindings: dict = {}
-) -> ResultRow:
+def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
     """Select a single row from a query"""
     rows = select_rows(query, bindings)
     if len(rows) != 1:
@@ -139,9 +107,7 @@ def select_one_row(
     return rows[0]
 
 
-def select_rows(
-    query: str, bindings: dict = {}
-) -> list[ResultRow]:
+def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
     """Select multiple rows from a query"""
     results = graphvar.get().query(
         query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
