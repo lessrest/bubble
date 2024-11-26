@@ -72,9 +72,9 @@ def print_n3() -> None:
     )
 
 
-def get_single_subject(graph: Graph, predicate, object):
-    """Get a single subject for a predicate-object pair"""
-    subjects = get_subjects(graph, predicate, object)
+def get_single_subject(predicate, object):
+    """Get a single subject for a predicate-object pair from the current graph"""
+    subjects = get_subjects(graphvar.get(), predicate, object)
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
