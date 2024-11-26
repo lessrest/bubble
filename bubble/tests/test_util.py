@@ -1,10 +1,10 @@
 import pytest
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF
-from rich.console import Console
 
 from bubble.vars import using_graph
 from bubble.util import get_single_subject, print_n3
+
 
 def test_print_n3(capsys):
     """Test that print_n3 outputs formatted N3"""
@@ -14,16 +14,18 @@ def test_print_n3(capsys):
         predicate = RDF.type
         object = URIRef("http://example.org/TestType")
         g.add((subject, predicate, object))
-        
+
         # Call print_n3
         print_n3()
-        
+
         # Capture the output
         captured = capsys.readouterr()
-        
+
         # Verify output contains the triple components
         assert "http://example.org/subject" in captured.out
-        assert "a" in captured.out  # RDF.type gets serialized as 'a' in N3
+        assert (
+            "a" in captured.out
+        )  # RDF.type gets serialized as 'a' in N3
         assert "http://example.org/TestType" in captured.out
 
 
@@ -34,17 +36,21 @@ def test_get_single_subject():
         predicate = RDF.type
         object = URIRef("http://example.org/TestType")
         g.add((subject, predicate, object))
-        
+
         # Test successful case
         result = get_single_subject(predicate, object)
         assert result == subject
 
         # Test case with no matches
-        with pytest.raises(ValueError, match="Expected 1 subject, got 0"):
+        with pytest.raises(
+            ValueError, match="Expected 1 subject, got 0"
+        ):
             get_single_subject(predicate, Literal("nonexistent"))
-            
+
         # Test case with multiple matches
         subject2 = URIRef("http://example.org/subject2")
         g.add((subject2, predicate, object))
-        with pytest.raises(ValueError, match="Expected 1 subject, got 2"):
+        with pytest.raises(
+            ValueError, match="Expected 1 subject, got 2"
+        ):
             get_single_subject(predicate, object)
