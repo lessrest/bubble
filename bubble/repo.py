@@ -94,7 +94,10 @@ class Bubble:
                 (
                     memory_part,
                     NT.gigabyteSize,
-                    Literal(memory_info.total / 1024 / 1024 / 1024),
+                    Literal(
+                        memory_info.total / 1024 / 1024 / 1024,
+                        datatype=XSD.integer,
+                    ),
                 )
             )
 
