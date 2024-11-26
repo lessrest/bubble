@@ -1,8 +1,11 @@
 import base64
+from contextvars import ContextVar
 import secrets
 
 from xid import XID
 from rdflib import BNode, URIRef, Namespace
+
+from bubble.ns import SWA
 
 
 class Mint:
@@ -65,3 +68,14 @@ class Mint:
             .rstrip("=")
             .upper()
         )
+
+
+mintvar = ContextVar("mint", default=Mint())
+
+
+def fresh_uri(namespace: Namespace) -> URIRef:
+    return mintvar.get().fresh_secure_iri(namespace)
+
+
+def fresh_iri() -> URIRef:
+    return fresh_uri(SWA)

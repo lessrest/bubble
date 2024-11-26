@@ -8,11 +8,34 @@ from rdflib import XSD, Literal
 
 from bubble.macsysinfo import computer_serial_number, get_disk_info
 from bubble.ns import NT
+from bubble.gensym import mintvar
+
+from typing import TypedDict
+from pwd import struct_passwd
+from rdflib import URIRef
+
+from bubble.macsysinfo import DiskInfo
 
 
-async def get_a_bunch_of_info(mint):
+class SystemInfo(TypedDict):
+    computer_serial: str
+    machine_id: str
+    now: Literal
+    hostname: str
+    architecture: URIRef
+    system_type: URIRef
+    system_version: str
+    byte_size: int
+    gigabyte_size: float
+    user_info: struct_passwd
+    person_name: str
+    disk_info: DiskInfo
+    disk_uuid: str
+
+
+async def gather_system_info() -> SystemInfo:
     computer_serial = await computer_serial_number()
-    machine_id = mint.machine_id()
+    machine_id = mintvar.get().machine_id()
 
     now = get_timestamp()
     hostname, arch, system = get_system_info()
@@ -23,20 +46,21 @@ async def get_a_bunch_of_info(mint):
 
     disk_info = await get_disk_info("/System/Volumes/Data")
     disk_uuid = disk_info["DiskUUID"]
-    return (
-        computer_serial,
-        machine_id,
-        now,
-        hostname,
-        architecture,
-        system_type,
-        system_version,
-        byte_size,
-        gigabyte_size,
-        user_info,
-        person_name,
-        disk_info,
-        disk_uuid,
+
+    return SystemInfo(
+        computer_serial=computer_serial,
+        machine_id=machine_id,
+        now=now,
+        hostname=hostname,
+        architecture=architecture,
+        system_type=system_type,
+        system_version=system_version,
+        byte_size=byte_size,
+        gigabyte_size=gigabyte_size,
+        user_info=user_info,
+        person_name=person_name,
+        disk_info=disk_info,
+        disk_uuid=disk_uuid,
     )
 
 

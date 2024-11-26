@@ -1,5 +1,7 @@
 """Utility functions for N3 processing."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Optional, Sequence
 
 import trio
@@ -8,27 +10,60 @@ from rdflib import RDF, BNode, Graph, Namespace
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
-from bubble.gensym import Mint
+from bubble.gensym import fresh_uri
 from bubble.ns import NT, SWA, JSON
+
+
+S = _SubjectType
+P = _PredicateType
+O = _ObjectType
+
+
+# A global context variable for dependency injection of the current RDF graph.
+# This enables a form of dynamic scoping where code can access the "current graph"
+# without explicitly passing it through all function calls.
+graphvar = ContextVar("graph", default=Graph())
+
+
+@contextmanager
+def using_graph(graph: Graph):
+    """Temporarily set the current graph within a context.
+
+    This is a convenience wrapper around using() for the common case
+    of injecting a graph dependency.
+    """
+    with using(graphvar, graph):
+        yield
+
+
+@contextmanager
+def using(var: ContextVar, value):
+    """Context manager for temporarily setting a context variable.
+
+    Implements the dynamic scoping pattern - sets the value within the context
+    and restores the previous value when exiting, even if an exception occurs.
+    """
+    try:
+        token = var.set(value)
+        yield
+    finally:
+        var.reset(token)
 
 
 class New:
     """Create new nodes in a graph, inspired by Turtle syntax"""
 
-    def __init__(self, graph: Graph, mint: Mint = Mint()):
+    def __init__(self, graph: Graph):
         self.graph = graph
-        self.mint = mint
 
     def __call__(
         self,
-        type: Optional[_SubjectType] = None,
-        properties: dict[
-            _PredicateType, _ObjectType | list[_ObjectType]
-        ] = {},
-        subject: Optional[_SubjectType] = None,
-    ) -> _SubjectType:
+        type: Optional[S] = None,
+        properties: dict[P, O | list[O]] = {},
+        subject: Optional[S] = None,
+    ) -> S:
         if subject is None:
-            subject = self.mint.fresh_secure_iri(SWA)
+            subject = fresh_uri(SWA)
 
         if type is not None:
             self.graph.add((subject, RDF.type, type))
@@ -91,7 +126,6 @@ def skolemize(
     namespace: str = "https://swa.sh/.well-known/genid/",
 ) -> Graph:
     """Convert blank nodes in a graph to fresh IRIs"""
-    mint = Mint()
     ns = Namespace(namespace)
     g_sk = Graph()
 
@@ -105,7 +139,7 @@ def skolemize(
 
     def get_iri_for_bnode(bnode):
         if bnode not in bnode_map:
-            bnode_map[bnode] = mint.fresh_secure_iri(ns)
+            bnode_map[bnode] = fresh_uri(ns)
         return bnode_map[bnode]
 
     # Copy all triples, consistently replacing blank nodes
@@ -146,3 +180,7 @@ def turtle(src: str) -> Graph:
     graph.parse(data=src, format="turtle")
     graph.bind("nt", NT)
     return graph
+
+
+def new(*args, **kwargs):
+    return New(graphvar.get())(*args, **kwargs)
