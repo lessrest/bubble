@@ -16,6 +16,7 @@ from bubble.macs import (
     platform.system() != "Darwin",
     reason="macOS disk tests only run on Darwin"
 )
+@pytest.mark.slow
 @pytest.mark.trio
 async def test_disk_list():
     """Test retrieving list of disks"""
