@@ -130,20 +130,20 @@ def skolemize(
 
 
 def select_one_row(
-    graph: Graph, query: str, bindings: dict = {}
+    query: str, bindings: dict = {}
 ) -> ResultRow:
     """Select a single row from a query"""
-    rows = select_rows(graph, query, bindings)
+    rows = select_rows(query, bindings)
     if len(rows) != 1:
         raise ValueError("No result row found")
     return rows[0]
 
 
 def select_rows(
-    graph: Graph, query: str, bindings: dict = {}
+    query: str, bindings: dict = {}
 ) -> list[ResultRow]:
     """Select multiple rows from a query"""
-    results = graph.query(
+    results = graphvar.get().query(
         query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
     )
     rows = []
