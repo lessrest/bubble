@@ -42,6 +42,6 @@ def test_bind_prefixes():
         bind_prefixes()
         
         # Check that expected prefixes are bound
-        assert test_graph.namespace_manager.compute_qname(SWA.term)[0] == "swa"
-        assert test_graph.namespace_manager.compute_qname(NT.term)[0] == "nt"
-        assert test_graph.namespace_manager.compute_qname(AS.term)[0] == "as"
+        assert test_graph.namespace_manager.compute_qname(str(SWA))[0] == "swa"
+        assert test_graph.namespace_manager.compute_qname(str(NT))[0] == "nt"
+        assert test_graph.namespace_manager.compute_qname(str(AS))[0] == "as"
