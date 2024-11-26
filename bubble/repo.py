@@ -136,9 +136,16 @@ class Bubble:
 
     async def commit(self) -> None:
         """Commit the bubble"""
-        await trio.run_process(["git", "add", "."])
+        await trio.run_process(["git", "-C", str(self.path), "add", "."])
         result = await trio.run_process(
-            ["git", "commit", "-m", f"Initialize {self.base}"],
+            [
+                "git",
+                "-C",
+                str(self.path),
+                "commit",
+                "-m",
+                f"Initialize {self.base}",
+            ],
             capture_stdout=True,
             capture_stderr=True,
             check=False,
