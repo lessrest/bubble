@@ -21,7 +21,8 @@ async def test_disk_list():
     """Test retrieving list of disks"""
     disks = await disk_list()
     
-    assert isinstance(disks, DiskList)
+    assert isinstance(disks, dict)
+    assert "AllDisks" in disks
     assert isinstance(disks["AllDisks"], list)
     assert len(disks["AllDisks"]) > 0
     assert all(isinstance(d, str) for d in disks["AllDisks"])
@@ -40,8 +41,9 @@ async def test_get_disk_info():
     
     info = await get_disk_info(disk_id)
     
-    assert isinstance(info, DiskInfo)
-    assert isinstance(info["Size"], int)
+    assert isinstance(info, dict)
+    # Check required fields are present with correct types
+    assert isinstance(info.get("Size"), int)
     assert isinstance(info["DeviceIdentifier"], str)
     assert isinstance(info["DeviceNode"], str)
     assert isinstance(info["Content"], str)
@@ -62,8 +64,9 @@ async def test_all_disk_infos():
     
     # Check first disk info
     first_disk = next(iter(all_info.values()))
-    assert isinstance(first_disk, DiskInfo)
-    assert isinstance(first_disk["Size"], int)
+    assert isinstance(first_disk, dict)
+    # Check required fields are present with correct types
+    assert isinstance(first_disk.get("Size"), int)
     assert isinstance(first_disk["DeviceIdentifier"], str)
 
 
