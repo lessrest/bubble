@@ -53,7 +53,7 @@ class Bubble:
 
             machine_id = mint.machine_id()
             machine = SWA[machine_id]
-            graph.add((machine, RDF.type, NT.ComputerEnvironment))
+            graph.add((machine, RDF.type, NT.Computer))
 
             # find hostname
             hostname = socket.gethostname()
