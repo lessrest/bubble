@@ -63,12 +63,16 @@ class Bubble:
             graph.add((machine, NT.hostname, Literal(hostname)))
 
             # find architecture
+            cpu_part = mint.fresh_blank_node()
+            graph.add((machine, NT.hasPart, cpu_part))
+            graph.add((cpu_part, RDF.type, NT.CentralProcessingUnit))
+
             arch = platform.machine()
             match arch:
                 case "x86_64":
-                    graph.add((machine, NT.architecture, NT.AMD64))
+                    graph.add((cpu_part, NT.architecture, NT.AMD64))
                 case "arm64":
-                    graph.add((machine, NT.architecture, NT.ARM64))
+                    graph.add((cpu_part, NT.architecture, NT.ARM64))
                 case _:
                     raise ValueError(f"Unknown architecture: {arch}")
 
