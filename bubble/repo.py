@@ -8,6 +8,7 @@
 # Each bubble has a unique IRI minted on creation.
 
 from rdflib import RDF, Graph, Literal, URIRef
+from rich import inspect
 from trio import Path
 import trio
 
@@ -36,7 +37,7 @@ class Bubble:
 
         if not await (path / "root.n3").exists():
             base = mint.fresh_secure_iri(SWA)
-            graph = Graph(base=base)
+            graph = Graph(base=base, identifier=base)
             graph.bind("swa", SWA)
             graph.bind("nt", NT)
             graph.add((base, RDF.type, NT.Bubble))
@@ -49,6 +50,8 @@ class Bubble:
             graph = Graph()
             graph.parse(path / "root.n3", format="n3")
             if graph.base is None:
+                inspect(graph, all=True)
+                inspect(graph.absolutize(""))
                 raise ValueError(f"Bubble at {path} is missing a base URI")
             return Bubble(path, mint, URIRef(graph.base))
 
