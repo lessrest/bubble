@@ -105,11 +105,13 @@ async def test_shell_no_output_file(graph, shell_capability):
     # When no output file is created, there should be no result node
     results = shell_capability.select_one_row(
         """
-        SELECT ?result 
+        SELECT ?result ?path
         WHERE { 
-            ?invocation nt:result ?result 
+            OPTIONAL {
+                ?invocation nt:result ?result .
+                ?result nt:path ?path
+            }
         }
-        OPTIONAL { ?result nt:path ?path }
         """,
         {"invocation": shell_capability.invocation}
     )
