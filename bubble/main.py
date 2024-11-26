@@ -1,48 +1,33 @@
 import os
-from typing import Optional
-import trio
-import typer
-from typer import Option
-from rich.console import Console
+import pathlib
 import subprocess
 
-from rdflib import Graph
+from typing import Optional
 
+from rich import inspect
+import trio
+import typer
+
+from typer import Option
+from rdflib import Graph
+from rich.console import Console
+
+from bubble.id import Mint
 from bubble.n3 import StepExecution
 from bubble.n3_utils import print_n3
+from bubble.repo import Bubble
 
-DEFAULT_N3_PATH = os.environ["BUBBLE_N3_PATH"]
 console = Console(width=80)
 
 app = typer.Typer(add_completion=False)
 
-
-def handle_output(g: Graph, output_path: Optional[str], message: str) -> None:
-    """Handle graph output to file or stdout"""
-    content = g.serialize(format="n3")
-    if output_path:
-        with open(output_path, "w") as f:
-            f.write(content)
-        console.print(f"\n{message}: {output_path}")
-    else:
-        print_n3(g)
-
-
-def handle_error(e: Exception, context: str = "") -> None:
-    """Handle and print errors consistently"""
-    if isinstance(e, FileNotFoundError):
-        console.print(f"[red]Error:[/red] File '{context}' not found")
-    elif isinstance(e, subprocess.CalledProcessError):
-        console.print(f"[red]EYE reasoner error:[/red]\n{e.stderr}")
-    else:
-        console.print(f"[red]Error:[/red] {str(e)}")
-    raise e
+home = pathlib.Path.home()
 
 
 @app.command()
 def main(
     input_path: str = Option(
-        DEFAULT_N3_PATH, "--input", "-i", help="Input N3 file path"
+        str(home / "bubble"), "--input", "-i", help="Input N3 file path"
     ),
     output_path: Optional[str] = Option(
         None, "--output", "-o", help="Output file path (defaults to stdout)"
@@ -56,25 +41,14 @@ def main(
     invoke: bool = Option(False, "--invoke", help="Invoke capabilities"),
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
-    try:
-        execution = StepExecution(input_path)
 
-        # Apply reasoning if requested
-        if reason:
-            trio.run(execution.reason)
+    async def run():
+        mint = Mint()
+        path = trio.Path(input_path)
+        bubble = await Bubble.open(path, mint)
+        inspect(bubble)
 
-        if invoke:
-            trio.run(execution.process)
-
-        # Apply skolemization if requested
-        if skolem:
-            raise NotImplementedError("Skolemization not implemented")
-
-        # Output the result
-        handle_output(execution.graph, output_path, "Output written to")
-
-    finally:
-        pass
+    trio.run(run)
 
 
 if __name__ == "__main__":

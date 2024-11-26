@@ -1,9 +1,12 @@
 from typing import LiteralString
-import pytest
 from pathlib import Path
-from rdflib import Graph, URIRef, Namespace, BNode
+
+import pytest
+
+from rdflib import BNode, Graph, URIRef, Namespace
+
 from bubble import StepExecution
-from bubble.n3_utils import get_single_object, get_objects
+from bubble.n3_utils import get_objects, get_single_object
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")

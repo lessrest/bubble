@@ -1,17 +1,16 @@
-import pytest
 from pathlib import Path
-from rdflib import Graph, URIRef, Literal, Namespace, BNode, RDF
+
+import pytest
+
+from rdflib import RDF, BNode, Graph, URIRef, Literal
+
 from bubble import ShellCapability
+from bubble.ns import NT
 from bubble.capabilities import (
     FileResult,
-    create_result_node,
     get_file_metadata,
+    create_result_node,
 )
-from bubble.tests.test_n3 import NT
-
-# Test namespaces
-SWA = Namespace("https://swa.sh/")
-NT = Namespace("https://node.town/2024/")
 
 
 @pytest.fixture

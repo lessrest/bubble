@@ -1,9 +1,12 @@
 """Utility functions for N3 processing."""
 
-from typing import Sequence
-from rdflib import RDF, Graph, IdentifiedNode, Literal, BNode, Namespace
-from rdflib.graph import _SubjectType
 import subprocess
+
+from typing import Sequence
+
+from rdflib import RDF, BNode, Graph, Literal, Namespace, IdentifiedNode
+from rdflib.graph import _SubjectType
+
 from bubble.id import Mint
 from bubble.ns import JSON
 

@@ -31,6 +31,7 @@ dependencies = [
     "py-machineid>=0.6.0",
     "typer>=0.13.1",
     "pyright>=1.1.389",
+    "pytest-watcher>=0.4.3",
 ]
 
 [tool.uv.sources]

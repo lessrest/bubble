@@ -1,6 +1,9 @@
-import pytest
 import re
+
+import pytest
+
 from rdflib import Namespace
+
 from bubble.id import Mint
 
 

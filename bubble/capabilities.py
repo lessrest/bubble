@@ -1,18 +1,18 @@
-from dataclasses import dataclass
-import datetime
 import hashlib
+import datetime
 import tempfile
 
 from abc import ABC, abstractmethod
 from typing import Iterable, Optional
+from dataclasses import dataclass
 
 import trio
 
-from rdflib import BNode, Graph, Literal, URIRef, RDF
+from rdflib import RDF, BNode, Graph, URIRef, Literal
 from rich.console import Console
 
 from bubble.ns import NT
-from bubble.n3_utils import get_json_value, json_to_n3
+from bubble.n3_utils import json_to_n3, get_json_value
 
 console = Console()
 
@@ -147,8 +147,8 @@ class HTTPRequestCapability(Capability):
     ) -> None:
         # we'll use httpx to do the request
         import httpx
-        from bubble.ns import NT
 
+        from bubble.ns import NT
         from bubble.n3_utils import get_single_object
 
         requests = list(provides)

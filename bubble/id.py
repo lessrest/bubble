@@ -1,7 +1,8 @@
-import secrets
 import base64
-from rdflib import Namespace, URIRef
+import secrets
+
 from xid import XID
+from rdflib import URIRef, Namespace
 
 
 class Mint:

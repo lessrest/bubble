@@ -1,30 +1,30 @@
 """N3 processor for handling N3 files and invocations."""
 
+from glob import glob
 from typing import Tuple, Optional
+from pathlib import Path
+
 import trio
+
 from rich import pretty
 from rdflib import RDF, URIRef
-from rdflib.graph import _SubjectType, _ObjectType
+from rdflib.graph import _ObjectType, _SubjectType
 from rich.console import Console
-from pathlib import Path
-from glob import glob
 
 from bubble.ns import NT
+from bubble.n3_utils import get_objects, get_single_object
 from bubble.capabilities import HTTPRequestCapability
-from bubble.n3_utils import get_single_object, get_objects
 
 console = Console()
 pretty.install()
 
-# Constants
-DEFAULT_BASE = "https://swa.sh/2024/11/22/step/1"
 CORE_RULES_DIR = Path(__file__).parent / "rules"
 
 
 class StepExecution:
     """Engine for processing N3 files and applying rules"""
 
-    def __init__(self, step: Optional[str] = None, base: str = DEFAULT_BASE):
+    def __init__(self, base: str, step: Optional[str] = None):
         self.step = step
         self.base = base
 
