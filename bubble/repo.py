@@ -64,6 +64,10 @@ class Bubble:
             arch = platform.machine()
             graph.add((machine, NT.architecture, Literal(arch)))
 
+            # find operating system
+            os = platform.system()
+            graph.add((machine, NT.os, Literal(os)))
+
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
