@@ -21,20 +21,10 @@ home = pathlib.Path.home()
 
 
 @app.command()
-def main(
+def show(
     input_path: str = Option(
         str(home / "bubble"), "--input", "-i", help="Input N3 file path"
     ),
-    output_path: Optional[str] = Option(
-        None, "--output", "-o", help="Output file path (defaults to stdout)"
-    ),
-    reason: bool = Option(
-        False, "--reason", "-r", help="Run the EYE reasoner on the input"
-    ),
-    skolem: bool = Option(
-        False, "--skolem", "-s", help="Convert blank nodes to IRIs"
-    ),
-    invoke: bool = Option(False, "--invoke", help="Invoke capabilities"),
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
 

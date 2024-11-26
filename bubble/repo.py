@@ -19,6 +19,8 @@ from bubble.id import Mint
 from bubble.ns import AS, NT, SWA
 from bubble.n3_utils import get_single_subject
 
+import psutil
+
 
 class Bubble:
     """A repository of RDF/N3 documents"""
@@ -78,6 +80,9 @@ class Bubble:
                 case _:
                     raise ValueError(f"Unknown operating system: {os}")
 
+            # find amount of memory
+            memory = psutil.virtual_memory()
+            graph.add((machine, NT.memory, Literal(memory.total)))
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
