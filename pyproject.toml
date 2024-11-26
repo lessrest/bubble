@@ -97,3 +97,6 @@ trio_mode = true
 md_report = true
 md_report_verbose = 1
 mock_use_standalone_module = true
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+]
