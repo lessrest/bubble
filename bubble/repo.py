@@ -62,11 +62,13 @@ class Bubble:
 
             # find architecture
             arch = platform.machine()
-            graph.add((machine, NT.architecture, Literal(arch)))
-
-            # find operating system
-            os = platform.system()
-            graph.add((machine, NT.os, Literal(os)))
+            match arch:
+                case "x86_64":
+                    graph.add((machine, NT.architecture, NT.AMD64))
+                case "arm64":
+                    graph.add((machine, NT.architecture, NT.ARM64))
+                case _:
+                    raise ValueError(f"Unknown architecture: {arch}")
 
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
