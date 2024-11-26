@@ -19,17 +19,17 @@ async def test_repo_initialization(temp_repo):
     # Verify basic repo properties
     assert isinstance(temp_repo.bubble, URIRef)
     assert isinstance(temp_repo.graph, Graph)
-    assert await temp_repo.workdir.exists()
-    assert await temp_repo.rootpath.exists()
+    assert await trio.Path(temp_repo.workdir).exists()
+    assert await trio.Path(temp_repo.rootpath).exists()
     
     # Verify git initialization
-    assert await temp_repo.workdir.joinpath(".git").exists()
+    assert await trio.Path(temp_repo.workdir / ".git").exists()
 
 @pytest.mark.trio
 async def test_repo_load_surfaces(temp_repo):
     """Test loading surfaces into the repository"""
     # Create a test surface file
-    surface_path = temp_repo.workdir / "test.n3"
+    surface_path = trio.Path(temp_repo.workdir) / "test.n3"
     await surface_path.write_text("""
         @prefix : <http://example.org/> .
         :TestSubject a :TestType .
@@ -46,7 +46,7 @@ async def test_repo_load_surfaces(temp_repo):
 async def test_repo_commit(temp_repo):
     """Test committing changes to the repository"""
     # Add a test file
-    test_file = temp_repo.workdir / "test.txt"
+    test_file = trio.Path(temp_repo.workdir) / "test.txt"
     await test_file.write_text("test content")
     
     # Commit changes
