@@ -46,6 +46,7 @@ class Bubble:
             graph = Graph(base=base, identifier=base)
             graph.bind("swa", SWA)
             graph.bind("nt", NT)
+            graph.bind("as", AS)
 
             graph.add((base, RDF.type, NT.Bubble))
 
