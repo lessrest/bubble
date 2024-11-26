@@ -90,6 +90,13 @@ class Bubble:
             graph.add((machine, NT.hasPart, memory_part))
             graph.add((memory_part, RDF.type, NT.RandomAccessMemory))
             graph.add((memory_part, NT.byteSize, Literal(memory_info.total)))
+            graph.add(
+                (
+                    memory_part,
+                    NT.gigabyteSize,
+                    Literal(memory_info.total / 1024 / 1024 / 1024),
+                )
+            )
 
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
