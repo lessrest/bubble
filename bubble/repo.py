@@ -80,7 +80,9 @@ class Bubble:
             os = platform.system()
             match os:
                 case "Darwin":
-                    graph.add((machine, NT.os, NT.macOS))
+                    os_part = mint.fresh_blank_node()
+                    graph.add((machine, NT.hasPart, os_part))
+                    graph.add((os_part, RDF.type, NT.MacOSInstallation))
                 case _:
                     raise ValueError(f"Unknown operating system: {os}")
 
