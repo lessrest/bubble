@@ -7,8 +7,8 @@ from rdflib import Graph, URIRef, Literal
 from pytest_httpx import HTTPXMock
 from rdflib.graph import _SubjectType
 
-from bubble.n3_utils import turtle
 from bubble.ns import NT
+from bubble.n3_utils import turtle
 from bubble.capabilities import (
     FileResult,
     ShellCapability,

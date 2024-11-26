@@ -2,11 +2,12 @@ import plistlib
 
 from typing import Optional, TypedDict
 
-from rich import inspect
 import rich
-from rich.table import Table
-from trio import run_process
 import trio
+
+from rich import inspect
+from trio import run_process
+from rich.table import Table
 
 
 class DiskInfo(TypedDict):

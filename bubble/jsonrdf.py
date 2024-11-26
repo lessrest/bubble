@@ -1,9 +1,10 @@
-from bubble.n3_utils import get_objects, get_single_object, select_rows
-from bubble.ns import JSON
-from rdflib.graph import _SubjectType
 from typing import Any, Union
 
-from rdflib import RDF, BNode, Graph, IdentifiedNode, Literal, URIRef
+from rdflib import RDF, BNode, Graph, URIRef, Literal, IdentifiedNode
+from rdflib.graph import _SubjectType
+
+from bubble.ns import JSON
+from bubble.n3_utils import select_rows
 
 
 def get_json_value(graph: Graph, node: _SubjectType) -> dict:

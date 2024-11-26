@@ -2,13 +2,14 @@
 
 from typing import Optional, Sequence
 
+import trio
+
 from rdflib import RDF, BNode, Graph, Namespace
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
-import trio
 
 from bubble.id import Mint
-from bubble.ns import JSON, NT, SWA
+from bubble.ns import NT, SWA, JSON
 
 
 class New:

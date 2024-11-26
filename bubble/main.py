@@ -1,20 +1,19 @@
 import os
+import logging
 import pathlib
 
 import trio
 import typer
 import anthropic
-from anthropic.types import MessageParam
 
 from typer import Option
 from rich.console import Console
+from rich.logging import RichHandler
+from anthropic.types import MessageParam
 
 from bubble.id import Mint
-from bubble.n3_utils import print_n3
 from bubble.repo import Bubbler
-import logging
-
-from rich.logging import RichHandler
+from bubble.n3_utils import print_n3
 
 FORMAT = "%(message)s"
 logging.basicConfig(
