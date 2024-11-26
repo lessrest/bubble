@@ -63,11 +63,13 @@ def processor(basic_n3: LiteralString):
 
 
 @pytest.fixture
-def shell_processor(shell_command_n3: LiteralString, tmp_path: Path):
+async def shell_processor(shell_command_n3: LiteralString, tmp_path: Path):
     """Creates a StepExecution instance with shell command N3"""
     n3_file = tmp_path / "test.n3"
     n3_file.write_text(shell_command_n3)
-    return StepExecution(base="https://test.example/", step=str(n3_file))
+    execution = StepExecution(base="https://test.example/", step=str(n3_file))
+    await execution.reason()
+    return execution
 
 
 def test_get_next_step(processor: StepExecution):
