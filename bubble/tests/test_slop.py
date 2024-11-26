@@ -3,23 +3,20 @@ from anthropic import TextEvent
 from bubble.slop import stream_sentences, stream_normally
 
 
+def create_text_stream(*chunks):
+    """Create a mock Anthropic text stream from text chunks"""
+    return [TextEvent(type="text", text=chunk, snapshot="") for chunk in chunks]
+
 @pytest.fixture
 def text_stream():
     """Create a mock Anthropic text stream"""
-    events = [
-        TextEvent(
-            type="text", text="<sentence>First sentence", snapshot=""
-        ),
-        TextEvent(type="text", text=".</sentence> ", snapshot=""),
-        TextEvent(type="text", text="<sentence>Second ", snapshot=""),
-        TextEvent(
-            type="text", text="sentence.</sentence>", snapshot=""
-        ),
-        TextEvent(
-            type="text", text="<sentence>Third sentence.", snapshot=""
-        ),
-    ]
-    return events
+    return create_text_stream(
+        "<sentence>First sentence",
+        ".</sentence> ",
+        "<sentence>Second ",
+        "sentence.</sentence>",
+        "<sentence>Third sentence."
+    )
 
 
 @pytest.mark.trio
@@ -65,13 +62,7 @@ async def test_stream_normally(text_stream):
 @pytest.mark.trio
 async def test_stream_multiline_sentences():
     """Test handling of multiline sentence content"""
-    events = [
-        TextEvent(
-            type="text",
-            text="<sentence>First\nline\nof text.",
-            snapshot="",
-        ),
-    ]
+    events = create_text_stream("<sentence>First\nline\nof text.")
 
     sentences = []
     async for sentence in stream_sentences(events):
