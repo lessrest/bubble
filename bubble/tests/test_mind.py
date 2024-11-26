@@ -13,61 +13,40 @@ from rdflib.namespace import RDF, RDFS
 
 from bubble.mind import reason
 
-# Test data directory in the same folder as this test file
-TEST_DIR = Path(__file__).parent / "test_data"
-
-def setup_test_files():
-    """Create temporary N3 files with test data.
-    
-    Returns:
-        list[str]: Paths to the created N3 files
-    """
-    # Ensure test directory exists
-    TEST_DIR.mkdir(exist_ok=True)
-    
-    # Define test namespaces
-    EX = Namespace("http://example.org/")
-    
-    # Basic facts about Socrates
-    facts = f"""
-    @prefix : <{EX}> .
-    @prefix rdfs: <{RDFS}> .
-    
-    :Socrates a :Human .
-    :Human rdfs:subClassOf :Mortal .
-    """.strip()
-    
-    # RDFS subclass inference rule
-    rules = f"""
-    @prefix : <{EX}> .
-    @prefix rdfs: <{RDFS}> .
-    @prefix log: <http://www.w3.org/2000/10/swap/log#> .
-    
-    {{?A rdfs:subClassOf ?B . ?X a ?A}} => {{?X a ?B}} .
-    """.strip()
-    
-    # Write files
-    facts_file = TEST_DIR / "facts.n3"
-    rules_file = TEST_DIR / "rules.n3"
-    
-    facts_file.write_text(facts)
-    rules_file.write_text(rules)
-    
-    return [str(facts_file), str(rules_file)]
 
 @pytest.fixture
-async def test_files():
-    """Fixture providing test N3 files and cleanup.
+def test_data():
+    """Test data for N3 reasoning"""
+    EX = Namespace("http://example.org/")
     
-    Yields:
-        list[str]: Paths to the test N3 files
-    """
-    files = setup_test_files()
-    yield files
-    # Cleanup after tests
-    for file in files:
-        Path(file).unlink(missing_ok=True)
-    TEST_DIR.rmdir()
+    return {
+        "facts": f"""
+        @prefix : <{EX}> .
+        @prefix rdfs: <{RDFS}> .
+        
+        :Socrates a :Human .
+        :Human rdfs:subClassOf :Mortal .
+        """.strip(),
+        
+        "rules": f"""
+        @prefix : <{EX}> .
+        @prefix rdfs: <{RDFS}> .
+        @prefix log: <http://www.w3.org/2000/10/swap/log#> .
+        
+        {{?A rdfs:subClassOf ?B . ?X a ?A}} => {{?X a ?B}} .
+        """.strip()
+    }
+
+@pytest.fixture
+async def test_files(tmp_path, test_data):
+    """Fixture providing temporary N3 test files"""
+    facts_file = tmp_path / "facts.n3" 
+    rules_file = tmp_path / "rules.n3"
+    
+    facts_file.write_text(test_data["facts"])
+    rules_file.write_text(test_data["rules"])
+    
+    return [str(facts_file), str(rules_file)]
 
 @pytest.mark.trio
 async def test_basic_reasoning(test_files):
