@@ -119,7 +119,7 @@ class BubbleRepo:
 
     async def commit(self) -> None:
         """Commit the bubble"""
-        if not await self.workdir.joinpath(".git").exists():
+        if not await trio.Path(self.workdir / ".git").exists():
             await trio.run_process(
                 ["git", "-C", str(self.workdir), "init"],
             )
