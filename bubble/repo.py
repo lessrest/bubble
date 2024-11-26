@@ -8,6 +8,7 @@
 # Each bubble has a unique IRI minted on creation.
 
 from datetime import UTC, datetime
+import platform
 import socket
 import trio
 
@@ -58,6 +59,10 @@ class Bubble:
             # find hostname
             hostname = socket.gethostname()
             graph.add((machine, NT.hostname, Literal(hostname)))
+
+            # find architecture
+            arch = platform.machine()
+            graph.add((machine, NT.architecture, Literal(arch)))
 
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
