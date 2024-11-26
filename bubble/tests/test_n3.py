@@ -5,7 +5,7 @@ import pytest
 
 from rdflib import BNode, Graph, URIRef, Namespace
 
-from bubble.n3 import StepExecution
+from bubble.eyereason import StepExecution
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")

@@ -11,8 +11,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from anthropic.types import MessageParam
 
-from bubble.id import Mint
-from bubble.repo import Bubbler
+from bubble.gensym import Mint
+from bubble.bubblerepo import BubbleRepo
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -95,7 +95,7 @@ def show(
 
     async def run():
         mint = Mint()
-        bubble = await Bubbler.open(trio.Path(input_path), mint)
+        bubble = await BubbleRepo.open(trio.Path(input_path), mint)
         await bubble.load_surfaces()
         await bubble.load_rules()
         await bubble.load_ontology()

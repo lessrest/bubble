@@ -3,7 +3,7 @@ import pytest
 from rdflib import Graph, Literal, Variable
 
 from bubble.ns import JSON
-from bubble.jsonrdf import (
+from bubble.rdfjson import (
     rdf_from_json,
     json_from_rdf,
     convert_json_value,

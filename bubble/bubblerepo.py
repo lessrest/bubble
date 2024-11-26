@@ -7,24 +7,17 @@
 # If the repository is empty, it will be initialized as a new bubble.
 # Each bubble has a unique IRI minted on creation.
 
-import os
-import pwd
-import socket
 import getpass
 import logging
-import platform
 import tempfile
 
-from datetime import UTC, datetime
 
 import trio
-import psutil
 
 from trio import Path
 from rdflib import (
     OWL,
     RDF,
-    XSD,
     RDFS,
     Graph,
     URIRef,
@@ -33,15 +26,15 @@ from rdflib import (
 )
 from rdflib.graph import QuotedGraph, _TripleType, _SubjectType
 
-from bubble.id import Mint
+from bubble.gensym import Mint
 from bubble.ns import AS, NT, SWA, UUID
-from bubble.mac import get_disk_info, computer_serial_number
 from bubble.rdfutil import New, print_n3, get_single_subject
+from bubble.sysinfo import get_a_bunch_of_info
 
 logger = logging.getLogger(__name__)
 
 
-class Bubbler:
+class BubbleRepo:
     """A repository of RDF/N3 documents"""
 
     # The path to the bubble's root directory
@@ -115,12 +108,12 @@ class Bubbler:
         return conclusion
 
     @staticmethod
-    async def open(path: Path, mint: Mint) -> "Bubbler":
+    async def open(path: Path, mint: Mint) -> "BubbleRepo":
         def fresh_iri() -> URIRef:
             return mint.fresh_secure_iri(SWA)
 
         if not await path.exists():
-            raise ValueError(f"Bubble not found at {path}")
+            await path.mkdir(parents=True)
 
         if not await (path / "root.n3").exists():
             BUBBLE = Namespace(fresh_iri().toPython() + "/")
@@ -130,7 +123,7 @@ class Bubbler:
             head = fresh_iri()
 
             g = Graph(base=BUBBLE)
-            Bubbler.bind_prefixes(g)
+            BubbleRepo.bind_prefixes(g)
 
             new = New(g, mint)
 
@@ -148,7 +141,7 @@ class Bubbler:
                 person_name,
                 disk_info,
                 disk_uuid,
-            ) = await Bubbler.get_a_bunch_of_info(mint)
+            ) = await get_a_bunch_of_info(mint)
 
             machine = SWA[machine_id]
             disk_urn = UUID[disk_uuid]
@@ -357,7 +350,7 @@ class Bubbler:
 
             g.serialize(destination=path / "root.n3", format="n3")
 
-            bubbler = Bubbler(path, mint, bubble)
+            bubbler = BubbleRepo(path, mint, bubble)
             await bubbler.commit()
             return bubbler
 
@@ -368,83 +361,7 @@ class Bubbler:
             bubble = get_single_subject(g, RDF.type, NT.Bubble)
 
             assert isinstance(bubble, URIRef)
-            return Bubbler(path, mint, URIRef(bubble))
-
-    @staticmethod
-    async def get_a_bunch_of_info(mint):
-        computer_serial = await computer_serial_number()
-        machine_id = mint.machine_id()
-
-        now = Bubbler.get_timestamp()
-        hostname, arch, system = Bubbler.get_system_info()
-        architecture = Bubbler.resolve_architecture(arch)
-        system_type, system_version = Bubbler.resolve_system(system)
-        byte_size, gigabyte_size = Bubbler.get_memory_size()
-        user_info, person_name = Bubbler.get_user_info()
-
-        disk_info = await get_disk_info("/System/Volumes/Data")
-        disk_uuid = disk_info["DiskUUID"]
-        return (
-            computer_serial,
-            machine_id,
-            now,
-            hostname,
-            architecture,
-            system_type,
-            system_version,
-            byte_size,
-            gigabyte_size,
-            user_info,
-            person_name,
-            disk_info,
-            disk_uuid,
-        )
-
-    @staticmethod
-    def get_timestamp():
-        return Literal(datetime.now(UTC), datatype=XSD.dateTime)
-
-    @staticmethod
-    def get_system_info():
-        hostname = socket.gethostname()
-        arch = platform.machine()
-        system = platform.system()
-        return hostname, arch, system
-
-    @staticmethod
-    def get_memory_size():
-        memory_info = psutil.virtual_memory()
-        byte_size = memory_info.total
-        gigabyte_size = round(byte_size / 1024 / 1024 / 1024, 2)
-        return byte_size, gigabyte_size
-
-    @staticmethod
-    def get_user_info():
-        user_info = pwd.getpwuid(os.getuid())
-        person_name = user_info.pw_gecos
-        return user_info, person_name
-
-    @staticmethod
-    def resolve_system(system):
-        match system:
-            case "Darwin":
-                system_type = NT.macOSEnvironment
-                system_version = platform.mac_ver()[0]
-
-            case _:
-                raise ValueError(f"Unknown operating system: {system}")
-        return system_type, system_version
-
-    @staticmethod
-    def resolve_architecture(arch):
-        match arch:
-            case "x86_64":
-                architecture = NT.AMD64
-            case "arm64":
-                architecture = NT.ARM64
-            case _:
-                raise ValueError(f"Unknown architecture: {arch}")
-        return architecture
+            return BubbleRepo(path, mint, URIRef(bubble))
 
     @staticmethod
     def bind_prefixes(g):
@@ -454,10 +371,17 @@ class Bubbler:
 
     async def commit(self) -> None:
         """Commit the bubble"""
+        if not await self.workdir.joinpath(".git").exists():
+            await trio.run_process(
+                ["git", "-C", str(self.workdir), "init"],
+            )
+
+        # Add all files to the index
         await trio.run_process(
-            ["git", "-C", str(self.workdir), "add", "."]
+            ["git", "-C", str(self.workdir), "add", "."],
         )
-        result = await trio.run_process(
+
+        await trio.run_process(
             [
                 "git",
                 "-C",
@@ -465,10 +389,5 @@ class Bubbler:
                 "commit",
                 "-m",
                 f"Initialize {self.bubble}",
-            ],
-            capture_stdout=True,
-            capture_stderr=True,
-            check=False,
+            ]
         )
-        if result.returncode != 0:
-            raise ValueError(f"Failed to commit: {result.stderr}")

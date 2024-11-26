@@ -8,7 +8,7 @@ from rdflib import RDF, BNode, Graph, Namespace
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
-from bubble.id import Mint
+from bubble.gensym import Mint
 from bubble.ns import NT, SWA, JSON
 
 

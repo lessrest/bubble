@@ -14,7 +14,7 @@ from rdflib.query import ResultRow
 from rich.console import Console
 
 from bubble.ns import NT
-from bubble.jsonrdf import json_from_rdf
+from bubble.rdfjson import json_from_rdf
 from bubble.rdfutil import New, select_one_row
 
 console = Console()
