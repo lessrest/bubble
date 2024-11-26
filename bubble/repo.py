@@ -8,17 +8,18 @@
 # Each bubble has a unique IRI minted on creation.
 
 from datetime import UTC, datetime
+import getpass
 import platform
 import socket
 import trio
 
 from trio import Path
-from rdflib import RDF, XSD, Graph, Literal, URIRef
+from rdflib import OWL, RDF, XSD, Graph, Literal, URIRef
 
 from bubble.id import Mint
 from bubble.ns import AS, NT, SWA
 from bubble.n3_utils import get_single_subject
-
+from bubble.mac import computer_serial_number, get_disk_info
 import psutil
 
 
@@ -40,6 +41,11 @@ class Bubble:
         self.graph = Graph(base=base, identifier=base)
         self.graph.parse(self.root, format="n3")
 
+    async def load_all_documents(self) -> None:
+        """Load all documents from the repository into the graph"""
+        for path in await self.path.glob("*.n3"):
+            self.graph.parse(path, format="n3")
+
     @staticmethod
     async def open(path: Path, mint: Mint) -> "Bubble":
         if not await path.exists():
@@ -56,7 +62,17 @@ class Bubble:
 
             machine_id = mint.machine_id()
             machine = SWA[machine_id]
-            graph.add((machine, RDF.type, NT.Computer))
+            computer_serial = await computer_serial_number()
+            graph.add((machine, RDF.type, NT.ComputerMachine))
+            graph.add((machine, NT.serialNumber, Literal(computer_serial)))
+            person = mint.fresh_secure_iri(SWA)
+            graph.add((person, RDF.type, AS.Person))
+
+            user = mint.fresh_secure_iri(SWA)
+            graph.add((user, RDF.type, NT.Account))
+            graph.add((user, NT.username, Literal(getpass.getuser())))
+            graph.add((user, NT.owner, person))
+            graph.add((user, NT.context, machine))
 
             # find hostname
             hostname = socket.gethostname()
@@ -106,10 +122,39 @@ class Bubble:
                 )
             )
 
+            disk_info = await get_disk_info("/System/Volumes/Data")
+            disk_uuid = disk_info["DiskUUID"]
+            disk_urn = URIRef(f"urn:uuid:{disk_uuid}")
+
+            assert isinstance(disk_uuid, str)
+
+            filesystem = SWA[disk_uuid]
+            graph.add((filesystem, OWL.sameAs, disk_urn))
+            graph.add((filesystem, RDF.type, NT.Filesystem))
+            graph.add((filesystem, NT.byteSize, Literal(disk_info["Size"])))
+            graph.add((machine, NT.hasPart, filesystem))
+
+            home_dir = mint.fresh_secure_iri(SWA)
+            graph.add((user, NT.homeDirectory, home_dir))
+            graph.add((home_dir, RDF.type, NT.Directory))
+            graph.add((home_dir, NT.path, Literal(await Path.home())))
+            graph.add((home_dir, NT.filesystem, filesystem))
+
+            repo_dir = mint.fresh_secure_iri(SWA)
+            graph.add((repo_dir, RDF.type, NT.Directory))
+            graph.add((repo_dir, NT.path, Literal(path)))
+            graph.add((repo_dir, NT.filesystem, filesystem))
+            graph.add((repo_dir, NT.parent, home_dir))
+
+            repo = mint.fresh_secure_iri(SWA)
+            graph.add((repo, RDF.type, NT.Repository))
+            graph.add((repo, NT.tracks, base))
+            graph.add((repo, NT.hasWorkingDirectory, repo_dir))
+
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
-            graph.add((creation_activity, AS.actor, machine))
+            graph.add((creation_activity, AS.actor, user))
             graph.add((creation_activity, AS.object, base))
 
             now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
@@ -131,7 +176,6 @@ class Bubble:
             base = get_single_subject(graph, RDF.type, NT.Bubble)
 
             assert isinstance(base, URIRef)
-
             return Bubble(path, mint, URIRef(base))
 
     async def commit(self) -> None:
