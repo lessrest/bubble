@@ -83,6 +83,9 @@ class Bubble:
                     os_part = mint.fresh_blank_node()
                     graph.add((machine, NT.hasPart, os_part))
                     graph.add((os_part, RDF.type, NT.MacOSInstallation))
+                    graph.add(
+                        (os_part, NT.version, Literal(platform.mac_ver()[0]))
+                    )
                 case _:
                     raise ValueError(f"Unknown operating system: {os}")
 
