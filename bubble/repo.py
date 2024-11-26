@@ -100,7 +100,7 @@ class BubbleRepo:
     @staticmethod
     async def open(path: Path, mint: Mint) -> "BubbleRepo":
         if not await trio.Path(path).exists():
-            await path.mkdir(parents=True)
+            await trio.Path(path).mkdir(parents=True)
 
         if not await trio.Path(path / "root.n3").exists():
             bubble = await describe_new_bubble(path)
