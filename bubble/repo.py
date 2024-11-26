@@ -67,11 +67,11 @@ class BubbleRepo:
             pattern: Glob pattern to match
             kind: Description of what's being loaded for logging
         """
-        paths = list(await directory.glob(pattern))
+        paths = [p async for p in trio.Path(directory).glob(pattern)]
 
         for path in paths:
             logger.info(f"Loading {kind} from {path}")
-            self.graph.parse(path)
+            self.graph.parse(str(path))
 
     async def load(self, path: Path) -> None:
         """Load the graph from a file"""
@@ -99,10 +99,10 @@ class BubbleRepo:
 
     @staticmethod
     async def open(path: Path, mint: Mint) -> "BubbleRepo":
-        if not await path.exists():
+        if not await trio.Path(path).exists():
             await path.mkdir(parents=True)
 
-        if not await (path / "root.n3").exists():
+        if not await trio.Path(path / "root.n3").exists():
             bubble = await describe_new_bubble(path)
             repo = BubbleRepo(path, bubble)
             await repo.commit()
