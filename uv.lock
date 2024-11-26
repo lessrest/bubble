@@ -57,13 +57,16 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "httpx" },
+    { name = "mock" },
     { name = "openai" },
     { name = "psutil" },
     { name = "py-machineid" },
     { name = "py-xid" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pytest-httpx" },
     { name = "pytest-md-report" },
+    { name = "pytest-mock" },
     { name = "pytest-trio" },
     { name = "pytest-watcher" },
     { name = "rdflib" },
@@ -84,13 +87,16 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = "==0.39.*" },
     { name = "httpx", specifier = "==0.*" },
+    { name = "mock", specifier = ">=5.1.0" },
     { name = "openai", specifier = "==1.55.*" },
     { name = "psutil", specifier = ">=6.1.0" },
     { name = "py-machineid", specifier = ">=0.6.0" },
     { name = "py-xid", specifier = ">=1.0.0" },
     { name = "pyright", specifier = ">=1.1.389" },
     { name = "pytest", specifier = "==8.*" },
+    { name = "pytest-httpx", specifier = ">=0.34.0" },
     { name = "pytest-md-report", specifier = "==0.6.*" },
+    { name = "pytest-mock", specifier = ">=3.14.0" },
     { name = "pytest-trio", specifier = "==0.*" },
     { name = "pytest-watcher", specifier = ">=0.4.3" },
     { name = "rdflib", git = "https://github.com/RDFLib/rdflib" },
@@ -288,6 +294,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979 },
+]
+
+[[package]]
+name = "mock"
+version = "5.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/ab/41d09a46985ead5839d8be987acda54b5bb93f713b3969cc0be4f81c455b/mock-5.1.0.tar.gz", hash = "sha256:5e96aad5ccda4718e0a229ed94b2024df75cc2d55575ba5762d31f5767b8767d", size = 80232 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/20/471f41173930550f279ccb65596a5ac19b9ac974a8d93679bcd3e0c31498/mock-5.1.0-py3-none-any.whl", hash = "sha256:18c694e5ae8a208cdb3d2c20a993ca1a7b0efa258c247a1e565150f477f83744", size = 30938 },
 ]
 
 [[package]]
@@ -506,6 +521,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-httpx"
+version = "0.34.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/08/d0be3fe5645c6cd9396093a9ddf97d60814a3b066fd5b38ddced34a13d14/pytest_httpx-0.34.0.tar.gz", hash = "sha256:3ca4b0975c0f93b985f17df19e76430c1086b5b0cce32b1af082d8901296a735", size = 54108 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/72/7138a0faf5d780d6b9ceedef22da0b66ae8e22a676a12fd55a05c0cdd979/pytest_httpx-0.34.0-py3-none-any.whl", hash = "sha256:42cf0a66f7b71b9111db2897e8b38a903abd33a27b11c48aff4a3c7650313af2", size = 19440 },
+]
+
+[[package]]
 name = "pytest-md-report"
 version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
@@ -518,6 +546,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/62/b3/b68a712044b2096c28edf73e262e17e56c82a30f55abc16b8e9d39c24650/pytest_md_report-0.6.2.tar.gz", hash = "sha256:5e96c655ebc9b5c3c7b78bf7c5382c1f68056e96904430252790f8737de5ce99", size = 283407 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ee/e9/6fd1b512826377e17193289147d8a697e0b56bbba4dbee709e62e7d8e94a/pytest_md_report-0.6.2-py3-none-any.whl", hash = "sha256:66e27efa5c155c87eb4700d60876e61a85c13361448c4031fda964c43e63c9b9", size = 13905 },
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/90/a955c3ab35ccd41ad4de556596fa86685bf4fc5ffcc62d22d856cfd4e29a/pytest-mock-3.14.0.tar.gz", hash = "sha256:2719255a1efeceadbc056d6bf3df3d1c5015530fb40cf347c0f9afac88410bd0", size = 32814 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/3b/b26f90f74e2986a82df6e7ac7e319b8ea7ccece1caec9f8ab6104dc70603/pytest_mock-3.14.0-py3-none-any.whl", hash = "sha256:0b72c38033392a5f4621342fe11e9219ac11ec9d375f8e2a0c164539e0d70f6f", size = 9863 },
 ]
 
 [[package]]

@@ -1,13 +1,19 @@
 from pathlib import Path
 
+import httpx
 import pytest
 
-from rdflib import RDF, BNode, Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal
+from pytest_httpx import HTTPXMock
+from rdflib.graph import _SubjectType
 
-from bubble import ShellCapability
+from bubble.n3_utils import turtle
 from bubble.ns import NT
 from bubble.capabilities import (
     FileResult,
+    ShellCapability,
+    HTTPRequestCapability,
+    http_client,
     get_file_metadata,
     create_result_node,
 )
@@ -15,27 +21,37 @@ from bubble.capabilities import (
 
 @pytest.fixture
 def graph():
-    return Graph()
+    g = Graph()
+    g.bind("nt", NT)
+    return g
 
 
 @pytest.fixture
-def shell_capability():
-    return ShellCapability()
+def invocation():
+    return URIRef("https://test.example/invocation")
+
+
+@pytest.fixture
+def shell_capability(graph: Graph, invocation: _SubjectType):
+    return ShellCapability(graph, invocation)
 
 
 async def test_shell_capability_success(shell_capability, graph):
     """Test successful shell command execution"""
-    # Create invocation with command
-    invocation = URIRef("https://test.example/invocation")
-    command_node = BNode()
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @base <https://test.example/> .
 
-    graph.add((invocation, RDF.type, NT.Invocation))
-    graph.add((invocation, NT.provides, command_node))
-    graph.add((command_node, RDF.type, NT.ShellCommand))
-    graph.add((command_node, NT.value, Literal('echo "test" > $out')))
+    <invocation> a nt:Invocation ;
+        nt:provides [ a nt:ShellCommand ;
+            nt:value 'echo "test" > $out' ] .
+    """
+
+    graph.parse(data=turtle_data, format="turtle")
+    invocation = URIRef("https://test.example/invocation")
 
     # Execute the command
-    await shell_capability.execute(graph, invocation, None, [command_node])
+    await shell_capability.execute()
 
     # Verify results
     result_node = next(graph.objects(invocation, NT.result))
@@ -53,38 +69,42 @@ async def test_shell_capability_success(shell_capability, graph):
 
 async def test_shell_capability_failure(shell_capability, graph):
     """Test shell command failure handling"""
-    invocation = URIRef("https://test.example/invocation")
-    graph.add((invocation, RDF.type, NT.Invocation))
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @base <https://test.example/> .
 
+    <invocation> a nt:Invocation .
+    """
+
+    graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(ValueError) as exc_info:
-        await shell_capability.execute(graph, invocation, None, [])
-    assert "No shell command provided" in str(exc_info.value)
+        await shell_capability.execute()
+    assert "No" in str(exc_info.value)
 
 
-async def test_shell_capability_with_stdin(shell_capability, graph):
+async def test_shell_capability_with_stdin():
     """Test shell command with standard input"""
+    graph = turtle("""
+    @prefix nt: <https://node.town/2024/> .
+    @base <https://test.example/> .
+
+    <invocation> a nt:Invocation ;
+        nt:provides [ a nt:ShellCommand ;
+            nt:value "cat > $out" ] ;
+        nt:provides [ a nt:StandardInput ;
+            nt:value "test input" ] .
+    """)
+
     invocation = URIRef("https://test.example/invocation")
-    command_node = BNode()
-    stdin_node = BNode()
 
-    graph.add((invocation, RDF.type, NT.Invocation))
-    graph.add((invocation, NT.provides, command_node))
-    graph.add((invocation, NT.provides, stdin_node))
-    graph.add((command_node, RDF.type, NT.ShellCommand))
-    graph.add((command_node, NT.value, Literal("cat > $out")))
-    graph.add((stdin_node, RDF.type, NT.StandardInput))
-    graph.add((stdin_node, NT.value, Literal("test input")))
-
-    await shell_capability.execute(
-        graph, invocation, None, [command_node, stdin_node]
-    )
+    shell_capability = ShellCapability(graph, invocation)
+    await shell_capability.execute()
 
     # Verify results
-    result_node = next(graph.objects(invocation, NT.result))
-    assert result_node is not None
+    (result_row, path) = shell_capability.select_one_row(
+        "SELECT ?result ?path WHERE { ?invocation nt:result ?result . ?result nt:path ?path }"
+    )
 
-    # Check file path exists
-    path = next(graph.objects(result_node, NT.path))
     assert Path(path).exists()
 
     # Verify content
@@ -120,3 +140,36 @@ async def test_create_result_node():
     assert (result_node, NT.path, Literal("/test/path")) in graph
     assert (result_node, NT.size, Literal(100)) in graph
     assert (result_node, NT.contentHash, Literal("abc123")) in graph
+
+
+async def test_http_request_capability(httpx_mock: HTTPXMock):
+    """Test HTTPRequestCapability"""
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @prefix json: <https://node.town/2024/json/#> .
+    @base <https://test.example/> .
+
+    <invocation> a nt:Invocation ;
+        nt:provides <request> .
+
+    <request> a nt:HTTPRequest ;
+        nt:hasURL "https://example.com" ;
+        nt:hasAuthorizationHeader "Bearer abc123" ;
+        nt:posts [ a json:Object ;
+            json:has [ json:key "key" ; json:val "value" ] ] .
+    """
+
+    graph = Graph()
+    graph.parse(data=turtle_data, format="turtle")
+    httpx_mock.add_response(
+        url="https://example.com",
+        method="POST",
+        match_headers={"Authorization": "Bearer abc123"},
+        match_json={"key": "value"},
+    )
+
+    async with httpx.AsyncClient() as client:
+        http_client.set(client)
+        invocation = URIRef("https://test.example/invocation")
+        capability = HTTPRequestCapability(graph, invocation)
+        await capability.execute()

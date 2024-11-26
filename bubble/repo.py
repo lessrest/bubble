@@ -15,24 +15,21 @@ import logging
 import platform
 import tempfile
 
-from typing import Optional
 from datetime import UTC, datetime
 
 import trio
 import psutil
 
 from trio import Path
-from rdflib import OWL, RDF, RDFS, XSD, Graph, URIRef, Literal, Namespace
-from rdflib.graph import QuotedGraph, _ObjectType, _TripleType
+from rdflib import OWL, RDF, XSD, RDFS, Graph, URIRef, Literal, Namespace
+from rdflib.graph import QuotedGraph, _TripleType, _SubjectType
 
 from bubble.id import Mint
-from bubble.ns import AS, NT, SWA
+from bubble.ns import AS, NT, SWA, UUID
 from bubble.mac import get_disk_info, computer_serial_number
-from bubble.n3_utils import get_single_subject, print_n3
+from bubble.n3_utils import New, print_n3, get_single_subject
 
 logger = logging.getLogger(__name__)
-
-UUID = Namespace("urn:uuid:")
 
 
 class Bubbler:
@@ -48,12 +45,12 @@ class Bubbler:
     minter: Mint
 
     # The bubble's IRI
-    bubble: URIRef
+    bubble: _SubjectType
 
     # The graph of the bubble
     graph: Graph
 
-    def __init__(self, path: Path, mint: Mint, base: URIRef):
+    def __init__(self, path: Path, mint: Mint, base: _SubjectType):
         self.workdir = path
         self.rootpath = path / "root.n3"
         self.minter = mint
@@ -117,26 +114,16 @@ class Bubbler:
             raise ValueError(f"Bubble not found at {path}")
 
         if not await (path / "root.n3").exists():
-            BUBBLE = Namespace(fresh_iri().toPython())
+            BUBBLE = Namespace(fresh_iri().toPython() + "/")
+
+            surface = BUBBLE["root.n3"]
+            step = fresh_iri()
+            head = fresh_iri()
+
             g = Graph(base=BUBBLE)
             Bubbler.bind_prefixes(g)
 
-            def new(
-                type: URIRef,
-                properties: dict[URIRef, _ObjectType | list[_ObjectType]],
-                subject: Optional[URIRef] = None,
-            ) -> URIRef:
-                if subject is None:
-                    subject = fresh_iri()
-                g.add((subject, RDF.type, type))
-                if properties is not None:
-                    for predicate, object in properties.items():
-                        if isinstance(object, list):
-                            for item in object:
-                                g.add((subject, predicate, item))
-                        else:
-                            g.add((subject, predicate, object))
-                return subject
+            new = New(g, mint)
 
             (
                 computer_serial,
@@ -186,8 +173,9 @@ class Bubbler:
                     RDFS.label: Literal(
                         f"a bubble for {person_name}", lang="en"
                     ),
+                    NT.head: step,
                 },
-                subject=BUBBLE["#bubble"],
+                subject=BUBBLE["#"],
             )
 
             new(
@@ -204,13 +192,11 @@ class Bubbler:
                                 f"worktree directory at {path}", lang="en"
                             ),
                         },
-                        subject=BUBBLE["#worktree"],
                     ),
                     RDFS.label: Literal(
                         f"bubble repository at {path}", lang="en"
                     ),
                 },
-                subject=BUBBLE["#origin"],
             )
 
             user = new(
@@ -296,7 +282,7 @@ class Bubbler:
                         f"creation of the bubble at {path}", lang="en"
                     ),
                 },
-                subject=BUBBLE["#creation"],
+                subject=BUBBLE["#genesis"],
             )
 
             def quote(triples: list[_TripleType]) -> QuotedGraph:
@@ -305,14 +291,10 @@ class Bubbler:
                     quoted.add((subject, predicate, object))
                 return quoted
 
-            surface = BUBBLE["root.n3"]
-            step = BUBBLE["#first"]
-            head = BUBBLE["#second"]
-
             new(
                 NT.Step,
                 {
-                    NT.supposes: quote([(surface, NT.head, step)]),
+                    NT.supposes: quote([(bubble, NT.head, step)]),
                     RDFS.label: Literal(
                         f"the first step of the bubble at {path}", lang="en"
                     ),
@@ -323,7 +305,7 @@ class Bubbler:
             new(
                 NT.Step,
                 {
-                    NT.supposes: quote([(surface, NT.head, head)]),
+                    NT.supposes: quote([(bubble, NT.head, head)]),
                     NT.succeeds: step,
                     RDFS.label: Literal(
                         f"the second step of the bubble at {path}", lang="en"
@@ -340,7 +322,6 @@ class Bubbler:
                         NT.Surface,
                         {
                             NT.partOf: bubble,
-                            NT.head: step,
                             RDFS.label: Literal(
                                 f"the root surface of the bubble at {path}",
                                 lang="en",

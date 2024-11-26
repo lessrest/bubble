@@ -1,14 +1,44 @@
 """Utility functions for N3 processing."""
 
-import subprocess
+from typing import Optional, Sequence
 
-from typing import Sequence
-
-from rdflib import RDF, BNode, Graph, Literal, Namespace, IdentifiedNode
-from rdflib.graph import _SubjectType
+from rdflib import RDF, BNode, Graph, Namespace
+from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
+from rdflib.query import ResultRow
+import trio
 
 from bubble.id import Mint
-from bubble.ns import JSON
+from bubble.ns import JSON, NT, SWA
+
+
+class New:
+    """Create new nodes in a graph, inspired by Turtle syntax"""
+
+    def __init__(self, graph: Graph, mint: Mint = Mint()):
+        self.graph = graph
+        self.mint = mint
+
+    def __call__(
+        self,
+        type: Optional[_SubjectType] = None,
+        properties: dict[_PredicateType, _ObjectType | list[_ObjectType]] = {},
+        subject: Optional[_SubjectType] = None,
+    ) -> _SubjectType:
+        if subject is None:
+            subject = self.mint.fresh_secure_iri(SWA)
+
+        if type is not None:
+            self.graph.add((subject, RDF.type, type))
+
+        if properties is not None:
+            for predicate, object in properties.items():
+                if isinstance(object, list):
+                    for item in object:
+                        self.graph.add((subject, predicate, item))
+                else:
+                    self.graph.add((subject, predicate, object))
+
+        return subject
 
 
 def print_n3(graph: Graph) -> None:
@@ -17,9 +47,8 @@ def print_n3(graph: Graph) -> None:
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    n3 = graph.serialize(format="n3")
-    n3 = n3.replace("    ", "  ")  # Replace 4 spaces with 2 spaces globally
-    n3 = n3.strip()  # strip leading and trailing whitespace
+    n3 = graph.serialize(format="n3").replace("    ", "  ").strip()
+
     print(
         Panel(
             Syntax(n3, "turtle", theme="friendly_grayscale"),
@@ -54,28 +83,17 @@ def get_subjects(graph: Graph, predicate, object):
     return list(graph.subjects(predicate, object))
 
 
-def show(input_path: str) -> Graph:
-    """Load and normalize an N3 file"""
-    g = Graph()
-    g.parse(input_path, format="n3")
-    return g
-
-
 async def reason(input_paths: Sequence[str]) -> Graph:
     """Run the EYE reasoner on N3 files and return the resulting graph"""
     cmd = ["eye", "--nope", "--pass", *input_paths]
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=1
+
+    with trio.move_on_after(1):
+        result = await trio.run_process(
+            cmd, capture_stdout=True, capture_stderr=True, check=True
         )
-    except subprocess.TimeoutExpired as e:
-        # print the captured output and stderr
-        print(e.stdout)
-        print(e.stderr)
-        raise TimeoutError("The EYE reasoner timed out after 1 second")
 
     g = Graph()
-    g.parse(data=result.stdout, format="n3")
+    g.parse(data=result.stdout.decode(), format="n3")
     return g
 
 
@@ -132,56 +150,30 @@ The RDF representation uses a custom JSON ontology with the following structure:
 """
 
 
-def get_json_value(graph: Graph, node: _SubjectType) -> dict:
-    """Convert an RDF JSON object node to a Python dictionary.
-
-    Args:
-        graph: The RDF graph containing the JSON structure
-        node: The root node of the JSON object to convert
-
-    Returns:
-        A Python dictionary representing the JSON structure
-
-    Raises:
-        ValueError: If an unexpected value type is encountered
-    """
-    result = {}
-    for prop in get_objects(graph, node, JSON.has):
-        key = get_single_object(graph, prop, JSON.key).toPython()
-        value = get_single_object(graph, prop, JSON.val)
-        # if value is a literal, add it to the result
-        if isinstance(value, Literal):
-            result[key] = value.toPython()
-        elif isinstance(value, IdentifiedNode):
-            if value.toPython() == JSON.null:
-                result[key] = None
-            else:
-                result[key] = get_json_value(graph, value)
-        else:
-            raise ValueError(f"Unexpected value type: {type(value)}")
-    return result
+def select_one_row(graph: Graph, query: str, bindings: dict = {}) -> ResultRow:
+    """Select a single row from a query"""
+    rows = select_rows(graph, query, bindings)
+    if len(rows) != 1:
+        raise ValueError("No result row found")
+    return rows[0]
 
 
-def json_to_n3(graph: Graph, value: dict) -> BNode:
-    """Convert a Python dictionary to an RDF JSON object representation.
+def select_rows(
+    graph: Graph, query: str, bindings: dict = {}
+) -> list[ResultRow]:
+    """Select multiple rows from a query"""
+    results = graph.query(
+        query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
+    )
+    rows = []
+    for row in results:
+        assert isinstance(row, ResultRow)
+        rows.append(row)
+    return rows
 
-    Args:
-        graph: The RDF graph to add the JSON structure to
-        value: The Python dictionary to convert
 
-    Returns:
-        A blank node representing the root of the JSON object in RDF
-    """
-    bn = BNode()
-    graph.add((bn, RDF.type, JSON.Object))
-    for key, value in value.items():
-        prop = BNode()
-        graph.add((bn, JSON["has"], prop))
-        graph.add((prop, JSON["key"], Literal(key)))
-        if isinstance(value, dict):
-            graph.add((prop, JSON["val"], json_to_n3(graph, value)))
-        elif value is None:
-            graph.add((prop, JSON["val"], JSON.null))
-        else:
-            graph.add((prop, JSON["val"], Literal(value)))
-    return bn
+def turtle(src: str) -> Graph:
+    graph = Graph()
+    graph.parse(data=src, format="turtle")
+    graph.bind("nt", NT)
+    return graph

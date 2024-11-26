@@ -5,7 +5,7 @@ import pytest
 
 from rdflib import BNode, Graph, URIRef, Namespace
 
-from bubble import StepExecution
+from bubble.n3 import StepExecution
 from bubble.n3_utils import get_objects, get_single_object
 
 # Test namespaces

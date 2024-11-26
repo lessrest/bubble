@@ -1,26 +1,18 @@
-from collections import defaultdict
 from io import StringIO
-import httpx
-import rdflib
+from collections import defaultdict
+
 import rich
 import trio
-from typing import Dict, List, Optional, Union
-from urllib.parse import urlencode
-from rdflib import Graph, IdentifiedNode, URIRef, Literal, Namespace, BNode
-from rdflib.namespace import RDF, RDFS, XSD
-from rdflib.query import ResultRow
+import httpx
+import rdflib
 
-from bubble.n3_utils import (
-    get_objects,
-    get_single_object,
-    get_subjects,
-    print_n3,
-)
+from rdflib import Graph, Namespace, IdentifiedNode
+from rdflib.query import ResultRow
+from rdflib.namespace import RDFS
 
 # Define some useful Wikidata namespaces
 WD = Namespace("http://www.wikidata.org/entity/")
 WDT = Namespace("http://www.wikidata.org/prop/direct/")
-RDFS = Namespace("http://www.w3.org/2000/01/rdf-schema#")
 SCHEMA = Namespace("http://schema.org/")
 
 

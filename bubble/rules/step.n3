@@ -12,7 +12,7 @@
 
 # Rule: Apply suppositions
 {
-   ?surface nt:head ?step .
+   ?bubble nt:head ?step .
    ?step nt:supposes ?graph .
 }
 => ?graph .
@@ -56,17 +56,17 @@
 
 # Rule: advance the head step
 {
-   ?surface nt:head ?step .
+   ?bubble nt:head ?step .
    ?next nt:succeeds ?step .
 }
 => 
 {
    ?step nt:decides 
    {
-       ?surface nt:head ?next .
+       ?bubble nt:head ?next .
    } .
    ?step nt:revokes 
    {
-       ?surface nt:head ?step .
+       ?bubble nt:head ?step .
    } .
 } .

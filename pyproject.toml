@@ -33,6 +33,9 @@ dependencies = [
     "pyright>=1.1.389",
     "pytest-watcher>=0.4.3",
     "psutil>=6.1.0",
+    "pytest-mock>=3.14.0",
+    "mock>=5.1.0",
+    "pytest-httpx>=0.34.0",
 ]
 
 [tool.uv.sources]
@@ -82,3 +85,4 @@ venv = ".venv"
 trio_mode = true
 md_report = true
 md_report_verbose = 1
+mock_use_standalone_module = true

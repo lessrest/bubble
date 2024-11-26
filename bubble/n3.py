@@ -1,7 +1,7 @@
 """N3 processor for handling N3 files and invocations."""
 
 from glob import glob
-from typing import Tuple, Optional
+from typing import Optional
 from pathlib import Path
 
 import trio
@@ -12,7 +12,7 @@ from rdflib.graph import _ObjectType, _SubjectType
 from rich.console import Console
 
 from bubble.ns import NT
-from bubble.n3_utils import get_objects, get_single_object, print_n3
+from bubble.n3_utils import print_n3, get_single_object
 from bubble.capabilities import HTTPRequestCapability
 
 console = Console()
@@ -59,12 +59,12 @@ class StepExecution:
 
     def get_invocation_details(
         self, invocation: _SubjectType
-    ) -> Optional[Tuple[_ObjectType, _ObjectType]]:
+    ) -> Optional[_ObjectType]:
         """Get the parameter and target type for an invocation"""
         try:
             target = get_single_object(self.graph, invocation, NT.invokes)
             target_type = get_single_object(self.graph, target, RDF.type)
-            return target, target_type
+            return target_type
         except ValueError:
             return None
 
@@ -81,27 +81,18 @@ class StepExecution:
         console.print(f"Processing {len(invocations)} invocations")
         console.rule()
 
-        capability_map = {
-            NT.ShellCapability: ShellCapability(),
-            NT.POSTCapability: HTTPRequestCapability(),
-        }
-
         async with trio.open_nursery() as nursery:
             for invocation in invocations:
-                details = self.get_invocation_details(invocation)
-                if details:
-                    target, target_type = details
-                    provides = get_objects(self.graph, invocation, NT.provides)
-
-                    if target_type in capability_map:
-                        capability = capability_map[target_type]
-                        nursery.start_soon(
-                            capability.execute,
-                            self.graph,
-                            invocation,
-                            target,
-                            provides,
-                        )
+                capability_map = {
+                    NT.ShellCapability: ShellCapability,
+                    NT.POSTCapability: HTTPRequestCapability,
+                }
+                target_type = self.get_invocation_details(invocation)
+                if target_type in capability_map:
+                    capability = capability_map[target_type]
+                    nursery.start_soon(
+                        capability(self.graph, invocation).execute
+                    )
 
     async def process(self) -> None:
         """Main processing method"""
