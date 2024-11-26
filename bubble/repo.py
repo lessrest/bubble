@@ -82,7 +82,7 @@ class Bubble:
 
             # find amount of memory
             memory_info = psutil.virtual_memory()
-            memory_part = mint.fresh_secure_iri(SWA)
+            memory_part = mint.fresh_blank_node()
             graph.add((machine, NT.hasPart, memory_part))
             graph.add((memory_part, RDF.type, NT.RandomAccessMemory))
             graph.add((memory_part, NT.byteSize, Literal(memory_info.total)))
