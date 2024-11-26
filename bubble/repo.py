@@ -113,6 +113,11 @@ class Bubble:
     async def commit(self) -> None:
         """Commit the bubble"""
         await trio.run_process(["git", "add", "."])
-        await trio.run_process(
-            ["git", "commit", "-m", f"Initialize {self.base}"]
+        result = await trio.run_process(
+            ["git", "commit", "-m", f"Initialize {self.base}"],
+            capture_stdout=True,
+            capture_stderr=True,
+            check=False,
         )
+        if result.returncode != 0:
+            raise ValueError(f"Failed to commit: {result.stderr}")
