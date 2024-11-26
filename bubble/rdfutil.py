@@ -57,13 +57,13 @@ class New:
         return subject
 
 
-def print_n3(graph: Graph) -> None:
-    """Print the graph in N3 format"""
+def print_n3() -> None:
+    """Print the current graph in N3 format"""
     from rich import print
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    n3 = graph.serialize(format="n3").replace("    ", "  ").strip()
+    n3 = graphvar.get().serialize(format="n3").replace("    ", "  ").strip()
 
     print(
         Panel(
