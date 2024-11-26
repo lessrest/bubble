@@ -48,15 +48,15 @@ class Bubble:
             graph.bind("nt", NT)
 
             graph.add((base, RDF.type, NT.Bubble))
+
+            head = mint.fresh_secure_iri(SWA)
             graph.add(
                 (
-                    base,
+                    head,
                     NT.created,
                     Literal(datetime.now(UTC), datatype=XSD.dateTime),
                 )
             )
-
-            head = mint.fresh_secure_iri(SWA)
             graph.add((base, NT.pointsTo, head))
             graph.add((head, RDF.type, NT.Step))
             graph.add((head, NT.ranks, Literal(1)))
