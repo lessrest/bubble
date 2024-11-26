@@ -2,6 +2,7 @@
 # This enables a form of dynamic scoping where code can access the "current graph"
 # without explicitly passing it through all function calls.
 from contextlib import contextmanager
+from typing import Sequence
 from rdflib import Graph, Literal
 
 
@@ -42,7 +43,7 @@ def using_graph(graph: Graph):
         yield graph
 
 
-def quote(triples: list[_TripleType]) -> QuotedGraph:
+def quote(triples: Sequence[_TripleType]) -> QuotedGraph:
     quoted = QuotedGraph(graphvar.get().store, fresh_iri())
     for subject, predicate, object in triples:
         quoted.add((subject, predicate, object))

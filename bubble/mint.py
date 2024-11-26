@@ -3,7 +3,7 @@ from contextvars import ContextVar
 import secrets
 
 from xid import XID
-from rdflib import BNode, URIRef, Namespace
+from rdflib import URIRef, Namespace
 
 from bubble.prfx import SWA
 
@@ -48,10 +48,6 @@ class Mint:
     def fresh_id(self) -> str:
         """Generate a non-secure pseudorandom identifier."""
         return XID().string().upper()
-
-    def fresh_blank_node(self) -> BNode:
-        """Generate a fresh blank node."""
-        return BNode()
 
     def machine_id(self) -> str:
         """Generate a consistent machine identifier encoded in base32."""

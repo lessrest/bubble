@@ -22,22 +22,24 @@ async def reason(graphs: Sequence[Graph]) -> Graph:
 
     # Create temporary files for each graph
     temp_files = []
-    async with trio.open_nursery() as nursery:
-        for i, graph in enumerate(graphs):
-            # Create temp file
-            fd, path = tempfile.mkstemp(suffix='.n3')
-            temp_files.append(path)
-            
-            # Write graph to temp file
-            graph.serialize(path, format='n3')
+    for i, graph in enumerate(graphs):
+        # Create temp file
+        fd, path = tempfile.mkstemp(suffix=".n3")
+        temp_files.append(path)
+
+        # Write graph to temp file
+        graph.serialize(path, format="n3")
 
     try:
         # Run EYE reasoner on temp files
         cmd = ["eye", "--nope", "--pass", *temp_files]
-        
+
         with trio.move_on_after(1):
             result = await trio.run_process(
-                cmd, capture_stdout=True, capture_stderr=True, check=True
+                cmd,
+                capture_stdout=True,
+                capture_stderr=True,
+                check=True,
             )
 
         # Parse result into new graph

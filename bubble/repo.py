@@ -8,7 +8,6 @@
 # Each bubble has a unique IRI minted on creation.
 
 import logging
-import tempfile
 
 
 import trio
@@ -22,6 +21,7 @@ from rdflib import (
 from rdflib.graph import _SubjectType
 
 from bubble.boot import describe_new_bubble
+from bubble.mind import reason
 from bubble.mint import Mint, mintvar
 from bubble.prfx import NT
 from bubble.util import get_single_subject
@@ -93,12 +93,7 @@ class BubbleRepo:
 
     async def reason(self) -> Graph:
         """Reason over the graph"""
-        from bubble.reason import reason
-
-        tmpfile = Path(tempfile.gettempdir()) / "bubble.n3"
-        self.graph.serialize(destination=tmpfile, format="n3")
-        logger.info(f"Reasoning over {tmpfile}")
-        conclusion = await reason([str(tmpfile)])
+        conclusion = await reason([self.graph])
         logger.info(f"Conclusion has {len(conclusion)} triples")
         return conclusion
 

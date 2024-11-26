@@ -14,7 +14,7 @@ from bubble.prfx import NT, SWA, JSON
 
 S = _SubjectType
 P = _PredicateType
-O = _ObjectType
+O = _ObjectType  # noqa: E741
 
 
 class New:
@@ -72,17 +72,17 @@ def print_n3(graph: Optional[Graph] = None) -> None:
     )
 
 
-def get_single_subject(predicate, object, graph: Optional[Graph] = None):
+def get_single_subject(predicate, object):
     """Get a single subject for a predicate-object pair from the current graph"""
-    subjects = get_subjects(predicate, object, graph)
+    subjects = get_subjects(predicate, object)
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
 
 
-def get_subjects(predicate, object, graph: Optional[Graph] = None):
+def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
-    g = graph if graph is not None else graphvar.get()
+    g = graphvar.get()
     return list(g.subjects(predicate, object))
 
 
