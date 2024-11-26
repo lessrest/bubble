@@ -1,5 +1,5 @@
-from rdflib import Graph, Literal
-from bubble.vars import using_graph, graphvar, langstr, bind_prefixes
+from rdflib import Graph, Literal, URIRef
+from bubble.vars import using_graph, graphvar, langstr, bind_prefixes, quote
 from bubble.prfx import AS, NT, SWA
 
 
@@ -57,3 +57,26 @@ def test_bind_prefixes():
             test_graph.namespace_manager.compute_qname(str(AS))[0]
             == "as"
         )
+
+
+def test_quote():
+    """Test creation of quoted graphs"""
+    test_graph = Graph()
+    with using_graph(test_graph):
+        # Create some test triples
+        subject = URIRef("http://example.org/subject")
+        predicate = URIRef("http://example.org/predicate")
+        object = URIRef("http://example.org/object")
+        triples = [(subject, predicate, object)]
+        
+        # Create quoted graph
+        quoted = quote(triples)
+        
+        # Verify it's a QuotedGraph
+        assert quoted.__class__.__name__ == "QuotedGraph"
+        
+        # Verify the triple was added
+        assert (subject, predicate, object) in quoted
+        
+        # Verify it has a unique identifier
+        assert quoted.identifier is not None
