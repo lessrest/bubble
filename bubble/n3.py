@@ -11,7 +11,7 @@ from rdflib import URIRef
 from rdflib.graph import _SubjectType
 from rich.console import Console
 
-from bubble.n3_utils import select_rows
+from bubble.rdfutil import select_rows
 from bubble.capabilities import InvocationContext, capability_map
 
 console = Console()
@@ -29,7 +29,7 @@ class StepExecution:
 
     async def reason(self) -> None:
         """Run the EYE reasoner on N3 files and update the processor's graph"""
-        from bubble.n3_utils import reason
+        from bubble.rdfutil import reason
 
         if not self.step:
             raise ValueError("No step file provided")
@@ -37,7 +37,8 @@ class StepExecution:
         # Get all rule files for reasoning
         rule_files = glob(str(CORE_RULES_DIR / "*.n3"))
 
-        # If step is a directory, get all n3 files, otherwise use the single file
+        # If step is a directory, get all n3 files, otherwise use the
+        # single file
         step_files = (
             glob(str(Path(self.step) / "*.n3"))
             if Path(self.step).is_dir()
@@ -80,5 +81,7 @@ class StepExecution:
 
         except* Exception as e:
             for error in e.exceptions:
-                console.print(f"[red]Error processing N3:[/red] {str(error)}")
+                console.print(
+                    f"[red]Error processing N3:[/red] {str(error)}"
+                )
                 raise error

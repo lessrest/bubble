@@ -13,11 +13,13 @@ from anthropic.types import MessageParam
 
 from bubble.id import Mint
 from bubble.repo import Bubbler
-from bubble.n3_utils import print_n3
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level=logging.INFO,
+    format=FORMAT,
+    datefmt="[%X]",
+    handlers=[RichHandler()],
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,8 @@ async def stream_sentences(stream, initial_sentence="") -> str:
                 if sentence_content.strip():
                     # Handle multiline content by joining with spaces
                     cleaned_sentence = " ".join(
-                        line.strip() for line in sentence_content.splitlines()
+                        line.strip()
+                        for line in sentence_content.splitlines()
                     )
 
                     # Print the complete sentence
@@ -123,7 +126,9 @@ def show(
                         }
                     )
                 else:
-                    history.append({"role": "user", "content": user_message})
+                    history.append(
+                        {"role": "user", "content": user_message}
+                    )
 
     trio.run(run)
 

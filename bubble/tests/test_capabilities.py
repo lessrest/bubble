@@ -5,10 +5,9 @@ import pytest
 
 from rdflib import Graph, URIRef, Literal
 from pytest_httpx import HTTPXMock
-from rdflib.graph import _SubjectType
 
 from bubble.ns import NT
-from bubble.n3_utils import turtle
+from bubble.rdfutil import turtle
 from bubble.capabilities import (
     InvocationContext,
     FileResult,
@@ -55,7 +54,9 @@ async def test_shell_capability_success(shell_capability):
 
     # Verify results
     result_node = next(
-        shell_capability.graph.objects(shell_capability.invocation, NT.result)
+        shell_capability.graph.objects(
+            shell_capability.invocation, NT.result
+        )
     )
     assert result_node is not None
 
@@ -135,7 +136,9 @@ async def test_file_handler_metadata(tmp_path):
 async def test_create_result_node():
     """Test creating a result node in the graph"""
     graph = Graph()
-    file_result = FileResult(path="/test/path", size=100, content_hash="abc123")
+    file_result = FileResult(
+        path="/test/path", size=100, content_hash="abc123"
+    )
 
     result_node = await create_result_node(graph, file_result)
 

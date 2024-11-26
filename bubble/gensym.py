@@ -13,7 +13,10 @@ class Mint:
         raw_token = secrets.token_bytes(8)
         # Convert to base32 and remove padding
         encoded = (
-            base64.b32encode(raw_token).decode("ascii").rstrip("=").upper()
+            base64.b32encode(raw_token)
+            .decode("ascii")
+            .rstrip("=")
+            .upper()
         )
         return encoded
 
@@ -56,4 +59,9 @@ class Mint:
         # Take first 20 bytes (40 hex chars)
         raw_bytes = bytes.fromhex(hex_id[:40])
         # Convert to base32 and remove padding
-        return base64.b32encode(raw_bytes).decode("ascii").rstrip("=").upper()
+        return (
+            base64.b32encode(raw_bytes)
+            .decode("ascii")
+            .rstrip("=")
+            .upper()
+        )

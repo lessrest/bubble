@@ -1,9 +1,7 @@
-from functools import wraps
 import hashlib
 import datetime
 import tempfile
 
-from abc import ABC, abstractmethod
 from typing import Optional
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -17,7 +15,7 @@ from rich.console import Console
 
 from bubble.ns import NT
 from bubble.jsonrdf import json_from_rdf
-from bubble.n3_utils import New, select_one_row
+from bubble.rdfutil import New, select_one_row
 
 console = Console()
 
@@ -30,7 +28,9 @@ class InvocationContext:
     graph: Graph
     invocation: _SubjectType
 
-    def select_one_row(self, query: str, bindings: dict = {}) -> ResultRow:
+    def select_one_row(
+        self, query: str, bindings: dict = {}
+    ) -> ResultRow:
         bindings = bindings.copy()
         bindings["invocation"] = self.invocation
 

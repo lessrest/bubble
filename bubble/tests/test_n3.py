@@ -63,11 +63,15 @@ def processor(basic_n3: LiteralString):
 
 
 @pytest.fixture
-async def shell_processor(shell_command_n3: LiteralString, tmp_path: Path):
+async def shell_processor(
+    shell_command_n3: LiteralString, tmp_path: Path
+):
     """Creates a StepExecution instance with shell command N3"""
     n3_file = tmp_path / "test.n3"
     n3_file.write_text(shell_command_n3)
-    execution = StepExecution(base="https://test.example/", step=str(n3_file))
+    execution = StepExecution(
+        base="https://test.example/", step=str(n3_file)
+    )
     await execution.reason()
     return execution
 
@@ -84,7 +88,9 @@ async def test_process_shell_command(shell_processor: StepExecution):
     assert len(invocations) == 1
 
     # Check result was added
-    result = next(shell_processor.graph.objects(invocations[0], NT.result))
+    result = next(
+        shell_processor.graph.objects(invocations[0], NT.result)
+    )
     assert result is not None
 
     # Verify file was created with expected content

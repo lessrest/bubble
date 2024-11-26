@@ -7,40 +7,50 @@ readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
+    # Structured concurrency library for managing async code
     "trio==0.27.*",
-    # structured concurrency
+    # Rich text and beautiful formatting in the terminal
     "rich==13.*",
-    # pretty terminal output
+    # Modern async HTTP client with support for HTTP/2
     "httpx==0.*",
-    # async HTTP client
+    # Python library for working with RDF (Resource Description Framework)
     "rdflib==7.*",
-    # RDF data access
+    # Popular Python testing framework
     "pytest==8.*",
-    # testing framework
+    # Pytest plugin for testing async code using Trio
     "pytest-trio==0.*",
-    # async testing with structured concurrency
+    # Generates Markdown reports from pytest results
     "pytest-md-report==0.6.*",
-    # reporting for continuous integration
+    # Client library for Replicate's AI model hosting platform
     "replicate==1.*",
-    # Replicate SDK (various AI models)
+    # Official OpenAI API client for GPT models
     "openai==1.55.*",
-    # OpenAI SDK (GPT-4o, o1, etc)
+    # Official Anthropic API client for Claude models
     "anthropic==0.39.*",
-    # Anthropic SDK (Claude, Sonnet, etc)
+    # Globally unique ID generator
     "py-xid>=1.0.0",
+    # Cross-platform unique machine ID generator
     "py-machineid>=0.6.0",
+    # Modern CLI framework built on Click
     "typer>=0.13.1",
+    # Static type checker for Python
     "pyright>=1.1.389",
+    # Auto-rerun pytest on file changes
     "pytest-watcher>=0.4.3",
+    # Cross-platform library for retrieving system information
     "psutil>=6.1.0",
+    # Thin wrapper around the mock package for pytest
     "pytest-mock>=3.14.0",
+    # Mocking and testing library
     "mock>=5.1.0",
+    # Pytest plugin for mocking httpx requests
     "pytest-httpx>=0.34.0",
+    "autopep8>=2.3.1",
 ]
 
 [tool.uv.sources]
 # stay current with rdflib
-rdflib = { git = "https://github.com/RDFLib/rdflib" } 
+rdflib = { git = "https://github.com/RDFLib/rdflib" }
 
 # I don't remember but this was necessary at some point for something
 httptools = { git = "https://github.com/tacaswell/httptools", branch = "patch-1" }
@@ -56,10 +66,13 @@ build-backend = "setuptools.build_meta"
 include = ["bubble"]
 
 [project.scripts]
-bubble = "bubble.main:app"
+bubble = "bubble.main:main"
+
+# run this to wrap comments; ruff can't do that
+wrapcomments = "autopep8 --in-place --max-line-length 72 --select E501 --aggressive bubble/**.py"
 
 [tool.ruff]
-line-length = 80 # slim fit
+line-length = 72         # slim fit
 target-version = "py313" # I'm not interested in old Python versions
 
 [tool.ruff.lint.isort]
@@ -71,7 +84,7 @@ length-sort = true
 dev-dependencies = [
     "ruff==0.*",
     "pytest==8.*",
-    "pytest-trio==0.*" # async testing for trio structured concurrency
+    "pytest-trio==0.*", # async testing for trio structured concurrency
 ]
 
 python-preference = "managed"

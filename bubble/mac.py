@@ -1,11 +1,10 @@
 import plistlib
 
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 import rich
 import trio
 
-from rich import inspect
 from trio import run_process
 from rich.table import Table
 
@@ -51,7 +50,9 @@ async def get_disk_info(disk: str) -> DiskInfo:
 
 async def all_disk_infos() -> dict[str, DiskInfo]:
     disks = await disk_list()
-    return {disk: await get_disk_info(disk) for disk in disks["AllDisks"]}
+    return {
+        disk: await get_disk_info(disk) for disk in disks["AllDisks"]
+    }
 
 
 async def computer_serial_number():

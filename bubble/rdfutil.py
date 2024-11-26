@@ -22,7 +22,9 @@ class New:
     def __call__(
         self,
         type: Optional[_SubjectType] = None,
-        properties: dict[_PredicateType, _ObjectType | list[_ObjectType]] = {},
+        properties: dict[
+            _PredicateType, _ObjectType | list[_ObjectType]
+        ] = {},
         subject: Optional[_SubjectType] = None,
     ) -> _SubjectType:
         if subject is None:
@@ -115,7 +117,9 @@ def skolemize(
     return g_sk
 
 
-def select_one_row(graph: Graph, query: str, bindings: dict = {}) -> ResultRow:
+def select_one_row(
+    graph: Graph, query: str, bindings: dict = {}
+) -> ResultRow:
     """Select a single row from a query"""
     rows = select_rows(graph, query, bindings)
     if len(rows) != 1:

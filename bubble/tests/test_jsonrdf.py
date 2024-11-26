@@ -3,8 +3,12 @@ import pytest
 from rdflib import Graph, Literal, Variable
 
 from bubble.ns import JSON
-from bubble.jsonrdf import rdf_from_json, json_from_rdf, convert_json_value
-from bubble.n3_utils import New, select_rows
+from bubble.jsonrdf import (
+    rdf_from_json,
+    json_from_rdf,
+    convert_json_value,
+)
+from bubble.rdfutil import New, select_rows
 
 
 @pytest.fixture
@@ -52,7 +56,10 @@ def test_convert_json_value_object(graph, new):
             {
                 JSON.has: new(
                     None,
-                    {JSON.key: Literal("nested"), JSON.val: Literal("value")},
+                    {
+                        JSON.key: Literal("nested"),
+                        JSON.val: Literal("value"),
+                    },
                 )
             },
         ),
@@ -72,7 +79,7 @@ def test_json_to_n3_simple(graph):
     rows = select_rows(
         graph,
         """
-        SELECT ?key ?value 
+        SELECT ?key ?value
         WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
         """,
         {"root": root},
@@ -100,7 +107,11 @@ def test_json_to_n3_nested(graph):
     )
 
     assert len(rows) == 1
-    assert rows[0] == (Literal("outer"), Literal("inner"), Literal("value"))
+    assert rows[0] == (
+        Literal("outer"),
+        Literal("inner"),
+        Literal("value"),
+    )
 
 
 def test_json_to_n3_null(graph):
@@ -110,7 +121,7 @@ def test_json_to_n3_null(graph):
     rows = select_rows(
         graph,
         """
-        SELECT ?key ?value 
+        SELECT ?key ?value
         WHERE { ?root json:has [ json:key ?key ; json:val ?value ] }
         """,
         {"root": root},

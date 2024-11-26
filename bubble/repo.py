@@ -21,13 +21,22 @@ import trio
 import psutil
 
 from trio import Path
-from rdflib import OWL, RDF, XSD, RDFS, Graph, URIRef, Literal, Namespace
+from rdflib import (
+    OWL,
+    RDF,
+    XSD,
+    RDFS,
+    Graph,
+    URIRef,
+    Literal,
+    Namespace,
+)
 from rdflib.graph import QuotedGraph, _TripleType, _SubjectType
 
 from bubble.id import Mint
 from bubble.ns import AS, NT, SWA, UUID
 from bubble.mac import get_disk_info, computer_serial_number
-from bubble.n3_utils import New, print_n3, get_single_subject
+from bubble.rdfutil import New, print_n3, get_single_subject
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +105,7 @@ class Bubbler:
 
     async def reason(self) -> Graph:
         """Reason over the graph"""
-        from bubble.n3_utils import reason
+        from bubble.rdfutil import reason
 
         tmpfile = Path(tempfile.gettempdir()) / "bubble.n3"
         self.graph.serialize(destination=tmpfile, format="n3")
@@ -189,7 +198,8 @@ class Bubbler:
                             NT.parent: home_dir,
                             NT.path: Literal(path),
                             RDFS.label: Literal(
-                                f"worktree directory at {path}", lang="en"
+                                f"worktree directory at {path}",
+                                lang="en",
                             ),
                         },
                     ),
@@ -204,7 +214,9 @@ class Bubbler:
                 {
                     NT.gid: Literal(user_info.pw_gid),
                     NT.homeDirectory: home_dir,
-                    NT.owner: new(AS.Person, {NT.name: Literal(person_name)}),
+                    NT.owner: new(
+                        AS.Person, {NT.name: Literal(person_name)}
+                    ),
                     NT.uid: Literal(user_info.pw_uid),
                     NT.username: Literal(getpass.getuser()),
                     RDFS.label: Literal(
@@ -217,7 +229,8 @@ class Bubbler:
                 NT.ComputerMachine,
                 {
                     RDFS.label: Literal(
-                        f"{person_name}'s {system_type} computer", lang="en"
+                        f"{person_name}'s {system_type} computer",
+                        lang="en",
                     ),
                     NT.hosts: [
                         new(
@@ -296,7 +309,8 @@ class Bubbler:
                 {
                     NT.supposes: quote([(bubble, NT.head, step)]),
                     RDFS.label: Literal(
-                        f"the first step of the bubble at {path}", lang="en"
+                        f"the first step of the bubble at {path}",
+                        lang="en",
                     ),
                 },
                 subject=step,
@@ -308,7 +322,8 @@ class Bubbler:
                     NT.supposes: quote([(bubble, NT.head, head)]),
                     NT.succeeds: step,
                     RDFS.label: Literal(
-                        f"the second step of the bubble at {path}", lang="en"
+                        f"the second step of the bubble at {path}",
+                        lang="en",
                     ),
                 },
                 subject=head,
@@ -439,7 +454,9 @@ class Bubbler:
 
     async def commit(self) -> None:
         """Commit the bubble"""
-        await trio.run_process(["git", "-C", str(self.workdir), "add", "."])
+        await trio.run_process(
+            ["git", "-C", str(self.workdir), "add", "."]
+        )
         result = await trio.run_process(
             [
                 "git",

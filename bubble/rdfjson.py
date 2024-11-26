@@ -4,7 +4,7 @@ from rdflib import RDF, BNode, Graph, URIRef, Literal, IdentifiedNode
 from rdflib.graph import _SubjectType
 
 from bubble.ns import JSON
-from bubble.n3_utils import select_rows
+from bubble.rdfutil import select_rows
 
 
 def json_from_rdf(graph: Graph, node: _SubjectType) -> dict:
