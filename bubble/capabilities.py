@@ -16,6 +16,7 @@ from rich.console import Console
 from bubble.ns import NT
 from bubble.rdfjson import json_from_rdf
 from bubble.rdfutil import New, select_one_row
+from bubble.graphvar import using_graph
 
 console = Console()
 
@@ -34,7 +35,8 @@ class InvocationContext:
         bindings = bindings.copy()
         bindings["invocation"] = self.invocation
 
-        return select_one_row(self.graph, query, bindings)
+        with using_graph(self.graph):
+            return select_one_row(query, bindings)
 
 
 def capability(capability_type: _SubjectType):

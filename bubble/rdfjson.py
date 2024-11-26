@@ -5,23 +5,24 @@ from rdflib.graph import _SubjectType
 
 from bubble.ns import JSON
 from bubble.rdfutil import select_rows
+from bubble.graphvar import using_graph
 
 
 def json_from_rdf(graph: Graph, node: _SubjectType) -> dict:
-    return {
-        row.key.toPython(): convert_json_value(graph, row.value)
-        for row in select_rows(
-            graph,
-            """
-            SELECT ?key ?value WHERE {
-                ?node json:has ?prop .
-                ?prop json:key ?key .
-                ?prop json:val ?value .
-            }
-            """,
-            {"node": node},
-        )
-    }
+    with using_graph(graph):
+        return {
+            row.key.toPython(): convert_json_value(graph, row.value)
+            for row in select_rows(
+                """
+                SELECT ?key ?value WHERE {
+                    ?node json:has ?prop .
+                    ?prop json:key ?key .
+                    ?prop json:val ?value .
+                }
+                """,
+                {"node": node},
+            )
+        }
 
 
 def convert_json_value(graph: Graph, value: _SubjectType) -> str | dict:
