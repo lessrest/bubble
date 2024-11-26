@@ -1,21 +1,17 @@
-import os
 import pathlib
-import subprocess
 
 from typing import Optional
 
-from rich import inspect
 import trio
 import typer
 
+from rich import inspect
 from typer import Option
-from rdflib import Graph
 from rich.console import Console
 
 from bubble.id import Mint
-from bubble.n3 import StepExecution
-from bubble.n3_utils import print_n3
 from bubble.repo import Bubble
+from bubble.n3_utils import print_n3
 
 console = Console(width=80)
 
@@ -47,6 +43,7 @@ def main(
         path = trio.Path(input_path)
         bubble = await Bubble.open(path, mint)
         inspect(bubble)
+        print_n3(bubble.graph)
 
     trio.run(run)
 

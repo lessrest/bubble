@@ -7,13 +7,15 @@
 # If the repository is empty, it will be initialized as a new bubble.
 # Each bubble has a unique IRI minted on creation.
 
-from rdflib import RDF, Graph, Literal, URIRef
-from rich import inspect
-from trio import Path
+from datetime import UTC, datetime
 import trio
 
+from trio import Path
+from rdflib import RDF, XSD, Graph, Literal, URIRef
+
 from bubble.id import Mint
-from bubble.ns import SWA, NT
+from bubble.ns import NT, SWA
+from bubble.n3_utils import get_single_subject
 
 
 class Bubble:
@@ -23,12 +25,16 @@ class Bubble:
     root: Path
     mint: Mint
     base: URIRef
+    graph: Graph
 
     def __init__(self, path: Path, mint: Mint, base: URIRef):
         self.path = path
         self.root = path / "root.n3"
         self.mint = mint
         self.base = base
+
+        self.graph = Graph(base=base, identifier=base)
+        self.graph.parse(self.root, format="n3")
 
     @staticmethod
     async def open(path: Path, mint: Mint) -> "Bubble":
@@ -40,7 +46,21 @@ class Bubble:
             graph = Graph(base=base, identifier=base)
             graph.bind("swa", SWA)
             graph.bind("nt", NT)
+
             graph.add((base, RDF.type, NT.Bubble))
+            graph.add(
+                (
+                    base,
+                    NT.created,
+                    Literal(datetime.now(UTC), datatype=XSD.dateTime),
+                )
+            )
+
+            head = mint.fresh_secure_iri(SWA)
+            graph.add((base, NT.pointsTo, head))
+            graph.add((head, RDF.type, NT.Step))
+            graph.add((head, NT.ranks, Literal(1)))
+
             graph.serialize(destination=path / "root.n3", format="n3")
             bubble = Bubble(path, mint, base)
             await bubble.commit()
@@ -49,11 +69,12 @@ class Bubble:
         else:
             graph = Graph()
             graph.parse(path / "root.n3", format="n3")
-            if graph.base is None:
-                inspect(graph, all=True)
-                inspect(graph.absolutize(""))
-                raise ValueError(f"Bubble at {path} is missing a base URI")
-            return Bubble(path, mint, URIRef(graph.base))
+
+            base = get_single_subject(graph, RDF.type, NT.Bubble)
+
+            assert isinstance(base, URIRef)
+
+            return Bubble(path, mint, URIRef(base))
 
     async def commit(self) -> None:
         """Commit the bubble"""

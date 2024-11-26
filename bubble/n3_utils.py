@@ -19,22 +19,34 @@ def print_n3(graph: Graph) -> None:
 
     n3 = graph.serialize(format="n3")
     n3 = n3.replace("    ", "  ")  # Replace 4 spaces with 2 spaces globally
-    print(
-        Panel(Syntax(n3, "turtle", theme="coffee", word_wrap=True), title="N3")
-    )
+    n3 = n3.strip()  # strip leading and trailing whitespace
+    print(Panel(Syntax(n3, "turtle", theme="coffee", word_wrap=True), width=80))
 
 
 def get_single_object(graph: Graph, subject, predicate):
     """Get a single object for a subject-predicate pair"""
-    objects = list(graph.objects(subject, predicate))
+    objects = get_objects(graph, subject, predicate)
     if len(objects) != 1:
         raise ValueError(f"Expected 1 object, got {len(objects)}")
     return objects[0]
 
 
+def get_single_subject(graph: Graph, predicate, object):
+    """Get a single subject for a predicate-object pair"""
+    subjects = get_subjects(graph, predicate, object)
+    if len(subjects) != 1:
+        raise ValueError(f"Expected 1 subject, got {len(subjects)}")
+    return subjects[0]
+
+
 def get_objects(graph: Graph, subject, predicate):
     """Get all objects for a subject-predicate pair"""
     return list(graph.objects(subject, predicate))
+
+
+def get_subjects(graph: Graph, predicate, object):
+    """Get all subjects for a predicate-object pair"""
+    return list(graph.subjects(predicate, object))
 
 
 def show(input_path: str) -> Graph:
