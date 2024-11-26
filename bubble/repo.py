@@ -81,8 +81,12 @@ class Bubble:
                     raise ValueError(f"Unknown operating system: {os}")
 
             # find amount of memory
-            memory = psutil.virtual_memory()
-            graph.add((machine, NT.memory, Literal(memory.total)))
+            memory_info = psutil.virtual_memory()
+            memory_part = mint.fresh_secure_iri(SWA)
+            graph.add((machine, NT.hasPart, memory_part))
+            graph.add((memory_part, RDF.type, NT.RandomAccessMemory))
+            graph.add((memory_part, NT.byteSize, Literal(memory_info.total)))
+
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
             graph.add((creation_activity, RDF.type, AS.Create))
