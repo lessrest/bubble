@@ -102,10 +102,18 @@ async def test_shell_no_output_file(graph, shell_capability):
     await do_shell(shell_capability)
     
     # Verify no result node was created
+    # When no output file is created, there should be no result node
     results = shell_capability.select_one_row(
-        "SELECT ?result WHERE { ?invocation nt:result ?result }"
+        """
+        SELECT ?result 
+        WHERE { 
+            ?invocation nt:result ?result 
+        }
+        OPTIONAL { ?result nt:path ?path }
+        """,
+        {"invocation": shell_capability.invocation}
     )
-    assert result is None
+    assert results is None
 
 
 @pytest.mark.trio 
