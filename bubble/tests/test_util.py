@@ -17,7 +17,7 @@ def test_graph():
 
 def test_print_n3(test_graph, capsys):
     """Test that print_n3 outputs formatted N3"""
-    print_n3()
+    print_n3(test_graph)
     
     captured = capsys.readouterr()
     
@@ -31,8 +31,9 @@ def test_get_single_subject(test_graph):
     """Test getting a single subject from a triple pattern"""
     # Test successful case
     result = get_single_subject(
-        RDF.type, 
-        URIRef("http://example.org/TestType")
+        RDF.type,
+        URIRef("http://example.org/TestType"),
+        test_graph
     )
     assert result == URIRef("http://example.org/subject")
 

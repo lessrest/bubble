@@ -56,18 +56,14 @@ class New:
         return subject
 
 
-def print_n3() -> None:
+def print_n3(graph: Optional[Graph] = None) -> None:
     """Print the current graph in N3 format"""
     from rich import print
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    n3 = (
-        graphvar.get()
-        .serialize(format="n3")
-        .replace("    ", "  ")
-        .strip()
-    )
+    g = graph if graph is not None else graphvar.get()
+    n3 = g.serialize(format="n3").replace("    ", "  ").strip()
 
     print(
         Panel(
@@ -76,17 +72,18 @@ def print_n3() -> None:
     )
 
 
-def get_single_subject(predicate, object):
+def get_single_subject(predicate, object, graph: Optional[Graph] = None):
     """Get a single subject for a predicate-object pair from the current graph"""
-    subjects = get_subjects(predicate, object)
+    subjects = get_subjects(predicate, object, graph)
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
 
 
-def get_subjects(predicate, object):
+def get_subjects(predicate, object, graph: Optional[Graph] = None):
     """Get all subjects for a predicate-object pair from the current graph"""
-    return list(graphvar.get().subjects(predicate, object))
+    g = graph if graph is not None else graphvar.get()
+    return list(g.subjects(predicate, object))
 
 
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
