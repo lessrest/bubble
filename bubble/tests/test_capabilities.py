@@ -10,12 +10,13 @@ from rdflib.graph import _SubjectType
 from bubble.ns import NT
 from bubble.n3_utils import turtle
 from bubble.capabilities import (
+    InvocationContext,
     FileResult,
-    ShellCapability,
-    HTTPRequestCapability,
     http_client,
     get_file_metadata,
     create_result_node,
+    do_post,
+    do_shell,
 )
 
 
@@ -32,11 +33,11 @@ def invocation():
 
 
 @pytest.fixture
-def shell_capability(graph: Graph, invocation: _SubjectType):
-    return ShellCapability(graph, invocation)
+def shell_capability(graph, invocation):
+    return InvocationContext(graph, invocation)
 
 
-async def test_shell_capability_success(shell_capability, graph):
+async def test_shell_capability_success(shell_capability):
     """Test successful shell command execution"""
     turtle_data = """
     @prefix nt: <https://node.town/2024/> .
@@ -47,18 +48,19 @@ async def test_shell_capability_success(shell_capability, graph):
             nt:value 'echo "test" > $out' ] .
     """
 
-    graph.parse(data=turtle_data, format="turtle")
-    invocation = URIRef("https://test.example/invocation")
+    shell_capability.graph.parse(data=turtle_data, format="turtle")
 
     # Execute the command
-    await shell_capability.execute()
+    await do_shell(shell_capability)
 
     # Verify results
-    result_node = next(graph.objects(invocation, NT.result))
+    result_node = next(
+        shell_capability.graph.objects(shell_capability.invocation, NT.result)
+    )
     assert result_node is not None
 
     # Check file path exists
-    path = next(graph.objects(result_node, NT.path))
+    path = next(shell_capability.graph.objects(result_node, NT.path))
     assert Path(path).exists()
 
     # Verify content
@@ -67,7 +69,7 @@ async def test_shell_capability_success(shell_capability, graph):
         assert content == "test"
 
 
-async def test_shell_capability_failure(shell_capability, graph):
+async def test_shell_capability_failure(shell_capability):
     """Test shell command failure handling"""
     turtle_data = """
     @prefix nt: <https://node.town/2024/> .
@@ -76,9 +78,9 @@ async def test_shell_capability_failure(shell_capability, graph):
     <invocation> a nt:Invocation .
     """
 
-    graph.parse(data=turtle_data, format="turtle")
+    shell_capability.graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(ValueError) as exc_info:
-        await shell_capability.execute()
+        await do_shell(shell_capability)
     assert "No" in str(exc_info.value)
 
 
@@ -97,8 +99,8 @@ async def test_shell_capability_with_stdin():
 
     invocation = URIRef("https://test.example/invocation")
 
-    shell_capability = ShellCapability(graph, invocation)
-    await shell_capability.execute()
+    shell_capability = InvocationContext(graph, invocation)
+    await do_shell(shell_capability)
 
     # Verify results
     (result_row, path) = shell_capability.select_one_row(
@@ -171,5 +173,4 @@ async def test_http_request_capability(httpx_mock: HTTPXMock):
     async with httpx.AsyncClient() as client:
         http_client.set(client)
         invocation = URIRef("https://test.example/invocation")
-        capability = HTTPRequestCapability(graph, invocation)
-        await capability.execute()
+        await do_post(InvocationContext(graph, invocation))

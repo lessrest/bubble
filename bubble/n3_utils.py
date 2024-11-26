@@ -52,18 +52,9 @@ def print_n3(graph: Graph) -> None:
 
     print(
         Panel(
-            Syntax(n3, "turtle", theme="friendly_grayscale"),
-            title="Bubble Graph",
+            Syntax(n3, "turtle", theme="zenburn"),
         )
     )
-
-
-def get_single_object(graph: Graph, subject, predicate):
-    """Get a single object for a subject-predicate pair"""
-    objects = get_objects(graph, subject, predicate)
-    if len(objects) != 1:
-        raise ValueError(f"Expected 1 object, got {len(objects)}")
-    return objects[0]
 
 
 def get_single_subject(graph: Graph, predicate, object):
@@ -72,11 +63,6 @@ def get_single_subject(graph: Graph, predicate, object):
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
-
-
-def get_objects(graph: Graph, subject, predicate):
-    """Get all objects for a subject-predicate pair"""
-    return list(graph.objects(subject, predicate))
 
 
 def get_subjects(graph: Graph, predicate, object):

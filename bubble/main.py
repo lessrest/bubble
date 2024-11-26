@@ -96,8 +96,6 @@ def show(
         await bubble.load_surfaces()
         await bubble.load_rules()
         await bubble.load_ontology()
-        conclusion = await bubble.reason()
-        print_n3(conclusion)
 
         n3_representation = bubble.graph.serialize(format="n3")
         message = initial_message(n3_representation)
@@ -106,13 +104,14 @@ def show(
             {"role": "user", "content": message},
         ]
 
-        while False:
+        while True:
             messages = history
             with claude(messages) as stream:
                 reply = await stream_normally(stream)
                 history.append({"role": "assistant", "content": reply})
 
                 # prompt user for chat message
+                console.rule()
                 user_message = console.input("> ")
                 if user_message == "/reason":
                     conclusion = await bubble.reason()

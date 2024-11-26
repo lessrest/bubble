@@ -7,7 +7,7 @@ from bubble.ns import JSON
 from bubble.n3_utils import select_rows
 
 
-def get_json_value(graph: Graph, node: _SubjectType) -> dict:
+def json_from_rdf(graph: Graph, node: _SubjectType) -> dict:
     return {
         row.key.toPython(): convert_json_value(graph, row.value)
         for row in select_rows(
@@ -28,12 +28,12 @@ def convert_json_value(graph: Graph, value: _SubjectType) -> str | dict:
     if isinstance(value, Literal):
         return value.toPython()
     elif isinstance(value, IdentifiedNode):
-        return get_json_value(graph, value)
+        return json_from_rdf(graph, value)
     else:
         raise ValueError(f"Unexpected value type: {type(value)}")
 
 
-def json_to_n3(graph: Graph, value: dict) -> BNode:
+def rdf_from_json(graph: Graph, value: dict) -> BNode:
     """Convert a Python dictionary to an RDF JSON object representation.
 
     Args:
@@ -46,7 +46,7 @@ def json_to_n3(graph: Graph, value: dict) -> BNode:
 
     def convert_value(val: Any) -> Union[BNode, Literal, URIRef]:
         if isinstance(val, dict):
-            return json_to_n3(graph, val)
+            return rdf_from_json(graph, val)
         elif val is None:
             return JSON.null
         else:

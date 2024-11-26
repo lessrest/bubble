@@ -7,13 +7,12 @@ from pathlib import Path
 import trio
 
 from rich import pretty
-from rdflib import RDF, URIRef
-from rdflib.graph import _ObjectType, _SubjectType
+from rdflib import URIRef
+from rdflib.graph import _SubjectType
 from rich.console import Console
 
-from bubble.ns import NT
-from bubble.n3_utils import print_n3, get_single_object
-from bubble.capabilities import HTTPRequestCapability
+from bubble.n3_utils import select_rows
+from bubble.capabilities import InvocationContext, capability_map
 
 console = Console()
 pretty.install()
@@ -27,14 +26,6 @@ class StepExecution:
     def __init__(self, base: str, step: Optional[str] = None):
         self.step = step
         self.base = base
-
-    def get_next_step(self, step: _SubjectType) -> _ObjectType:
-        """Get the next step in the process"""
-        return get_single_object(self.graph, step, NT.precedes)
-
-    def get_supposition(self, step: _SubjectType) -> _ObjectType:
-        """Get the supposition for a step"""
-        return get_single_object(self.graph, step, NT.supposes)
 
     async def reason(self) -> None:
         """Run the EYE reasoner on N3 files and update the processor's graph"""
@@ -57,56 +48,34 @@ class StepExecution:
         all_files = step_files + rule_files
         self.graph = await reason(all_files)
 
-    def get_invocation_details(
-        self, invocation: _SubjectType
-    ) -> Optional[_ObjectType]:
-        """Get the parameter and target type for an invocation"""
-        try:
-            target = get_single_object(self.graph, invocation, NT.invokes)
-            target_type = get_single_object(self.graph, target, RDF.type)
-            return target_type
-        except ValueError:
-            return None
-
     async def process_invocations(self, step: _SubjectType) -> None:
-        """Process all invocations for a step"""
-        from bubble.capabilities import ShellCapability
+        rows = select_rows(
+            self.graph,
+            """
+            SELECT ?invocation ?capability_type
+            WHERE {
+                ?invocation a nt:Invocation .
+                ?step nt:invokes ?invocation .
+                ?invocation nt:invokes ?target .
+                ?target a ?capability_type .
+            }
+            """,
+            {"step": step},
+        )
 
-        print_n3(self.graph)
-
-        invocations = list(self.graph.objects(step, NT.invokes))
-        if not invocations:
-            return
-
-        console.print(f"Processing {len(invocations)} invocations")
-        console.rule()
+        console.print(f"Processing {len(rows)} invocations")
 
         async with trio.open_nursery() as nursery:
-            for invocation in invocations:
-                capability_map = {
-                    NT.ShellCapability: ShellCapability,
-                    NT.POSTCapability: HTTPRequestCapability,
-                }
-                target_type = self.get_invocation_details(invocation)
-                if target_type in capability_map:
-                    capability = capability_map[target_type]
-                    nursery.start_soon(
-                        capability(self.graph, invocation).execute
-                    )
+            for invocation, capability_type in rows:
+                cap = capability_map[capability_type]
+                ctx = InvocationContext(self.graph, invocation)
+                nursery.start_soon(cap, ctx)
 
     async def process(self) -> None:
         """Main processing method"""
         try:
             step = URIRef(f"{self.base}#step")
-            print(f"Processing step: {step}")
-            next_step = self.get_next_step(step)
-            if not next_step:
-                raise ValueError("No next step found in the graph")
-
-            supposition = self.get_supposition(next_step)
-            if not supposition:
-                raise ValueError("No supposition found for the next step")
-
+            console.print(f"Processing step: {step}")
             await self.process_invocations(step)
 
         except* Exception as e:

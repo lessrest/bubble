@@ -3,7 +3,7 @@ import pytest
 from rdflib import Graph, Literal, Variable
 
 from bubble.ns import JSON
-from bubble.jsonrdf import json_to_n3, get_json_value, convert_json_value
+from bubble.jsonrdf import rdf_from_json, json_from_rdf, convert_json_value
 from bubble.n3_utils import New, select_rows
 
 
@@ -21,7 +21,7 @@ def new(graph):
 
 
 def test_get_json_value(graph, new):
-    assert get_json_value(
+    assert json_from_rdf(
         graph,
         new(
             JSON.Object,
@@ -68,7 +68,7 @@ def test_convert_json_value_invalid():
 
 def test_json_to_n3_simple(graph):
     """Test converting simple Python dict to RDF"""
-    root = json_to_n3(graph, {"key": "value"})
+    root = rdf_from_json(graph, {"key": "value"})
     rows = select_rows(
         graph,
         """
@@ -82,7 +82,7 @@ def test_json_to_n3_simple(graph):
 
 def test_json_to_n3_nested(graph):
     """Test converting nested dict structures"""
-    root = json_to_n3(graph, {"outer": {"inner": "value"}})
+    root = rdf_from_json(graph, {"outer": {"inner": "value"}})
     rows = select_rows(
         graph,
         """
@@ -105,7 +105,7 @@ def test_json_to_n3_nested(graph):
 
 def test_json_to_n3_null(graph):
     """Test handling null values"""
-    root = json_to_n3(graph, {"key": None})
+    root = rdf_from_json(graph, {"key": None})
 
     rows = select_rows(
         graph,

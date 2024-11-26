@@ -6,7 +6,6 @@ import pytest
 from rdflib import BNode, Graph, URIRef, Namespace
 
 from bubble.n3 import StepExecution
-from bubble.n3_utils import get_objects, get_single_object
 
 # Test namespaces
 SWA = Namespace("https://swa.sh/")
@@ -71,35 +70,6 @@ async def shell_processor(shell_command_n3: LiteralString, tmp_path: Path):
     execution = StepExecution(base="https://test.example/", step=str(n3_file))
     await execution.reason()
     return execution
-
-
-def test_get_next_step(processor: StepExecution):
-    """Test getting the next step from a graph"""
-    step = URIRef("https://test.example/#")
-    next_step = processor.get_next_step(step)
-    assert next_step == URIRef("https://test.example/next")
-
-
-def test_get_supposition(processor: StepExecution):
-    """Test getting the supposition for a step"""
-    next_step = URIRef("https://test.example/next")
-    supposition = processor.get_supposition(next_step)
-    assert supposition == URIRef("https://test.example/supposition")
-
-
-def test_get_single_object(processor: StepExecution):
-    """Test get_single_object utility function"""
-    step = URIRef("https://test.example/#")
-    next_step = get_single_object(processor.graph, step, NT.precedes)
-    assert next_step == URIRef("https://test.example/next")
-
-
-def test_get_objects(processor: StepExecution):
-    """Test get_objects utility function"""
-    step = URIRef("https://test.example/#")
-    objects = get_objects(processor.graph, step, NT.precedes)
-    assert len(objects) == 1
-    assert objects[0] == URIRef("https://test.example/next")
 
 
 async def test_process_shell_command(shell_processor: StepExecution):
