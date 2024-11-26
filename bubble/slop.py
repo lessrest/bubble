@@ -1,3 +1,4 @@
+import os
 import anthropic
 
 from rich.console import Console
@@ -25,7 +26,7 @@ async def stream_sentences(stream, initial_sentence=""):
                     )
 
                 # Remove trailing period if present
-                sentence_content = sentence_content.rstrip('.')
+                sentence_content = sentence_content.rstrip(".")
 
                 # Only process if there's actual content
                 if sentence_content.strip():
@@ -42,11 +43,14 @@ async def stream_sentences(stream, initial_sentence=""):
     # Handle any final incomplete sentence
     if current_sentence.strip():
         if "<sentence>" in current_sentence:
-            _, sentence_content = current_sentence.rsplit("<sentence>", 1)
-            sentence_content = sentence_content.rstrip('.')
+            _, sentence_content = current_sentence.rsplit(
+                "<sentence>", 1
+            )
+            sentence_content = sentence_content.rstrip(".")
             if sentence_content.strip():
                 cleaned_sentence = " ".join(
-                    line.strip() for line in sentence_content.splitlines()
+                    line.strip()
+                    for line in sentence_content.splitlines()
                 )
                 yield cleaned_sentence
 
