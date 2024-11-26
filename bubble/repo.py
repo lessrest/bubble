@@ -52,6 +52,7 @@ class Bubble:
 
             machine_id = mint.machine_id()
             machine = SWA[machine_id]
+            graph.add((machine, RDF.type, NT.Computer))
 
             head = mint.fresh_secure_iri(SWA)
             creation_activity = mint.fresh_secure_iri(SWA)
