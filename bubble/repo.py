@@ -14,7 +14,7 @@ from trio import Path
 from rdflib import RDF, XSD, Graph, Literal, URIRef
 
 from bubble.id import Mint
-from bubble.ns import NT, SWA
+from bubble.ns import AS, NT, SWA
 from bubble.n3_utils import get_single_subject
 
 
@@ -49,14 +49,18 @@ class Bubble:
 
             graph.add((base, RDF.type, NT.Bubble))
 
+            machine_id = mint.machine_id()
+            machine = SWA[machine_id]
+
             head = mint.fresh_secure_iri(SWA)
-            graph.add(
-                (
-                    head,
-                    NT.created,
-                    Literal(datetime.now(UTC), datatype=XSD.dateTime),
-                )
-            )
+            creation_activity = mint.fresh_secure_iri(SWA)
+            graph.add((creation_activity, RDF.type, AS.Create))
+            graph.add((creation_activity, AS.actor, machine))
+            graph.add((creation_activity, AS.object, base))
+
+            now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
+            graph.add((creation_activity, AS.published, now))
+
             graph.add((base, NT.pointsTo, head))
             graph.add((head, RDF.type, NT.Step))
             graph.add((head, NT.ranks, Literal(1)))
