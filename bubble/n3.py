@@ -3,7 +3,7 @@
 from typing import Tuple, Optional
 import trio
 from rich import pretty
-from rdflib import RDF, Graph, URIRef
+from rdflib import RDF, URIRef
 from rdflib.graph import _SubjectType, _ObjectType
 from rich.console import Console
 from pathlib import Path
@@ -27,23 +27,6 @@ class StepExecution:
     def __init__(self, step: Optional[str] = None, base: str = DEFAULT_BASE):
         self.step = step
         self.base = base
-        self.graph = Graph(base=base)
-
-        # Load all core rules from the rules directory
-        core_rule_files = glob(str(CORE_RULES_DIR / "*.n3"))
-        for rule_file in core_rule_files:
-            self.graph.parse(rule_file, format="n3")
-
-        # If a specific step file is provided, load it
-        if step:
-            if Path(step).is_dir():
-                # If step is a directory, load all .n3 files in it
-                n3_files = glob(str(Path(step) / "*.n3"))
-                for n3_file in n3_files:
-                    self.graph.parse(n3_file, format="n3")
-            else:
-                # Load single file
-                self.graph.parse(step, format="n3")
 
     def get_next_step(self, step: _SubjectType) -> _ObjectType:
         """Get the next step in the process"""

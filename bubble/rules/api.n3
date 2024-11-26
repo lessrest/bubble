@@ -136,3 +136,49 @@ ai:ReplicateWebService a nt:WebService ;
            ] 
        ] 
 } .
+
+# If we have an S3 credential, we can use rclone.
+{
+   ?credential a nt:S3Credential ;
+       nt:hasClientID ?clientID ;
+       nt:hasClientSecret ?clientSecret ;
+       nt:hasEndpoint ?endpoint 
+}
+=> 
+{
+   [] a nt:RcloneConfiguration ;
+       nt:has [
+           nt:environmentVariable "RCLONE_S3_ACCESS_KEY_ID" ;
+           nt:value ?clientID 
+       ] , [
+           nt:environmentVariable "RCLONE_S3_SECRET_ACCESS_KEY" ;
+           nt:value ?clientSecret 
+       ] , [
+           nt:environmentVariable "RCLONE_S3_ENDPOINT" ;
+           nt:value ?endpoint 
+       ] , [
+           nt:environmentVariable "RCLONE_S3_ENV_AUTH" ;
+           nt:value "true" 
+       ] 
+} .
+
+# If we have a POST request, we invoke the POST capability.
+#
+# Actually, we should check for a POST request in an outbox,
+# and remove it from the outbox after invoking the capability.
+{
+   ?request a nt:POSTRequest ;
+       nt:hasURL ?url ;
+       nt:posts ?body .
+   ?post a nt:POSTCapability .
+   nt:nonce nt:ranks ?rank .
+   ?step nt:ranks ?rank 
+}
+=> 
+{
+   ?step nt:invokes [
+       a nt:Invocation ;
+       nt:invokes ?post ;
+       nt:provides ?request 
+   ] 
+} .

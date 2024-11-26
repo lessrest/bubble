@@ -6,7 +6,6 @@ import tempfile
 from abc import ABC, abstractmethod
 from typing import Iterable, Optional
 
-from rich import inspect
 import trio
 
 from rdflib import BNode, Graph, Literal, URIRef, RDF
@@ -172,8 +171,6 @@ class HTTPRequestCapability(Capability):
         )
 
         response_value = response.json()
-
-        inspect(response_value)
 
         result_node = json_to_n3(graph, response_value)
         graph.add((invocation, NT.result, result_node))

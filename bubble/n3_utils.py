@@ -95,6 +95,10 @@ The RDF representation uses a custom JSON ontology with the following structure:
         json:has [
             json:property "age" ;
             json:value 30
+        ] ;
+        json:has [
+            json:property "children" ;
+            json:value json:null
         ]
     ]
 """
@@ -121,7 +125,10 @@ def get_json_value(graph: Graph, node: _SubjectType) -> dict:
         if isinstance(value, Literal):
             result[key] = value.toPython()
         elif isinstance(value, IdentifiedNode):
-            result[key] = get_json_value(graph, value)
+            if value.toPython() == JSON.null:
+                result[key] = None
+            else:
+                result[key] = get_json_value(graph, value)
         else:
             raise ValueError(f"Unexpected value type: {type(value)}")
     return result
@@ -145,6 +152,8 @@ def json_to_n3(graph: Graph, value: dict) -> BNode:
         graph.add((prop, JSON["key"], Literal(key)))
         if isinstance(value, dict):
             graph.add((prop, JSON["val"], json_to_n3(graph, value)))
+        elif value is None:
+            graph.add((prop, JSON["val"], JSON.null))
         else:
             graph.add((prop, JSON["val"], Literal(value)))
     return bn

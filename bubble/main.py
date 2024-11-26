@@ -57,21 +57,21 @@ def main(
 ) -> None:
     """Process N3 files with optional reasoning and skolemization."""
     try:
-        processor = StepExecution(input_path)
+        execution = StepExecution(input_path)
 
         # Apply reasoning if requested
         if reason:
-            trio.run(processor.reason)
+            trio.run(execution.reason)
 
         if invoke:
-            trio.run(processor.process)
+            trio.run(execution.process)
 
         # Apply skolemization if requested
         if skolem:
             raise NotImplementedError("Skolemization not implemented")
 
         # Output the result
-        handle_output(processor.graph, output_path, "Output written to")
+        handle_output(execution.graph, output_path, "Output written to")
 
     finally:
         pass
