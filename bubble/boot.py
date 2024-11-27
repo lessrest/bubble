@@ -144,7 +144,7 @@ def describe_machine(info, machine, filesystem, user):
         NT.ComputerMachine,
         {
             RDFS.label: langstr(
-                f"{info['person_name']}'s {info['system_type']} computer",
+                "a computer machine",
             ),
             NT.hosts: [
                 describe_posixenv(info, filesystem, user),
@@ -167,7 +167,7 @@ def describe_ram(info):
             NT.byteSize: Literal(info["byte_size"]),
             NT.gigabyteSize: info["gigabyte_size"],
             RDFS.label: langstr(
-                f"the RAM of {info['person_name']}'s {info['system_type']} computer",
+                "a random access memory unit",
             ),
         },
     )
@@ -179,7 +179,7 @@ def describe_cpu(info):
         {
             NT.architecture: info["architecture"],
             RDFS.label: langstr(
-                f"the CPU of {info['person_name']}'s {info['system_type']} computer",
+                "a central processing unit",
             ),
         },
     )
@@ -192,7 +192,7 @@ def describe_os(info):
             NT.type: info["system_type"],
             NT.version: info["system_version"],
             RDFS.label: langstr(
-                f"the {info['system_type']} operating system installed on {info['hostname']}",
+                f"operating system on {info['hostname']}",
             ),
         },
     )

@@ -1,38 +1,47 @@
-from typing import Any
+import logging
+from rdflib import IdentifiedNode, Literal
+from rdflib.collection import Collection
+from bubble.mint import fresh_uri
+from bubble.prfx import JSON, SWA
+from bubble.util import O, S, is_a, new, select_rows
+from bubble.vars import current_graph
 
-from rdflib import Literal, IdentifiedNode
-from rdflib.graph import _SubjectType
 
-from bubble.prfx import JSON
-from bubble.util import O, S, new, select_rows
+def json_from_rdf(
+    node: O,
+) -> dict | list | str | bool | int | float | None:
+    if node == JSON.null:
+        return None
 
+    if isinstance(node, Literal):
+        return node.toPython()
 
-def json_from_rdf(node: _SubjectType) -> dict:
-    return {
-        row.key.toPython(): convert_json_value(row.value)
-        for row in select_rows(
-            """
+    if is_a(node, JSON.Array):
+        assert isinstance(node, IdentifiedNode)
+        list = Collection(current_graph.get(), node)
+        return [json_from_rdf(item) for item in list]
+    if is_a(node, JSON.Object):
+        return {
+            row.key.toPython(): json_from_rdf(row.value)
+            for row in select_rows(
+                """
             SELECT ?key ?value WHERE {
                 ?node json:has ?prop .
                 ?prop json:key ?key .
                 ?prop json:val ?value .
             }
             """,
-            {"node": node},
-        )
-    }
+                {"node": node},
+            )
+        }
 
 
-def convert_json_value(value: _SubjectType) -> str | dict:
-    if isinstance(value, Literal):
-        return value.toPython()
-    elif isinstance(value, IdentifiedNode):
-        return json_from_rdf(value)
-    else:
-        raise ValueError(f"Unexpected value type: {type(value)}")
+logger = logging.getLogger(__name__)
 
 
-def rdf_from_json(value: dict) -> S:
+def rdf_from_json(
+    value: dict | None | str | bool | int | float | list,
+) -> S:
     """Convert a Python dictionary to an RDF JSON object representation.
 
     Args:
@@ -42,19 +51,27 @@ def rdf_from_json(value: dict) -> S:
         A blank node representing the root of the JSON object in RDF
     """
 
-    def convert_value(val: Any) -> O:
-        if isinstance(val, dict):
-            return rdf_from_json(val)
-        elif val is None:
-            return JSON.null
-        else:
-            return Literal(val)
+    if value is None:
+        return JSON.null
+    elif isinstance(value, dict):
+        props = []
+        for key, val in value.items():
+            prop = new(
+                JSON.Property,
+                {JSON.key: key, JSON.val: rdf_from_json(val)},
+            )
+            props.append(prop)
 
-    props = []
-    for key, val in value.items():
-        prop = new(
-            JSON.Property, {JSON.key: key, JSON.val: convert_value(val)}
+        return new(JSON.Object, {JSON.has: props})
+    elif isinstance(value, list):
+        items = []
+        for item in value:
+            items.append(rdf_from_json(item))
+
+        collection = Collection(
+            current_graph.get(), fresh_uri(SWA), items
         )
-        props.append(prop)
 
-    return new(JSON.Object, {JSON.has: props})
+        return new(JSON.Array, {}, collection.uri)
+    else:
+        return Literal(value)

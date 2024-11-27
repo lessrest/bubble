@@ -15,7 +15,7 @@ from rdflib.graph import _TripleType, QuotedGraph
 from bubble.prfx import AS, NT, SWA
 
 
-graphvar = ContextVar("graph", default=Graph())
+current_graph = ContextVar("graph", default=Graph())
 
 
 @contextmanager
@@ -39,12 +39,12 @@ def using_graph(graph: Graph):
     This is a convenience wrapper around using() for the common case
     of injecting a graph dependency.
     """
-    with using(graphvar, graph):
+    with using(current_graph, graph):
         yield graph
 
 
 def quote(triples: Sequence[_TripleType]) -> QuotedGraph:
-    quoted = QuotedGraph(graphvar.get().store, fresh_iri())
+    quoted = QuotedGraph(current_graph.get().store, fresh_iri())
     for subject, predicate, object in triples:
         quoted.add((subject, predicate, object))
     return quoted
@@ -55,7 +55,7 @@ def langstr(s: str) -> Literal:
 
 
 def bind_prefixes():
-    g = graphvar.get()
+    g = current_graph.get()
     g.bind("swa", SWA)
     g.bind("nt", NT)
     g.bind("as", AS)

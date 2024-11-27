@@ -1,9 +1,10 @@
 """Utility functions for N3 processing."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
+import trio
 
-from rdflib import RDF, Graph, IdentifiedNode, Literal
+from rdflib import RDF, Graph, Literal
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
@@ -14,7 +15,7 @@ from bubble.prfx import NT, SWA, JSON
 
 S = _SubjectType
 P = _PredicateType
-O = _ObjectType  # noqa: E741
+O = _ObjectType
 
 
 class New:
@@ -56,14 +57,18 @@ class New:
         return subject
 
 
-def print_n3(graph: Optional[Graph] = None) -> None:
+def print_n3() -> None:
     """Print the current graph in N3 format"""
     from rich import print
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    g = graph if graph is not None else current_graph.get()
-    n3 = g.serialize(format="n3").replace("    ", "  ").strip()
+    n3 = (
+        current_graph.get()
+        .serialize(format="n3")
+        .replace("    ", "  ")
+        .strip()
+    )
 
     print(
         Panel(
@@ -82,8 +87,21 @@ def get_single_subject(predicate, object):
 
 def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
-    g = current_graph.get()
-    return list(g.subjects(predicate, object))
+    return list(current_graph.get().subjects(predicate, object))
+
+
+async def reason(input_paths: Sequence[str]) -> Graph:
+    """Run the EYE reasoner on N3 files and update the current graph"""
+    cmd = ["eye", "--nope", "--pass", *input_paths]
+
+    with trio.move_on_after(1):
+        result = await trio.run_process(
+            cmd, capture_stdout=True, capture_stderr=True, check=True
+        )
+
+    g = Graph()
+    g.parse(data=result.stdout.decode(), format="n3")
+    return g
 
 
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
@@ -105,19 +123,10 @@ def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
 def turtle(src: str) -> Graph:
     """Parse turtle data into the current graph"""
     with using_graph(Graph()) as graph:
-        graph.parse(data=src, format="n3")
+        graph.parse(data=src, format="turtle")
         graph.bind("nt", NT)
         return graph
 
 
 def new(*args, **kwargs):
     return New(current_graph.get())(*args, **kwargs)
-
-
-def is_a(subject: S, type: S) -> bool:
-    if isinstance(subject, IdentifiedNode):
-        return type in current_graph.get().objects(subject, RDF.type)
-    elif isinstance(subject, Literal):
-        return subject.datatype == type
-    else:
-        raise ValueError(f"Unexpected subject type: {subject}")

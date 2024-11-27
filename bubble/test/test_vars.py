@@ -1,20 +1,26 @@
 from rdflib import Graph, Literal, URIRef
-from bubble.vars import using_graph, graphvar, langstr, bind_prefixes, quote
+from bubble.vars import (
+    using_graph,
+    current_graph,
+    langstr,
+    bind_prefixes,
+    quote,
+)
 from bubble.prfx import AS, NT, SWA
 
 
 def test_using_graph():
     """Test that using_graph properly manages graph context"""
-    original_graph = graphvar.get()
+    original_graph = current_graph.get()
     test_graph = Graph()
 
     # Test context management
     with using_graph(test_graph) as g:
-        assert graphvar.get() is test_graph
+        assert current_graph.get() is test_graph
         assert g is test_graph
 
     # Verify original graph is restored
-    assert graphvar.get() is original_graph
+    assert current_graph.get() is original_graph
 
 
 def test_nested_using_graph():
@@ -23,10 +29,10 @@ def test_nested_using_graph():
     graph2 = Graph()
 
     with using_graph(graph1):
-        assert graphvar.get() is graph1
+        assert current_graph.get() is graph1
         with using_graph(graph2):
-            assert graphvar.get() is graph2
-        assert graphvar.get() is graph1
+            assert current_graph.get() is graph2
+        assert current_graph.get() is graph1
 
 
 def test_langstr():
@@ -68,15 +74,15 @@ def test_quote():
         predicate = URIRef("http://example.org/predicate")
         object = URIRef("http://example.org/object")
         triples = [(subject, predicate, object)]
-        
+
         # Create quoted graph
         quoted = quote(triples)
-        
+
         # Verify it's a QuotedGraph
         assert quoted.__class__.__name__ == "QuotedGraph"
-        
+
         # Verify the triple was added
         assert (subject, predicate, object) in quoted
-        
+
         # Verify it has a unique identifier
         assert quoted.identifier is not None

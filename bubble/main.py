@@ -9,7 +9,6 @@ from rich.console import Console
 from rich.logging import RichHandler
 from anthropic.types import MessageParam
 
-from bubble.mint import Mint
 from bubble.repo import BubbleRepo
 from bubble.slop import claude, stream_normally
 
@@ -38,8 +37,7 @@ def show(
     """Process N3 files with optional reasoning and skolemization."""
 
     async def run():
-        mint = Mint()
-        bubble = await BubbleRepo.open(trio.Path(input_path), mint)
+        bubble = await BubbleRepo.open(trio.Path(input_path))
         await bubble.load_surfaces()
         await bubble.load_rules()
         await bubble.load_ontology()

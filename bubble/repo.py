@@ -24,6 +24,7 @@ from bubble.boot import describe_new_bubble
 from bubble.mind import reason
 from bubble.prfx import NT
 from bubble.util import get_single_subject
+from bubble.vars import using_graph, current_graph
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class BubbleRepo:
         self.workdir = path
         self.rootpath = path / "root.n3"
         self.bubble = base
-        self.graph = Graph()
+        self.graph = current_graph.get()
 
     async def load_many(
         self,
@@ -85,8 +86,8 @@ class BubbleRepo:
 
     async def load_rules(self) -> None:
         """Load all rules from the system rules directory"""
-        rules_dir = Path(__file__).parent / "rules"
-        await self.load_many(rules_dir, "*.n3", "rules")
+        rules_dir = Path(__file__).parent / "rule"
+        await self.load_many(rules_dir, "*.n3", "rule")
 
     async def reason(self) -> Graph:
         """Reason over the graph"""
@@ -109,7 +110,8 @@ class BubbleRepo:
             g = Graph()
             g.parse(path / "root.n3", format="n3")
 
-            bubble = get_single_subject(RDF.type, NT.Bubble)
+            with using_graph(g):
+                bubble = get_single_subject(RDF.type, NT.Bubble)
 
             assert isinstance(bubble, URIRef)
             return BubbleRepo(path, URIRef(bubble))

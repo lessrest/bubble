@@ -1,15 +1,19 @@
+import math
+import string
+
 import pytest
+import hypothesis.strategies as st
 
-from rdflib import Graph, Literal, Variable
+from rdflib import XSD, Graph, Literal, Variable
+from hypothesis import given
 
-from bubble.vars import using_graph
-from bubble.prfx import JSON
 from bubble.json import (
-    rdf_from_json,
     json_from_rdf,
-    convert_json_value,
+    rdf_from_json,
 )
-from bubble.util import new, select_rows
+from bubble.prfx import JSON
+from bubble.util import is_a, new, select_rows
+from bubble.vars import using_graph
 
 
 @pytest.fixture
@@ -39,12 +43,12 @@ def test_get_json_value(graph: Graph):
 
 def test_convert_json_value_literal():
     literal = Literal("test")
-    result = convert_json_value(literal)
+    result = json_from_rdf(literal)
     assert result == "test"
 
 
 def test_convert_json_value_object(graph: Graph):
-    assert convert_json_value(
+    assert json_from_rdf(
         new(
             JSON.Object,
             {
@@ -63,7 +67,7 @@ def test_convert_json_value_object(graph: Graph):
 def test_convert_json_value_invalid():
     """Test handling invalid value types"""
     with pytest.raises(ValueError):
-        convert_json_value(Variable("test"))
+        json_from_rdf(Variable("test"))
 
 
 def test_json_to_n3_simple(graph):
@@ -116,3 +120,32 @@ def test_json_to_n3_null():
         {"root": root},
     )
     assert rows == [(Literal("key"), JSON.null)]
+
+
+json = st.recursive(
+    st.none() | st.booleans() | st.floats() | st.text(string.printable),
+    lambda children: st.lists(children)
+    | st.dictionaries(st.text(string.printable), children),
+)
+
+
+@given(json)
+def test_json_to_rdf_roundtrip(json_data):
+    """Test converting JSON to RDF and back"""
+    rdf_data = rdf_from_json(json_data)
+    if isinstance(json_data, float) and math.isnan(json_data):
+        x = json_from_rdf(rdf_data)
+        assert isinstance(x, float)
+        assert math.isnan(x)
+    else:
+        assert json_from_rdf(rdf_data) == json_data
+
+
+@given(st.integers())
+def test_integer_typing(integer: int):
+    assert is_a(rdf_from_json(integer), XSD.integer)
+
+
+@given(st.floats())
+def test_float_typing(float: float):
+    assert is_a(rdf_from_json(float), XSD.double)
