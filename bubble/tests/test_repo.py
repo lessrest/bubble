@@ -8,8 +8,7 @@ from bubble.mint import Mint
 @pytest.fixture
 async def temp_repo(tmp_path):
     """Create a temporary repository for testing"""
-    mint = Mint()
-    repo = await BubbleRepo.open(trio.Path(tmp_path), mint)
+    repo = await BubbleRepo.open(trio.Path(tmp_path))
     return repo
 
 

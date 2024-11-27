@@ -38,9 +38,6 @@ class BubbleRepo:
     # The path to the bubble's root.n3 file
     rootpath: Path
 
-    # The mint used to generate IRIs
-    minter: Mint
-
     # The bubble's IRI
     bubble: _SubjectType
 
@@ -50,7 +47,6 @@ class BubbleRepo:
     def __init__(self, path: Path, base: _SubjectType):
         self.workdir = path
         self.rootpath = path / "root.n3"
-        self.minter = mintvar.get()
         self.bubble = base
         self.graph = Graph()
 
@@ -100,7 +96,7 @@ class BubbleRepo:
         return conclusion
 
     @staticmethod
-    async def open(path: Path, mint: Mint) -> "BubbleRepo":
+    async def open(path: Path) -> "BubbleRepo":
         if not await trio.Path(path).exists():
             await trio.Path(path).mkdir(parents=True)
 
