@@ -1,271 +1,170 @@
-# Bubble - N3 Processing Framework
+# Bubble
 
-A semantic web framework that uses N3 rules to process data and generate content. Built with Python, RDFLib, and the EYE reasoner.
+An experimental framework exploring personal knowledge spaces and their interconnections. It aims to create environments where formal semantics, natural language, and computation flow together like a carefully crafted Belgian tripel.
 
-## Features
+## The Bubble Metaphor
 
-- 🔍 **N3 Processing** - Process N3 files with logical inference
-- 🐚 **Shell Integration** - Execute shell commands through N3 rules
-- 🎨 **Art Generation** - Generate images using AI models
-- 🧪 **Test Driven** - Comprehensive pytest test suite
+A bubble is a personal world of knowledge, capabilities, and commitments - your epistemological horizon. Like all living things, we exist in our own local, particular spheres of understanding and action. But bubbles aren't isolated:
+
+- Each bubble is a Git repository containing RDF graphs and N3 rules
+- Bubbles can link to other bubbles, forming what we call "froth"
+- Froth is a mesh network of knowledge spaces, carefully brewed together
+- Bubbles can replicate across machines while maintaining their identity
+- The system maintains awareness of its own distributed nature
+
+This metaphor plays with the tension between necessary insularity (we all live in our bubbles) and meaningful connection (bubbles touch, merge, and interact). The goal isn't to "break out" of our bubbles, but to make them more transparent, structured, and interlinked.
+
+## Vision
+
+Bubble explores what computing might look like if we move beyond traditional information management paradigms toward a unified semantic foundation. Key ideas:
+
+- Using knowledge graphs as a formal grounding layer for both LLMs and humans
+- Treating computation itself as a semantic domain that can be reasoned about
+- Breaking down the walls between "apps" through shared semantic understanding
+- Creating fluid interfaces between natural and formal languages
+- Building a "froth" of interconnected personal knowledge spaces
+
+The project combines:
+- RDF/N3 for knowledge representation
+- Logic programming through Prolog and the EYE reasoner
+- Modern web tech (FastAPI, HTMX, Tailwind)
+- Language models (via Anthropic's Claude)
+- Structured concurrency with Trio
+
+## Current State
+
+This is an exploratory research project, currently focusing on:
+
+- `bubble/repo.py`: Git-based RDF/N3 document management
+- `bubble/mind.py`: EYE reasoner integration for logical inference
+- `bubble/http.py`: Web interface with HTMX for fluid interactions
+- `bubble/main.py`: CLI interface with LLM-powered graph exploration
+
+The system maintains a knowledge graph about its own state and capabilities, which serves as both:
+1. A formal model that can be reasoned about by the system
+2. A grounding context for language model interactions
+
+## Prerequisites
+
+- Python 3.13+
+- Node.js (for Tailwind CSS)
+- SWI-Prolog: A modern implementation of Prolog, the original logical programming language. While often overlooked in today's landscape, Prolog represents one of computing's most elegant approaches to knowledge representation and reasoning.
+- EYE reasoner (clone from https://github.com/josd/eye)
+- Git
+- API keys for language models (currently Claude)
 
 ## Quick Start
 
-This repository includes a GitHub Dev Container configuration that automatically
-sets up:
-
-- Python
-- SWI-Prolog
-- EYE Reasoner
-
-Just open in GitHub Codespaces or VS Code with Dev Containers to get started
-immediately!
-
 ```bash
-# Create virtual environment and install dependencies
-python -m venv .venv
+# Clone the repository
+git clone https://github.com/lessrest/bubble.git
+cd bubble
+
+# Create Python virtual environment
+uv venv
+
+# Option 1: Using direnv (recommended)
+# First install direnv (https://direnv.net)
+# The .envrc will automatically activate the venv
+direnv allow
+
+# Option 2: Manual venv activation
 source .venv/bin/activate
-pip install -e .
 
-# Run the tests
-pytest
+# Install dependencies
+uv sync
 
-# Process an N3 file
-python -m bubble < input.n3
+# Install Node.js dependencies
+npm install
+
+# Set up your environment
+cp .env.example .env
+# Edit .env to add your API keys
+
+# Start the development environment
+overmind start
 ```
 
-## Running with Docker
-
-```bash
-make docker-build
-make docker-run
-```
-
-## Feature Progress
-
-### Implemented ✅
-
-- HTTP Request to RDF conversion
-- N3 rule-based request handling
-- Declarative routing with N3 patterns
-- Basic ActivityPub inbox (GET/POST)
-- RDFS reasoning and type inference
-- Comprehensive test suite with RDF assertions
-
-### Coming Soon 🚧
-
-- Server Identity & Profile
-- HTML/HTMX Interface
-- Activity validation
-- Outbox implementation
-- Federation support
-
-When you start the server, it exposes a simple ActivityPub inbox implementation
-at `http://localhost:8000/users/alice/inbox`. The configuration is split into
-two files:
-
-1. `ground-facts.ttl` - Defines the basic ActivityPub structure:
-
-```n3
-@base <http://localhost:8000/>.
-@prefix ap: <http://www.w3.org/ns/activitystreams#>.
-
-</users/alice> a ap:Person;
-  ap:inbox </users/alice/inbox>.
-
-</users/alice/inbox> a ap:Collection.
-```
-
-2. `rules/inbox.n3` - Contains the N3 rules for handling requests
-
-The `@base` directive in the ground facts sets the base IRI to resolve relative
-paths, so `/users/alice/inbox` becomes
-`http://localhost:8000/users/alice/inbox`. The inbox implementation can:
-
-- Accept POST requests with new ActivityPub Notes
-- Return the collection contents via GET requests
-- Maintain the collection items between requests
-
-You can test it with curl:
-
-```bash
-# Get the inbox contents
-curl http://localhost:8000/users/alice/inbox
-
-# Post a new Note
-curl -X POST -H "Content-Type: application/turtle" \
-  -d '@prefix as: <http://www.w3.org/ns/activitystreams#>.
-      <#body> a as:Note; as:content "Hello Alice!".' \
-  http://localhost:8000/users/alice/inbox
-```
-
-## Example: ActivityPub Inbox with N3 Rules
-
-This example shows how to implement an ActivityPub inbox using N3 rules. N3
-rules are logical implications of the form: `{ condition } => { conclusion }`
-where both sides are RDF graph patterns.
-
-The framework:
-
-1. Converts HTTP requests into RDF graphs
-2. Applies N3 rules to match patterns and generate responses
-3. Converts response graphs back to HTTP responses
-
-When the response includes RDF graphs in the `http:body` predicate, they are
-automatically serialized as Turtle in the HTTP response body.
-
-```n3
-# First, declare our namespaces
-@prefix http: <http://www.w3.org/2011/http#>.
-@prefix as: <http://www.w3.org/ns/activitystreams#>.
-
-# Rule 1: GET request to an inbox
-# When we match:
-{
-  # An HTTP request...
-  ?request http:href ?collection;  # ...to some URL
-          http:method "GET" .      # ...using GET method
-
-  # And that URL identifies a Collection
-  ?collection a as:Collection.
-} => {
-  # Then generate a response...
-  ?response a http:Response;
-    http:respondsTo ?request;     # ...for this request
-    http:responseCode 200;        # ...with 200 OK status
-    http:contentType "application/turtle";  # ...as Turtle
-    # Include a graph in the response body
-    http:body {
-      ?collection a as:Collection
-    } .
-}.
-
-# Rule 2: Include collection items in GET response
-# This rule adds to the previous response
-{
-  ?request http:href ?collection;
-    http:method "GET" .
-
-  # Find the existing response
-  ?response a http:Response ;
-    http:respondsTo ?request .
-
-  # Match any items in the collection
-  ?collection ap:items ?item .
-} => {
-  # Add those items to the response body
-  ?response http:body {
-    ?collection ap:items ?item
-  } .
-}.
-
-# Rule 3: POST new items to the inbox
-{
-  # Match POST request
-  ?request http:href ?collection;
-          http:method "POST";
-          http:body ?object .     # Extract posted content
-
-  # Verify collection exists
-  ?collection a as:Collection .
-  # Verify posted content is a Note
-  ?object a as:Note .
-} => {
-  # Create success response
-  ?response a http:Response;
-    http:respondsTo ?request;
-    http:responseCode 201;
-    http:body "Activity accepted" .
-
-  # Add the Note to the collection
-  ?collection as:items ?object .
-}.
-```
-
-The framework handles all the RDF conversion:
-
-- Incoming requests become RDF graphs with `http:Request` type
-- Posted content in Turtle format is parsed into the request graph
-- Response graphs are converted back to HTTP responses
-- RDF graphs in `http:body` are serialized as Turtle
-
-This declarative approach lets us focus on the logic of what should happen
-rather than how to implement it. The rules engine handles matching patterns and
-generating the appropriate responses.
-
-## Example: HTML Pages in RDF
-
-The framework includes a way to represent HTML pages in RDF/Turtle format. This
-allows us to generate HTML responses using N3 rules and semantic data:
-
-```turtle
-# Define an HTML page
-[] a html:page;
-   html:title "Welcome";
-   html:body [
-     a html:p;
-     html:content "Hello World!"
-   ].
-```
-
-The framework automatically converts this RDF representation into proper HTML:
-
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Welcome</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-  </head>
-  <body>
-    <p>Hello World!</p>
-  </body>
-</html>
-```
-
-This approach allows us to:
-
-- Generate HTML pages from RDF data
-- Use semantic rules to determine page content
-- Keep HTML generation declarative
-- Mix HTML with other RDF responses
-
-HTTP requests are represented as RDF:
-
-```turtle
-_:request a http:Request;
-    http:path "/api/users/123";
-    http:method "GET".
-```
-
-## Key Features
-
-- Clean separation between routing logic and handlers
-- Pattern matching on URLs through N3 rules
-- Content negotiation via semantic rules
-- ActivityPub inbox/outbox handling
-- Session-based request contexts
+This will start:
+- FastAPI server on http://localhost:8000
+- Tailwind CSS watcher
+- pytest watcher
 
 ## Development
 
+The project uses Overmind to manage the development processes. The `Procfile` defines three main services:
+- `server`: The FastAPI application
+- `css`: Tailwind CSS watcher
+- `test`: pytest watcher
+
+Key commands:
 ```bash
-# Run tests
-deno task test
+# Start all development processes
+overmind start
 
-# Start dev server
-deno task dev
+# Connect to a specific process
+overmind connect server
+overmind connect css
+overmind connect test
 
-# Run specific test suites
-deno task test:server
-deno task test:rules
+# Explore your bubble's knowledge graph with LLM assistance
+python -m bubble.main show
 ```
 
-## License
+## Project Structure
 
-This project is licensed under the [GNU Affero GPL v3.0 or later](LICENSE.md),
-so watch out.
+- `/bubble`: Core Python package
+  - `repo.py`: RDF/N3 document management
+  - `mind.py`: EYE reasoner + LLM integration
+  - `http.py`: Web interface
+  - `main.py`: CLI interface
+- `/vocab`: RDF vocabularies and ontologies
+- `/rules`: N3 rules for inference
+- `/static`: Frontend assets
+
+## Design Philosophy
+
+Bubble explores several ambitious ideas:
+
+1. **Semantic Grounding**
+   - Using RDF as a formal foundation for system state
+   - Grounding LLM interactions in verifiable knowledge
+   - Making formal semantics accessible through natural language
+
+2. **Unified Computation**
+   - Breaking down application boundaries through shared semantics
+   - Treating all computation as queryable/manipulable knowledge
+   - Using rules and inference instead of traditional programming
+
+3. **Fluid Interfaces**
+   - Seamless transitions between formal and natural language
+   - UI as a projection of semantic knowledge
+   - Direct manipulation of the knowledge graph through conversation
+
+4. **Agent Architecture**
+   - LLMs as interpreters between human intent and formal semantics
+   - Knowledge graph as shared context for human-AI collaboration
+   - Reasoning about capabilities and permissions through formal logic
+
+5. **The Froth**
+   - Distributed networks of personal knowledge spaces
+   - Git as a synchronization and distribution layer
+   - Bubbles that know about their own distributed nature
+   - Careful brewing of shared understanding
+
+The project is intentionally experimental and speculative, focusing on exploring new paradigms rather than traditional application development. Like the Trappist monks and their dedication to brewing excellence, we're interested in crafting something with depth, character, and a touch of the divine.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Since this is an exploratory project, contributions should focus on:
+- Experimenting with novel human-AI interaction patterns
+- Exploring different approaches to semantic grounding
+- Improving the fluidity between formal and natural language
+- Adding interesting domains to reason about
+- Brewing new ways for bubbles to interact and form froth
+
+## License
+
+This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE.md).
+
+The AGPL is chosen deliberately - if you run a modified version of Bubble as a service, you must share your modifications. This aligns with our vision of collaborative knowledge and transparent computation.

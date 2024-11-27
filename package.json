@@ -1,0 +1,19 @@
+{
+  "name": "bubble",
+  "version": "1.0.0",
+  "description": "A semantic web framework that uses N3 rules to process data and generate content. Built with Python, RDFLib, and the EYE reasoner.",
+  "main": "index.js",
+  "scripts": {
+    "build": "tailwindcss -i ./bubble/static/css/input.css -o ./bubble/static/css/output.css",
+    "watch": "tailwindcss -i ./bubble/static/css/input.css -o ./bubble/static/css/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5"
+  }
+}

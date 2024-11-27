@@ -37,6 +37,7 @@ dependencies = [
     "pyright>=1.1.389",
     # Auto-rerun pytest on file changes
     "pytest-watcher>=0.4.3",
+    "pytest-watch>=0.2.0",
     # Cross-platform library for retrieving system information
     "psutil>=6.1.0",
     # Thin wrapper around the mock package for pytest

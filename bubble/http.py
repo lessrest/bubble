@@ -54,17 +54,8 @@ app = FastAPI(
     default_response_class=HypermediaResponse,
 )
 
-# # Add CORS middleware
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 cdn_scripts = [
-    "https://cdn.tailwindcss.com/?plugins=forms",
     "https://unpkg.com/htmx.org@2",
 ]
 
@@ -96,6 +87,7 @@ def base_html(title: str):
         with tag("head"):
             with tag("title"):
                 text(title)
+            tag("link", rel="stylesheet", href="/static/css/output.css")
             for script in cdn_scripts:
                 tag("script", src=script)
             tag("script", src="/live/index.js")
@@ -105,6 +97,20 @@ def base_html(title: str):
         with tag("body", classes="bg-slate-900 text-white"):
             yield
 
+
+def mount_static(
+    app: FastAPI, directory: str, mount_path: str = "/static"
+):
+    """
+    Mount a static files directory to the FastAPI application.
+    """
+    app.mount(
+        mount_path, StaticFiles(directory=directory), name="static"
+    )
+
+
+# Mount static files directory
+mount_static(app, "bubble/static")
 
 # Include the live router for websocket/live updates
 app.include_router(live_router)
@@ -134,17 +140,6 @@ def get_dashboard():
             else:
                 with tag("div", classes="text-red-500"):
                     text("No active session found. Please log in.")
-
-
-def mount_static(
-    app: FastAPI, directory: str, mount_path: str = "/static"
-):
-    """
-    Mount a static files directory to the FastAPI application.
-    """
-    app.mount(
-        mount_path, StaticFiles(directory=directory), name="static"
-    )
 
 
 def run_server(app: FastAPI):
