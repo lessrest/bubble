@@ -8,51 +8,30 @@ console = Console()
 
 async def stream_sentences(stream, initial_sentence=""):
     """Stream sentences from an Anthropic response, yielding each complete sentence."""
+    import re
+
+    # Start with any initial sentence fragment passed in
     current_sentence = initial_sentence
+
+    # Process each chunk from the stream
     for chunk in stream:
         if isinstance(chunk, anthropic.TextEvent):
+            # Add the new text to our current sentence buffer
             current_sentence += chunk.text
 
-            # Look for complete sentences
-            while "</sentence>" in current_sentence:
-                # Split on first </sentence> tag
-                parts = current_sentence.split("</sentence>", 1)
-                sentence_content = parts[0].strip()
+            # Keep extracting complete sentences while we have them
+            while match := re.search(
+                r"^(.*?[.!?])[ \n](.*)$", current_sentence, re.DOTALL
+            ):
+                # Extract the complete sentence and yield it
+                sentence_content = match.group(1)
+                # Keep the remainder for next iteration
+                current_sentence = match.group(2)
+                yield sentence_content
 
-                # Extract just the sentence content, ignoring any tags
-                if "<sentence>" in sentence_content:
-                    _, sentence_content = sentence_content.split(
-                        "<sentence>", 1
-                    )
-
-                # Remove trailing period if present
-                sentence_content = sentence_content.rstrip(".")
-
-                # Only process if there's actual content
-                if sentence_content.strip():
-                    # Handle multiline content by joining with spaces
-                    cleaned_sentence = " ".join(
-                        line.strip()
-                        for line in sentence_content.splitlines()
-                    )
-                    yield cleaned_sentence
-
-                # Keep remainder for next iteration
-                current_sentence = parts[1]
-
-    # Handle any final incomplete sentence
-    if current_sentence.strip():
-        if "<sentence>" in current_sentence:
-            _, sentence_content = current_sentence.rsplit(
-                "<sentence>", 1
-            )
-            sentence_content = sentence_content.rstrip(".")
-            if sentence_content.strip():
-                cleaned_sentence = " ".join(
-                    line.strip()
-                    for line in sentence_content.splitlines()
-                )
-                yield cleaned_sentence
+    # Yield any remaining text as the final sentence
+    if current_sentence:
+        yield current_sentence
 
 
 async def stream_normally(stream) -> str:
@@ -64,10 +43,6 @@ async def stream_normally(stream) -> str:
             text += chunk.text
             console.print(chunk.text, end="")
     console.print()
-
-    # Ensure we have complete XML tags
-    if text.count("<sentence>") != text.count("</sentence>"):
-        text += "</sentence>"
 
     return text
 
