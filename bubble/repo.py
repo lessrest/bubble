@@ -22,7 +22,6 @@ from rdflib.graph import _SubjectType
 
 from bubble.boot import describe_new_bubble
 from bubble.mind import reason
-from bubble.mint import Mint, mintvar
 from bubble.prfx import NT
 from bubble.util import get_single_subject
 

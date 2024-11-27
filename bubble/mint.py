@@ -75,3 +75,7 @@ def fresh_uri(namespace: Namespace) -> URIRef:
 
 def fresh_iri() -> URIRef:
     return fresh_uri(SWA)
+
+
+def fresh_id() -> str:
+    return mintvar.get().fresh_id()
