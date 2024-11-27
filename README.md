@@ -1,5 +1,7 @@
 # Bubble
 
+![Bubble Froth](froth.jpg)
+
 An experimental framework exploring personal knowledge spaces and their interconnections. It aims to create environments where formal semantics, natural language, and computation flow together like a carefully crafted Belgian tripel.
 
 ## The Bubble Metaphor
@@ -156,15 +158,16 @@ The project is intentionally experimental and speculative, focusing on exploring
 
 ## Contributing
 
-Since this is an exploratory project, contributions should focus on:
-- Experimenting with novel human-AI interaction patterns
-- Exploring different approaches to semantic grounding
-- Improving the fluidity between formal and natural language
-- Adding interesting domains to reason about
-- Brewing new ways for bubbles to interact and form froth
+Since this is an exploratory project, contributions should focus on
+
+- experimenting with novel human-AI interaction patterns;
+- exploring different approaches to semantic grounding;
+- improving the fluidity between formal and natural language;
+- adding interesting domains to reason about; or, especially,
+- brewing new ways for bubbles to interact and form froth.
 
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE.md).
 
-The AGPL is chosen deliberately - if you run a modified version of Bubble as a service, you must share your modifications. This aligns with our vision of collaborative knowledge and transparent computation.
+The AGPL is chosen deliberately. If you run a modified version of Bubble as a service, you must share your modifications with your users. This aligns with our vision of collaborative knowledge and transparent computation.
