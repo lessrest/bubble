@@ -11,6 +11,38 @@
     ],
     "python.defaultInterpreterPath": ".venv/bin/python",
     "python.testing.pytestEnabled": true,
-    "python.analysis.typeCheckingMode": "basic",
-    "makefile.configureOnOpen": false
+    "python.analysis.typeCheckingMode": "standard",
+    "makefile.configureOnOpen": false,
+    "github.copilot.chat.experimental.generateTests.codeLens": true,
+    "mentor.namespaces": [
+
+        {
+            "uri": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "defaultPrefix": "rdf"
+        },
+        {
+            "uri": "http://www.w3.org/2000/01/rdf-schema#",
+            "defaultPrefix": "rdfs"
+        },
+        {
+            "uri": "http://www.w3.org/ns/rdfa#",
+            "defaultPrefix": "rdfa"
+        },
+        {
+            "uri": "http://www.w3.org/2002/07/owl#",
+            "defaultPrefix": "owl"
+        },
+        {
+            "uri": "http://www.w3.org/2004/02/skos/core#",
+            "defaultPrefix": "skos"
+        },
+        {
+            "uri": "http://schema.org/",
+            "defaultPrefix": "schema"
+        },
+        {
+            "uri": "https://schema.org/",
+            "defaultPrefix": "schema"
+        }
+    ]
 }
