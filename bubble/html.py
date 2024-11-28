@@ -176,21 +176,6 @@ def tag(tagname: str, **kwargs):
     return context()
 
 
-def append_element(content: ET.Element):
-    parent = node.get()
-    parent.append(content)
-
-    @contextmanager
-    def context():
-        token = node.set(content)
-        try:
-            yield content
-        finally:
-            node.reset(token)
-
-    return context()
-
-
 def text(content: str):
     element = node.get()
     if len(element) > 0:
@@ -531,13 +516,6 @@ class ErrorMiddleware:
                 suppress=[starlette.middleware],
             )
             console.print(traceback)
-            # dump = console.export_html(
-            #     inline_styles=True,
-            #     theme=rich.terminal_theme.MONOKAI,
-            #     code_format="{code}",
-            # )
-
-            # raw_fragment(dump)
             text(console.export_text())
 
 
@@ -548,17 +526,3 @@ async def log_middleware(request: Request, call_next):
         f"{response.status_code} {request.method} {request.url}"
     )
     return response
-
-
-def xslt_document():
-    @contextmanager
-    def context():
-        with document() as doc:
-            with tag(
-                "xsl:stylesheet",
-                version="1.0",
-                xmlns_xsl="http://www.w3.org/1999/XSL/Transform",
-            ):
-                yield doc
-
-    return context()

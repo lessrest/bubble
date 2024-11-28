@@ -293,3 +293,40 @@ def test_elementtree_basics():
     result = ET.tostring(root, encoding="unicode", method="html")
     expected = '<html><head><title>Test</title></head><body class="content"><p>Hello <strong>World</strong>!</p></body></html>'
     assert result == expected
+
+
+def test_html_decorator_variations():
+    """Test different ways of using the HTMLDecorators API"""
+
+    @html.div(class_="container")
+    def container():
+        with tag("h1"):
+            text("Main Title")
+
+    @html("section", "content-section", data_role="content")
+    def section():
+        with tag("p"):
+            text("Section content")
+
+    @html.article(id="post-1", class_="blog-post")
+    def article():
+        container()
+        section()
+        with tag("footer"):
+            text("Article footer")
+
+    with document() as doc:
+        article()
+
+    result = doc.to_html(compact=True)
+
+    # Check the outer article element
+    assert '<article id="post-1" class="blog-post">' in result
+    # Check the nested container
+    assert '<div class="container"><h1>Main Title</h1></div>' in result
+    # Check the section with multiple attributes
+    assert 'class="content-section"' in result
+    assert 'data-role="content"' in result
+    assert "<p>Section content</p>" in result
+    # Check the footer
+    assert "<footer>Article footer</footer>" in result
