@@ -158,7 +158,7 @@ def resolve_architecture(arch):
     match arch:
         case "x86_64":
             architecture = NT.AMD64
-        case "arm64":
+        case "arm64" | "aarch64":
             architecture = NT.ARM64
         case _:
             raise ValueError(f"Unknown architecture: {arch}")

@@ -1,13 +1,11 @@
 """Tests for disk information functionality"""
 
-import platform
 import pytest
 import uuid
 
 from bubble.disk import get_disk_info
 
 
-@pytest.mark.trio
 async def test_get_disk_info_basic():
     """Test that get_disk_info returns valid data in the expected format"""
     info = await get_disk_info()
@@ -28,7 +26,6 @@ async def test_get_disk_info_basic():
     assert len(info["DiskUUID"]) > 0
 
 
-@pytest.mark.trio
 async def test_get_disk_info_stable_uuid():
     """Test that disk UUIDs are stable across multiple calls"""
     info1 = await get_disk_info()
@@ -41,7 +38,6 @@ async def test_get_disk_info_stable_uuid():
     assert isinstance(uuid_obj, uuid.UUID)
 
 
-@pytest.mark.trio
 async def test_get_disk_info_custom_mount():
     """Test getting disk info for a custom mount point"""
     # Use /tmp as it should exist on all POSIX systems
@@ -52,11 +48,7 @@ async def test_get_disk_info_custom_mount():
     assert "tmp" in info["VolumeName"].lower()
 
 
-@pytest.mark.skipif(
-    platform.system() != "Darwin",
-    reason="macOS-specific disk info test",
-)
-@pytest.mark.trio
+@pytest.mark.darwin
 async def test_get_disk_info_macos():
     """Test macOS-specific disk info features"""
     info = await get_disk_info()

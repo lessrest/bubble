@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+# Use .gitignore for exclusions
 # Use Python base image
 FROM python:3.13-slim
 
@@ -21,12 +23,18 @@ RUN mkdir -p /src && \
 # Set up app directory
 WORKDIR /app
 
-# Install Python dependencies
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
+# Install uv
+RUN pip install uv
+
+# Set up virtual environment path
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Copy application files
 COPY . .
+
+# Install Python dependencies
+RUN uv sync
 
 # Run tests by default
 CMD ["pytest"]
