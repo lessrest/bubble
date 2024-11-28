@@ -17,7 +17,6 @@ async def temp_repo(tmp_path):
         yield repo
 
 
-@pytest.mark.trio
 async def test_repo_initialization(temp_repo):
     """Test that a new repository is properly initialized"""
     logger.info("Testing repo initialization for %s", temp_repo.bubble)
@@ -38,7 +37,6 @@ async def test_repo_initialization(temp_repo):
     assert (temp_repo.bubble, RDF.type, NT.Bubble) in temp_repo.graph
 
 
-@pytest.mark.trio
 async def test_repo_load_surfaces(temp_repo):
     """Test loading surfaces into the repository"""
     # Create a test surface file
@@ -56,7 +54,6 @@ async def test_repo_load_surfaces(temp_repo):
     assert (test_subject, RDF.type, test_type) in temp_repo.graph
 
 
-@pytest.mark.trio
 async def test_repo_commit(temp_repo):
     """Test committing changes to the repository"""
     # Add a test file
@@ -76,7 +73,6 @@ async def test_repo_commit(temp_repo):
     ), "Working directory should be clean"
 
 
-@pytest.mark.trio
 async def test_repo_load_ontology(temp_repo):
     """Test loading ontology files"""
     await temp_repo.load_ontology()
@@ -84,7 +80,6 @@ async def test_repo_load_ontology(temp_repo):
     assert any(p == RDF.type for p in temp_repo.graph.predicates())
 
 
-@pytest.mark.trio
 async def test_repo_load_rules(temp_repo):
     """Test loading rule files"""
     await temp_repo.load_rules()
@@ -92,7 +87,6 @@ async def test_repo_load_rules(temp_repo):
     assert len(temp_repo.graph) > 0
 
 
-@pytest.mark.trio
 async def test_repo_git_config(temp_repo):
     """Test that Git configuration is set correctly"""
     # Get the bubble's email from the graph
