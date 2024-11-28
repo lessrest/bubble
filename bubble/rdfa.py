@@ -34,6 +34,7 @@ from bubble.html import (
     text,
     classes,
 )
+from bubble.vars import using
 
 router = APIRouter(
     prefix="/rdf", default_response_class=HypermediaResponse
@@ -49,6 +50,11 @@ language_preferences = contextvars.ContextVar(
     "language_preferences", default=["en", "sv", "lv"]
 )
 
+expansion_depth = contextvars.ContextVar("expansion_depth", default=0)
+visited_resources = contextvars.ContextVar(
+    "visited_resources", default=set()
+)
+
 
 @contextlib.contextmanager
 def language_context(langs: Sequence[str]):
@@ -57,6 +63,18 @@ def language_context(langs: Sequence[str]):
         yield
     finally:
         language_preferences.reset(token)
+
+
+@contextlib.contextmanager
+def expansion_context(depth: int):
+    """Context manager for controlling resource expansion depth."""
+    depth_token = expansion_depth.set(depth)
+    visited_token = visited_resources.set(set())
+    try:
+        yield
+    finally:
+        expansion_depth.reset(depth_token)
+        visited_resources.reset(visited_token)
 
 
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
@@ -166,21 +184,33 @@ def render_subresource(
             render_list(dataset.collection(subject), predicate)
         else:
             render_expander(subject, predicate)
+    elif isinstance(subject, URIRef):
+        render_expander(subject, predicate)
     else:
         render_value(subject, predicate)
 
 
-@html.div(
-    "bg-gray-800/30 dark:bg-gray-800/30 bg-gray-100/50 px-2 py-1",
-    "border-l-4 border-gray-300 dark:border-gray-700",
-    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
-    "hover:border-gray-400 dark:hover:border-gray-600",
-)
-@html.button("text-gray-900 dark:text-white")
+# @html.div(
+#     "bg-gray-800/30 dark:bg-gray-800/30 bg-gray-100/50 px-2 py-1",
+#     "border-l-4 border-gray-300 dark:border-gray-700",
+#     "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
+#     "hover:border-gray-400 dark:hover:border-gray-600",
+# )
 def render_expander(obj, predicate):
-    attr("hx-get", resource_path(obj))
-    attr("hx-swap", "outerHTML")
-    render_value(obj, predicate)
+    current_depth = expansion_depth.get()
+    visited = visited_resources.get()
+
+    # If we have depth remaining and haven't seen this resource yet
+    if current_depth > 0 and obj not in visited:
+        visited.add(obj)
+        with expansion_context(current_depth - 1):
+            rdf_resource(obj)
+    else:
+        # Render as expandable button if we're at depth 0 or already visited
+        with tag("button", classes="text-gray-900 dark:text-white"):
+            attr("hx-get", resource_path(obj))
+            attr("hx-swap", "outerHTML")
+            render_value(obj, predicate)
 
 
 @router.get("/resource/{subject:path}")
@@ -200,7 +230,7 @@ def get_rdf_resource(subject: str) -> None:
     "border-slate-300 dark:border-slate-700",
     "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
     "hover:border-slate-400 dark:hover:border-slate-600",
-    "px-2 py-1",
+    "mt-1",
 )
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     logger.info(f"Rendering RDF resource for {subject}")
@@ -287,13 +317,55 @@ def render_audio_player_and_header(subject, data, audio_url, duration):
     render_resource_header(subject, data)
 
 
-@html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2")
+@html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
 def render_properties(data):
-    if data["predicates"]:
-        for predicate, obj in data["predicates"]:
-            render_property(predicate, obj)
-    else:
+    if not data["predicates"]:
         classes("contents")
+        return
+
+    # Group predicates by predicate URI
+    grouped_predicates = {}
+    for predicate, obj in data["predicates"]:
+        if predicate not in grouped_predicates:
+            grouped_predicates[predicate] = []
+        grouped_predicates[predicate].append(obj)
+
+    # Render each group
+    with tag("dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2"):
+        for predicate, objects in grouped_predicates.items():
+            # Check if all objects are literals
+            all_literals = all(
+                isinstance(obj, Literal) for obj in objects
+            )
+
+            if all_literals and len(objects) > 1:
+                # Render multiple literals together
+                render_property_with_multiple_literals(
+                    predicate, objects
+                )
+            else:
+                # Render each object separately
+                for obj in objects:
+                    render_property(predicate, obj)
+
+
+@html.div("flex flex-col")
+def render_property_with_multiple_literals(predicate, literals):
+    render_property_label(predicate)
+    with tag("ul", classes="list-none"):
+        # Sort literals by language preference
+        prefs = language_preferences.get()
+        sorted_literals = sorted(
+            literals,
+            key=lambda x: [
+                prefs.index(x.language or ""),
+                x.language or "",
+                x.value,
+            ],
+        )
+        for obj in sorted_literals:
+            with tag("li", classes="ml-2"):
+                render_value(obj, predicate)
 
 
 @html.div("flex flex-col")
@@ -302,19 +374,32 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
+inside_property_label = contextvars.ContextVar(
+    "inside_property_label", default=False
+)
+
+
 def render_property_label(predicate):
     dataset = current_bubble.get().dataset
     label = get_label(dataset, predicate)
-    render_value(label or predicate)
+    token = inside_property_label.set(True)
+    try:
+        render_value(label or predicate)
+    finally:
+        inside_property_label.reset(token)
 
 
-@html.div("flex flex-row gap-2 justify-between")
+@html.div(
+    "flex flex-row gap-2 px-2 justify-between bg-blue-100/50 dark:bg-blue-700/10",
+    "border-b border-gray-300 dark:border-gray-700",
+)
 def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
         dataset = current_bubble.get().dataset
         type_label = get_label(dataset, data["type"])
-        render_value(type_label or data["type"])
+        with using(inside_property_label, True):
+            render_value(type_label or data["type"])
 
 
 @html.ul(
@@ -345,7 +430,7 @@ def render_value(obj: S, predicate: Optional[P] = None) -> None:
         _render_value_inner(obj)
 
 
-def _render_value_inner(obj: S) -> None:
+def _render_value_inner(obj: S, label: bool = False) -> None:
     if isinstance(obj, URIRef):
         _render_uri(obj)
     elif isinstance(obj, BNode):
@@ -370,12 +455,12 @@ def _render_uri(obj: URIRef) -> None:
     if label:
         # If we have a label, show it
         text(label)
-        # Add the CURIE in a smaller, dimmer font
-        prefix, namespace, name = (
-            dataset.namespace_manager.compute_qname(str(obj))
-        )
-        with tag("span", classes="text-sm opacity-60 pl-1"):
-            text(f"({prefix}:{name})")
+        # # Add the CURIE in a smaller, dimmer font
+        # prefix, namespace, name = (
+        #     dataset.namespace_manager.compute_qname(str(obj))
+        # )
+        # with tag("span", classes="text-sm opacity-60 pl-1"):
+        #     text(f"({prefix}:{name})")
     else:
         # If no label, show the CURIE as before
         prefix, namespace, name = (
@@ -385,7 +470,7 @@ def _render_uri(obj: URIRef) -> None:
         if prefix == "swa" and not any(c in name for c in "/."):
             with tag(
                 "span",
-                classes="font-mono max-w-[12ch] truncate inline-block align-bottom",
+                classes="font-mono max-w-[18ch] truncate inline-block align-bottom",
             ):
                 text(name)
         else:
@@ -523,14 +608,32 @@ def _render_date_literal(obj: Literal) -> None:
         t = arrow.get(obj.value)
         text(f"{t.humanize()}")
         attr("datetime", t.isoformat())
+    elif obj.datatype == XSD.date:
+        t = arrow.get(obj.value)
+        text(f"{t.humanize()}")
+        attr("datetime", t.isoformat())
     else:
         text(obj.value)
 
 
-@html.span("text-teal-600 dark:text-teal-400")
+@html.span(
+    "text-teal-600 dark:text-teal-400 inline-flex items-baseline"
+)
 def _render_language_literal(obj: Literal) -> None:
-    logger.info(f"Rendering language literal: {obj}")
-    text(obj.value)
+    assert obj.language
+    if not inside_property_label.get():
+        with tag(
+            "span",
+            classes="font-mono opacity-60 pr-1 text-xs language-tag",
+        ):
+            text(obj.language)
+        with tag(
+            "span",
+            classes="font-serif text-stone-600 dark:text-stone-400",
+        ):
+            text(f"{obj.value}")
+    else:
+        text(obj.value)
 
 
 @html.span("text-orange-600 dark:text-orange-400")
