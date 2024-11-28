@@ -28,32 +28,41 @@ dependencies = [
     # Official Anthropic API client for Claude models
     "anthropic==0.39.*",
     # Globally unique ID generator
-    "py-xid>=1.0.0",
+    "py-xid==1.*",
     # Cross-platform unique machine ID generator
-    "py-machineid>=0.6.0",
+    "py-machineid==0.*",
     # Modern CLI framework built on Click
-    "typer>=0.13.1",
+    "typer==0.*",
     # Static type checker for Python
-    "pyright>=1.1.389",
+    "pyright==1.*",
     # Auto-rerun pytest on file changes
-    "pytest-watcher>=0.4.3",
-    "pytest-watch>=0.2.0",
+    "pytest-watcher==0.*",
     # Cross-platform library for retrieving system information
-    "psutil>=6.1.0",
+    "psutil==6.*",
     # Thin wrapper around the mock package for pytest
-    "pytest-mock>=3.14.0",
+    "pytest-mock==3.*",
     # Mocking and testing library
-    "mock>=5.1.0",
+    "mock==5.*",
     # Pytest plugin for mocking httpx requests
-    "pytest-httpx>=0.34.0",
-    "autopep8>=2.3.1",
-    "coverage>=7.6.8",
-    "starlette>=0.41.3",
-    "fastapi>=0.115.5",
-    "hypercorn>=0.17.3",
-    "arrow>=1.3.0",
-    "hypothesis>=6.119.4",
-    "pytest-cov>=6.0.0",
+    "pytest-httpx==0.*",
+    # Used only for comment wrapping functionality
+    "autopep8==2.*",
+    # Code coverage measurement tool
+    "coverage==7.*",
+    # ASGI framework for building high-performance web services
+    "starlette==0.41.*",
+    # Modern, fast web framework for building APIs with Python
+    "fastapi==0.115.*",
+    # ASGI server with HTTP/2 support
+    "hypercorn==0.17.*",
+    # Better date and time manipulation for Python
+    "arrow==1.*",
+    # Property-based testing framework
+    "hypothesis==6.*",
+    # Coverage reporting plugin for pytest
+    "pytest-cov==6.*",
+    # Parse and pretty-print HTML
+    "beautifulsoup4==4.12.*",
 ]
 
 [tool.uv.sources]
@@ -104,6 +113,4 @@ trio_mode = true
 md_report = true
 md_report_verbose = 1
 mock_use_standalone_module = true
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-]
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
