@@ -37,11 +37,8 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        uv run pytest --cov=bubble --cov-report=xml --md-report-output tmp.md
+        uv run pytest --cov=bubble --md-report-output tmp.md
         echo "## Test coverage" >> $GITHUB_STEP_SUMMARY
         uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
         echo "## Test results" >> $GITHUB_STEP_SUMMARY
         cat tmp.md >> $GITHUB_STEP_SUMMARY
-
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v5.0.7
