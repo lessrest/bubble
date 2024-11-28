@@ -3,8 +3,9 @@ import hashlib
 import logging
 import re
 import urllib.parse
-
-from typing import Dict, List, Tuple, Optional
+import contextvars
+import contextlib
+from typing import Dict, List, Tuple, Optional, Sequence
 
 import arrow
 
@@ -40,13 +41,51 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
+rendering_sensitive_data = contextvars.ContextVar(
+    "rendering_sensitive_data", default=False
+)
+
+language_preferences = contextvars.ContextVar(
+    "language_preferences", default=["lv", "sv", "en"]
+)
+
+
+@contextlib.contextmanager
+def language_context(langs: Sequence[str]):
+    token = language_preferences.set(list(langs))
+    try:
+        yield
+    finally:
+        language_preferences.reset(token)
+
 
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
     logger.info(f"Getting label for {uri} from {dataset}")
+
+    # Get all labels with their languages
+    labels = []
     for s, p, o, c in dataset.quads((None, RDFS.label, None, None)):
-        logger.info(f"Label: {o} for {s} in context {c}")
-    labels = list(dataset.objects(uri, RDFS.label))
-    return labels[0] if labels else None
+        if s == uri:
+            if isinstance(o, Literal):
+                labels.append((o, o.language or ""))
+            else:
+                labels.append((o, ""))
+
+    if not labels:
+        return None
+
+    # Sort labels by language preference
+    prefs = language_preferences.get()
+
+    def lang_key(label_tuple):
+        lang = label_tuple[1]
+        try:
+            return prefs.index(lang)
+        except ValueError:
+            return len(prefs) if lang else len(prefs) + 1
+
+    sorted_labels = sorted(labels, key=lang_key)
+    return sorted_labels[0][0] if sorted_labels else None
 
 
 def get_subject_data(
@@ -62,7 +101,11 @@ def get_subject_data(
         else:
             data["predicates"].append((predicate, obj))
     data["predicates"].sort(
-        key=lambda x: (isinstance(x[1], BNode), str(x[0]))
+        key=lambda x: (
+            not isinstance(x[1], Literal),  # Literals first
+            isinstance(x[1], BNode),  # Then URIRefs, then BNodes
+            str(x[0]),  # Finally sort by predicate string
+        )
     )
     return data
 
@@ -115,7 +158,7 @@ def group_triples(
 
 
 def render_subresource(
-    subject: S, predicate: Optional[S] = None
+    subject: S, predicate: Optional[P] = None
 ) -> None:
     dataset = current_bubble.get().dataset
     if isinstance(subject, BNode):
@@ -175,7 +218,7 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_default_resource(subject, data)
 
 
-@html.div("flex", "flex-col", "items-start", "gap-1")
+@html.div("flex", "flex-col", "gap-1")
 def render_default_resource(subject: S, data: Optional[Dict] = None):
     render_resource_header(subject, data)
     render_properties(data)
@@ -259,14 +302,13 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
-@html.span("text-gray-600 dark:text-gray-400 opacity-80")
 def render_property_label(predicate):
     dataset = current_bubble.get().dataset
     label = get_label(dataset, predicate)
     render_value(label or predicate)
 
 
-@html.div("flex flex-row gap-2")
+@html.div("flex flex-row gap-2 justify-between")
 def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
@@ -279,17 +321,31 @@ def render_resource_header(subject, data):
     "list-decimal flex flex-col gap-1 ml-4 text-cyan-600 dark:text-cyan-500"
 )
 def render_list(
-    collection: List[S], predicate: Optional[S] = None
+    collection: List[S], predicate: Optional[P] = None
 ) -> None:
     for item in collection:
         with tag("li"):
             render_subresource(item, predicate)
 
 
+@contextlib.contextmanager
+def sensitive_context():
+    token = rendering_sensitive_data.set(True)
+    try:
+        yield
+    finally:
+        rendering_sensitive_data.reset(token)
+
+
 def render_value(obj: S, predicate: Optional[P] = None) -> None:
     if has_doxxing_risk(predicate):
-        classes("blur-sm hover:blur-none transition-all duration-300")
+        with sensitive_context():
+            _render_value_inner(obj)
+    else:
+        _render_value_inner(obj)
 
+
+def _render_value_inner(obj: S) -> None:
     if isinstance(obj, URIRef):
         _render_uri(obj)
     elif isinstance(obj, BNode):
@@ -307,11 +363,34 @@ def render_value(obj: S, predicate: Optional[P] = None) -> None:
 def _render_uri(obj: URIRef) -> None:
     attr("hx-get", resource_path(obj))
 
-    prefix, namespace, name = (
-        current_bubble.get().dataset.namespace_manager.compute_qname(str(obj))
-    )
-    text(name)
-    render_curie_prefix(prefix)
+    # Try to get a label first
+    dataset = current_bubble.get().dataset
+    label = get_label(dataset, obj)
+
+    if label:
+        # If we have a label, show it
+        text(label)
+        # Add the CURIE in a smaller, dimmer font
+        prefix, namespace, name = (
+            dataset.namespace_manager.compute_qname(str(obj))
+        )
+        with tag("span", classes="text-sm opacity-60 pl-1"):
+            text(f"({prefix}:{name})")
+    else:
+        # If no label, show the CURIE as before
+        prefix, namespace, name = (
+            dataset.namespace_manager.compute_qname(str(obj))
+        )
+        # Only truncate IDs from the SWA namespace
+        if prefix == "swa" and not any(c in name for c in "/."):
+            with tag(
+                "span",
+                classes="font-mono max-w-[12ch] truncate inline-block align-bottom",
+            ):
+                text(name)
+        else:
+            text(name)
+        render_curie_prefix(prefix)
 
 
 @html.span(
@@ -401,6 +480,8 @@ def _render_string_literal(obj: Literal) -> None:
     "before:content-['«'] after:content-['»']",
 )
 def render_other_string(obj):
+    if rendering_sensitive_data.get():
+        classes("blur-sm hover:blur-none transition-all duration-300")
     text(obj.value)
 
 

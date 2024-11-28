@@ -15,7 +15,6 @@ The module uses RDF and the Notation3 format to represent all data.
 from bubble.mint import fresh_iri
 from bubble.vars import (
     bind_prefixes,
-    langstr,
     quote,
     using_graph,
 )
@@ -76,9 +75,6 @@ def describe_user_account(info, home_dir):
             ),
             NT.uid: info["user_info"].pw_uid,
             NT.username: getpass.getuser(),
-            RDFS.label: langstr(
-                f"user account for {info['person_name']}"
-            ),
         },
     )
 
@@ -94,13 +90,7 @@ def describe_repository(path, filesystem, home_dir, bubble):
                     NT.filesystem: filesystem,
                     NT.parent: home_dir,
                     NT.path: path,
-                    RDFS.label: langstr(
-                        f"worktree directory at {path}",
-                    ),
                 },
-            ),
-            RDFS.label: langstr(
-                f"bubble repository at {path}",
             ),
         },
     )
@@ -113,9 +103,6 @@ def describe_bubble(bubble, step, info):
     return new(
         NT.Bubble,
         {
-            RDFS.label: langstr(
-                f"a bubble for {info['person_name']}",
-            ),
             NT.head: step,
             NT.emailAddress: f"{local_part}@swa.sh",
         },
@@ -129,9 +116,6 @@ async def describe_home_directory(info, filesystem):
         {
             NT.filesystem: filesystem,
             NT.path: await Path.home(),
-            RDFS.label: langstr(
-                f"home directory of {info['person_name']}",
-            ),
         },
     )
 
@@ -143,9 +127,7 @@ def describe_filesystem(info):
         {
             NT.byteSize: Literal(info["disk_info"]["Size"]),
             OWL.sameAs: UUID[info["disk_uuid"]],
-            RDFS.label: langstr(
-                f"disk {info['disk_info']['VolumeName']}",
-            ),
+            RDFS.label: info["disk_info"]["VolumeName"],
         },
     )
 
@@ -154,9 +136,6 @@ def describe_machine(info, machine, filesystem, user):
     new(
         NT.ComputerMachine,
         {
-            RDFS.label: langstr(
-                "a computer machine",
-            ),
             NT.hosts: [
                 describe_posixenv(info, filesystem, user),
                 describe_os(info),
@@ -177,9 +156,6 @@ def describe_ram(info):
         {
             NT.byteSize: Literal(info["byte_size"]),
             NT.gigabyteSize: info["gigabyte_size"],
-            RDFS.label: langstr(
-                "a random access memory unit",
-            ),
         },
     )
 
@@ -189,9 +165,6 @@ def describe_cpu(info):
         NT.CentralProcessingUnit,
         {
             NT.architecture: info["architecture"],
-            RDFS.label: langstr(
-                "a central processing unit",
-            ),
         },
     )
 
@@ -202,9 +175,6 @@ def describe_os(info):
         {
             NT.type: info["system_type"],
             NT.version: info["system_version"],
-            RDFS.label: langstr(
-                f"operating system on {info['hostname']}",
-            ),
         },
     )
 
@@ -216,9 +186,6 @@ def describe_posixenv(info, filesystem, user):
             NT.account: user,
             NT.filesystem: filesystem,
             NT.hostname: info["hostname"],
-            RDFS.label: langstr(
-                f"POSIX environment on {info['hostname']}",
-            ),
         },
     )
 
@@ -230,9 +197,6 @@ def describe_creation_event(user, bubble, path, info):
             AS.actor: user,
             AS.object: bubble,
             AS.published: info["now"],
-            RDFS.label: langstr(
-                f"creation of the bubble at {path}",
-            ),
         },
     )
 
@@ -248,9 +212,6 @@ def describe_next_step(bubble, step, head, path):
         {
             NT.supposes: quote([(bubble, NT.head, head)]),
             NT.succeeds: step,
-            RDFS.label: langstr(
-                f"the second step of the bubble at {path}",
-            ),
         },
         subject=head,
     )
@@ -261,9 +222,6 @@ def describe_initial_step(bubble, step, path):
         NT.Step,
         {
             NT.supposes: quote([(bubble, NT.head, step)]),
-            RDFS.label: langstr(
-                f"the first step of the bubble at {path}",
-            ),
         },
         subject=step,
     )
@@ -276,9 +234,6 @@ def describe_surface_addition(user, bubble, surface, path):
             AS.actor: user,
             AS.object: describe_root_surface(bubble, surface, path),
             AS.target: bubble,
-            RDFS.label: langstr(
-                f"addition of the root surface to the bubble at {path}",
-            ),
         },
     )
 
@@ -288,9 +243,6 @@ def describe_root_surface(bubble, surface, path):
         NT.Surface,
         {
             NT.partOf: bubble,
-            RDFS.label: langstr(
-                f"the root surface of the bubble at {path}",
-            ),
         },
         subject=surface,
     )

@@ -19,6 +19,17 @@
 ###  http://purl.obolibrary.org/obo/IAO_0000115
 <http://purl.obolibrary.org/obo/IAO_0000115> rdf:type owl:AnnotationProperty .
 
+#
+rdfs:subClassOf rdfs:label "is subclass of"@en , "är subklass av"@sv , "ir apakšklase no"@lv .
+rdfs:comment rdfs:label "has description"@en , "har beskrivning"@sv , "ir apraksts"@lv .
+rdfs:label rdfs:label "has label"@en , "har etikett"@sv , "ir etiķete"@lv .
+rdfs:domain rdfs:label "has domain"@en , "har domän"@sv , "ir domēns"@lv .
+rdfs:range rdfs:label "has range"@en , "har mål"@sv , "ir diapazons"@lv .
+rdf:type rdfs:label "is instance of"@en , "är instans av"@sv , "ir instances no"@lv .
+owl:Class rdfs:label "class"@en , "klass"@sv , "klase"@lv .
+owl:ObjectProperty rdfs:label "object property"@en , "egenskap (objekt)"@sv , "objekta īpašība"@lv .
+owl:DatatypeProperty rdfs:label "datatype property"@en , "egenskap (datatyp)"@sv , "datu tipa īpašība"@lv .
+owl:sameAs rdfs:label "is same as"@en , "är samma som"@sv , "ir vienāds ar"@lv .
 
 #################################################################
 #    Object Properties
@@ -26,69 +37,84 @@
 
 ###  https://node.town/2024/architecture
 nt:architecture rdf:type owl:ObjectProperty ;
-   rdfs:domain nt:CentralProcessingUnit .
+   rdfs:domain nt:CentralProcessingUnit ;
+   rdfs:comment "relates a CPU to its instruction set architecture"@en , "relaterar en CPU till dess instruktionsarkitektur"@sv , "saista CPU ar tā instrukciju kopuma arhitektūru"@lv ;
+   rdfs:label "has architecture"@en , "har arkitektur"@sv , "ir arhitektūra"@lv .
 
 
 ###  https://node.town/2024/filesystem
 nt:filesystem rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Directory ;
    rdfs:range nt:Filesystem ;
-   rdfs:comment "relates a directory to the filesystem that contains it"@en ;
-   rdfs:label "is on filesystem"@en .
+   rdfs:comment "relates a directory to the filesystem that contains it"@en , "relaterar en katalog till filsystemet som innehåller den"@sv , "saista direktoriju ar failu sistēmu, kas to satur"@lv ;
+   rdfs:label "is on filesystem"@en , "finns på filsystem"@sv , "ir failu sistēmā"@lv .
 
 
 ###  https://node.town/2024/head
 nt:head rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Bubble ;
    rdfs:range nt:Step ;
-   rdfs:comment "relates a bubble to its current step"@en ;
-   rdfs:label "has head"@en .
+   rdfs:comment "relates a bubble to its current step"@en , "relaterar en bubbla till dess aktuella steg"@sv , "saista burbuli ar tā pašreizējo soli"@lv ;
+   rdfs:label "has head"@en , "har huvud"@sv , "ir galva"@lv .
 
 
 ###  https://node.town/2024/homeDirectory
 nt:homeDirectory rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Account ;
    rdfs:range nt:Directory ;
-   rdfs:comment "relates an account to its primary storage directory"@en ;
-   rdfs:label "has home directory"@en .
+   rdfs:comment "relates an account to its primary storage directory"@en , "relaterar ett konto till dess primära lagringskatalog"@sv , "saista kontu ar tā galveno glabāšanas direktoriju"@lv ;
+   rdfs:label "has home directory"@en , "har hemkatalog"@sv , "ir mājas direktorija"@lv .
 
 
 ###  https://node.town/2024/hosts
 nt:hosts rdf:type owl:ObjectProperty ;
    rdfs:domain nt:ComputerMachine ;
    rdfs:range nt:ComputingEnvironment ;
-   rdfs:comment "relates a computer machine to the software environments it provides"@en ;
-   rdfs:label "hosts"@en .
+   rdfs:comment "relates a computer machine to the software environments it provides"@en , "relaterar en datormaskin till mjukvarumiljöerna den tillhandahåller"@sv , "saista datoru ar programmatūras vidēm, ko tas nodrošina"@lv ;
+   rdfs:label "hosts"@en , "är värd för"@sv , "mitina"@lv .
 
+###  https://node.town/2024/account
+nt:account rdf:type owl:ObjectProperty ;
+   rdfs:domain nt:ComputingEnvironment ;
+   rdfs:range nt:Account ;
+   rdfs:label "has account"@en , "har konto"@sv , "ir konts"@lv .
 
 ###  https://node.town/2024/owner
 nt:owner rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Continuant ;
    rdfs:range as:Agent ;
-   rdfs:comment "relates a continuant to the agent that owns it"@en ;
-   rdfs:label "is owned by"@en .
+   rdfs:comment "relates a continuant to the agent that owns it"@en , "relaterar en kontinuant till agenten som äger den"@sv , "saista turpinājumu ar aģentu, kam tas pieder"@lv ;
+   rdfs:label "is owned by"@en , "ägs av"@sv , "pieder"@lv .
 
 
 ###  https://node.town/2024/part
 nt:part rdf:type owl:ObjectProperty ;
-   rdfs:comment "relates a whole to its constituent components"@en ;
-   rdfs:label "has part"@en .
+   rdfs:comment "relates a whole to its constituent components"@en , "relaterar en helhet till dess beståndsdelar"@sv , "saista veselo ar tā sastāvdaļām"@lv ;
+   rdfs:label "has part"@en , "har del"@sv , "ir daļa"@lv .
 
 
 ###  https://node.town/2024/tracks
 nt:tracks rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Repository ;
    rdfs:range nt:Bubble ;
-   rdfs:comment "relates a repository to the bubble whose history it maintains"@en ;
-   rdfs:label "tracks"@en .
+   rdfs:comment "relates a repository to the bubble whose history it maintains"@en , "relaterar ett repository till bubblan vars historik det underhåller"@sv , "saista repozitoriju ar burbuli, kura vēsturi tas uztur"@lv ;
+   rdfs:label "tracks"@en , "spårar"@sv , "seko"@lv .
 
 
 ###  https://node.town/2024/worktree
 nt:worktree rdf:type owl:ObjectProperty ;
    rdfs:domain nt:Repository ;
    rdfs:range nt:Directory ;
-   rdfs:comment "relates a repository to the directory containing its working files"@en ;
-   rdfs:label "has worktree"@en .
+   rdfs:comment "relates a repository to the directory containing its working files"@en , "relaterar ett repository till katalogen som innehåller dess arbetsfiler"@sv , "saista repozitoriju ar direktoriju, kas satur tā darba failus"@lv ;
+   rdfs:label "has worktree"@en , "har arbetskatalog"@sv , "ir darba koks"@lv .
+
+
+###  https://node.town/2024/hasRisk
+nt:hasRisk rdf:type owl:ObjectProperty ;
+   rdfs:domain owl:Thing ;
+   rdfs:range nt:Risk ;
+   rdfs:comment "relates a thing to a risk associated with it"@en , "relaterar en sak till en risk som är förknippad med den"@sv , "saista lietu ar risku, kas ar to saistīts"@lv ;
+   rdfs:label "has risk"@en , "har risk"@sv , "ir risks"@lv .
 
 
 #################################################################
@@ -104,87 +130,87 @@ nt:architecture rdf:type owl:DatatypeProperty ;
 nt:byteSize rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:BoundedStore ;
    rdfs:range xsd:integer ;
-   rdfs:comment "the storage capacity or size in bytes"@en ;
-   rdfs:label "has byte size"@en .
+   rdfs:comment "the storage capacity or size in bytes"@en , "storleken på en lagringsenhet i byte"@sv , "krātuves ietilpība vai izmērs baitos"@lv ;
+   rdfs:label "has byte size"@en , "har storlek i bytes"@sv , "ir baitu izmērs"@lv .
 
 
 ###  https://node.town/2024/gid
 nt:gid rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Account ;
    rdfs:range xsd:string ;
-   rdfs:comment "the numeric primary group identifier of an account in a POSIX system"@en ;
-   rdfs:label "has POSIX group ID"@en .
+   rdfs:comment "the numeric primary group identifier of an account in a POSIX system"@en , "den numeriska primärgruppen som identifierar ett konto i ett POSIX-system"@sv , "lietotāja primārās grupas identifikators, kas identificē kontu sistēmā"@lv ;
+   rdfs:label "has POSIX group ID"@en , "har POSIX grupp-ID"@sv , "ir POSIX grupas ID"@lv .
 
 
 ###  https://node.town/2024/gigabyteSize
 nt:gigabyteSize rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:BoundedStore ;
    rdfs:range xsd:integer ;
-   rdfs:comment "the storage capacity or size in gigabytes"@en ;
-   rdfs:label "has gigabyte size"@en .
+   rdfs:comment "the storage capacity or size in gigabytes"@en , "storleken på en lagringsenhet i gigabyte"@sv , "krātuves ietilpība vai izmērs gigabaitos"@lv ;
+   rdfs:label "has gigabyte size"@en , "har storlek i gigabyte"@sv , "ir gigabaitu izmērs"@lv .
 
 
 ###  https://node.town/2024/hostname
 nt:hostname rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:PosixEnvironment ;
    rdfs:range xsd:string ;
-   rdfs:comment "the network name identifying a computer system"@en ;
-   rdfs:label "has hostname"@en .
+   rdfs:comment "the network name identifying a computer system"@en , "nätverksnamnet som identifierar en dator"@sv , "tīkla nosaukums, kas identificē datoru"@lv ;
+   rdfs:label "has hostname"@en , "har nätverksnamn"@sv , "ir tīkla nosaukums"@lv .
 
 
 ###  https://node.town/2024/name
 nt:name rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Person ;
    rdfs:range xsd:string ;
-   rdfs:comment "the full name of a person"@en ;
-   rdfs:label "has name"@en .
+   rdfs:comment "the full name of a person"@en , "fullständigt namn på en person"@sv , "pilnā vārds, kas identificē lietotāju"@lv ;
+   rdfs:label "has name"@en , "heter"@sv , "ir vārds"@lv .
 
 
 ###  https://node.town/2024/path
 nt:path rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Directory ;
    rdfs:range xsd:string ;
-   rdfs:comment "the absolute pathname of a directory in a filesystem"@en ;
-   rdfs:label "has path"@en .
+   rdfs:comment "the absolute pathname of a directory in a filesystem"@en , "den absoluta sökvägen till en katalog i ett filsystem"@sv , "absolūtā ceļa nosaukums, kas identificē direktoriju failu sistēmā"@lv ;
+   rdfs:label "has path"@en , "har sökväg"@sv , "ir ceļš"@lv .
 
 
 ###  https://node.town/2024/rank
 nt:rank rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Step ;
    rdfs:range xsd:integer ;
-   rdfs:comment "the sequential position of a step in a bubble's history"@en ;
-   rdfs:label "has rank"@en .
+   rdfs:comment "the sequential position of a step in a bubble's history"@en , "den sekventiella positionen för ett steg i en bubblas historik"@sv , "solis kārtas numurs burbuļa vēsturē"@lv ;
+   rdfs:label "has rank"@en , "är steg"@sv , "ir numurs"@lv .
 
 
 ###  https://node.town/2024/uid
 nt:uid rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Account ;
    rdfs:range xsd:string ;
-   rdfs:comment "the numeric user identifier of an account in a POSIX system"@en ;
-   rdfs:label "has POSIX user ID"@en .
+   rdfs:comment "the numeric user identifier of an account in a POSIX system"@en , "den numeriska användaridentifikatorn som identifierar ett konto i ett POSIX-system"@sv , "lietotāja identifikators, kas identificē kontu sistēmā"@lv ;
+   rdfs:label "has POSIX user ID"@en , "har POSIX användar-ID"@sv , "ir POSIX lietotāja ID"@lv .
 
 ### https://node.town/2024/serialNumber
 nt:serialNumber rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:EngineeredObject ;
    rdfs:range xsd:string ;
-   rdfs:comment "the serial number of an engineered object"@en ;
-   rdfs:label "has serial number"@en .
+   rdfs:comment "the serial number of an engineered object"@en , "serienumret på ett konstruerat objekt"@sv , "inženierijas objekta sērijas numurs"@lv ;
+   rdfs:label "has serial number"@en , "har serienummer"@sv , "ir sērijas numurs"@lv .
 
 
 ###  https://node.town/2024/username
 nt:username rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:Account ;
    rdfs:range xsd:string ;
-   rdfs:comment "the login name identifying an account in a system"@en ;
-   rdfs:label "has username"@en .
+   rdfs:comment "the login name identifying an account in a system"@en , "användarnamnet som identifierar ett konto i ett system"@sv , "lietotāja vārds, kas identificē kontu sistēmā"@lv ;
+   rdfs:label "has username"@en , "har användarnamn"@sv , "ir lietotāja vārds"@lv .
 
 
 ###  https://node.town/2024/version
 nt:version rdf:type owl:DatatypeProperty ;
    rdfs:domain nt:InformationContentEntity ;
    rdfs:range xsd:string ;
-   rdfs:comment "the version identifier of an information content entity"@en ;
-   rdfs:label "has version"@en .
+   rdfs:comment "the version identifier of an information content entity"@en , "versionidentifieringen för en informationsinnehållsentitet"@sv , "informācijas saturs entitātes versijas identifikators"@lv ;
+   rdfs:label "has version"@en , "har version"@sv , "ir versija"@lv .
 
 
 #################################################################
@@ -216,146 +242,157 @@ as:Actor rdf:type owl:Class ;
 as:Agent rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000023> .
 
+###  http://www.w3.org/ns/activitystreams#Person
+as:Person rdf:type owl:Class ;
+   rdfs:subClassOf as:Agent ;
+   rdfs:label "person"@en , "person"@sv , "persona"@lv .
 
 ###  https://node.town/2024/Account
 nt:Account rdf:type owl:Class ;
    rdfs:subClassOf nt:InformationContentEntity ;
-   rdfs:comment "an account is a user identity in a computer system with associated permissions and resources"@en ;
-   rdfs:label "account"@en .
+   rdfs:comment "an account is a user identity in a computer system with associated permissions and resources"@en , "ett konto är en användaridentitet i ett datorsystem med tillhörande behörigheter och resurser"@sv , "konts ir lietotāja identitāte datorsistēmā ar saistītām atļaujām un resursiem"@lv ;
+   rdfs:label "account"@en , "konto"@sv , "konts"@lv .
 
 
 ###  https://node.town/2024/BoundedStore
 nt:BoundedStore rdf:type owl:Class ;
    rdfs:subClassOf nt:Continuant ;
-   rdfs:comment "a bounded store is a computer memory that has a limited capacity"@en ;
-   rdfs:label "bounded store"@en .
+   rdfs:comment "a bounded store is a computer memory that has a limited capacity"@en , "ett begränsat lager är ett datorminne som har begränsad kapacitet"@sv , "ierobežota krātuve ir datora atmiņa ar ierobežotu ietilpību"@lv ;
+   rdfs:label "bounded store"@en , "begränsat lager"@sv , "ierobežota krātuve"@lv .
 
 
 ###  https://node.town/2024/Bubble
 nt:Bubble rdf:type owl:Class ;
    rdfs:subClassOf nt:Repository ;
-   rdfs:comment "a bubble repository is a versioned knowledge graph dataset that evolves in steps by reasoning with rules and invoking capabilities"@en ;
-   rdfs:label "bubble repository"@en .
+   rdfs:comment "a bubble repository is a versioned knowledge graph dataset that evolves in steps by reasoning with rules and invoking capabilities"@en , "ett bubbelarkiv är en versionshanterad kunskapsgrafsdatabas som utvecklas stegvis genom att resonera med regler och anropa förmågor"@sv , "burbuļa repozitorijs ir versiju zināšanu grafa datu kopa, kas attīstās pa soļiem, izmantojot likumus un izsaucot iespējas"@lv ;
+   rdfs:label "bubble repository"@en , "bubbelarkiv"@sv , "burbuļa repozitorijs"@lv .
 
 
 ###  https://node.town/2024/CentralProcessingUnit
 nt:CentralProcessingUnit rdf:type owl:Class ;
    rdfs:subClassOf nt:EngineeredObject ;
-   rdfs:comment "a central processing unit is a hardware component that executes instructions of computer programs"@en ;
-   rdfs:label "cpu"@en .
+   rdfs:comment "a central processing unit is a hardware component that executes instructions of computer programs"@en , "en centralprocessor är en hårdvarukomponent som utför instruktioner från datorprogram"@sv , "centrālais procesors ir aparatūras komponents, kas izpilda datora programmu instrukcijas"@lv ;
+   rdfs:label "cpu"@en , "processor"@sv , "procesors"@lv .
 
 
 ###  https://node.town/2024/ComputerMachine
 nt:ComputerMachine rdf:type owl:Class ;
    rdfs:subClassOf nt:EngineeredObject ;
-   rdfs:comment "a computer machine is a non-virtual computer"@en ;
-   rdfs:label "computer machine"@en .
+   rdfs:comment "a computer machine is a non-virtual computer"@en , "en datormaskin är en icke-virtuell dator"@sv , "datormašīna ir nevirtuals dators"@lv ;
+   rdfs:label "computer machine"@en , "datormaskin"@sv , "datormašīna"@lv .
 
 
 ###  https://node.town/2024/ComputingEnvironment
 nt:ComputingEnvironment rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000020> ;
-   rdfs:comment "a computing environment is a software environment that provides system services and interfaces"@en ;
-   rdfs:label "computing environment"@en .
+   rdfs:comment "a computing environment is a software environment that provides system services and interfaces"@en , "en datormiljö är en mjukvarumiljö som tillhandahåller systemtjänster och gränssnitt"@sv , "skaitļošanas vide ir programmatūras vide, kas nodrošina sistēmas pakalpojumus un saskarnes"@lv ;
+   rdfs:label "computing environment"@en , "datormiljö"@sv , "skaitļošanas vide"@lv .
 
 
 ###  https://node.town/2024/Continuant
 nt:Continuant rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000001> ;
-   rdfs:label "continuant"@en .
+   rdfs:comment "a continuant is an entity that continues to exist through time"@en , "en kontinuant är en entitet som fortsätter att existera genom tiden"@sv , "turpinājums ir entitāte, kas turpina pastāvēt laikā"@lv ;
+   rdfs:label "continuant"@en , "kontinuant"@sv , "turpinājums"@lv .
 
 
 ###  https://node.town/2024/Directory
 nt:Directory rdf:type owl:Class ;
    rdfs:subClassOf nt:InformationContentEntity ;
-   rdfs:comment "a directory is a filesystem container that organizes files and other directories in a hierarchical structure"@en ;
-   rdfs:label "directory"@en .
+   rdfs:comment "a directory is a filesystem container that organizes files and other directories in a hierarchical structure"@en , "en katalog är en filsystemsbehållare som organiserar filer och andra kataloger i en hierarkisk struktur"@sv , "direktorija ir failu sistēmas konteiners, kas organizē failus un citas direktorijas hierarhiskā struktūrā"@lv ;
+   rdfs:label "directory"@en , "katalog"@sv , "direktorija"@lv .
 
 
 ###  https://node.town/2024/EngineeredObject
 nt:EngineeredObject rdf:type owl:Class ;
    rdfs:subClassOf nt:Object ;
-   rdfs:comment "an engineered object is a cohesive material object made to fulfill a specification"@en ;
-   rdfs:label "engineered object"@en .
+   rdfs:comment "an engineered object is a cohesive material object made to fulfill a specification"@en , "ett konstruerat objekt är ett sammanhängande materiellt objekt skapat för att uppfylla en specifikation"@sv , "inženierijas objekts ir saskaņots materiāls objekts, kas izveidots, lai izpildītu specifikāciju"@lv ;
+   rdfs:label "engineered object"@en , "konstruerat objekt"@sv , "inženierijas objekts"@lv .
 
 
 ###  https://node.town/2024/Filesystem
 nt:Filesystem rdf:type owl:Class ;
    rdfs:subClassOf nt:BoundedStore ;
-   rdfs:comment "a filesystem is a method for storing and organizing computer files and their data"@en ;
-   rdfs:label "filesystem"@en .
+   rdfs:comment "a filesystem is a method for storing and organizing computer files and their data"@en , "ett filsystem är en metod för att lagra och organisera datafiler och deras data"@sv , "failu sistēma ir metode datora failu un to datu glabāšanai un organizēšanai"@lv ;
+   rdfs:label "filesystem"@en , "filsystem"@sv , "failu sistēma"@lv .
 
 
 ###  https://node.town/2024/InformationContentEntity
 nt:InformationContentEntity rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000031> ;
-   rdfs:label "information content entity"@en .
+   rdfs:comment "an information content entity is a generically dependent continuant that is about something"@en , "en informationsinnehållsentitet är en generiskt beroende kontinuant som handlar om något"@sv , "informācijas satura entitāte ir ģenēriski atkarīgs turpinājums, kas ir par kaut ko"@lv ;
+   rdfs:label "information content entity"@en , "informationsinnehållsentitet"@sv , "informācijas satura entitāte"@lv .
 
 
 ###  https://node.town/2024/Object
 nt:Object rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000040> ;
-   rdfs:comment "an object is a material entity with coherence and integrity"@en ;
-   rdfs:label "object"@en .
+   rdfs:comment "an object is a material entity with coherence and integrity"@en , "ett objekt är en materiell entitet med sammanhang och integritet"@sv , "objekts ir materiāla entitāte ar saskaņotību un integritāti"@lv ;
+   rdfs:label "object"@en , "objekt"@sv , "objekts"@lv .
 
 
 ###  https://node.town/2024/Person
 nt:Person rdf:type owl:Class ;
    rdfs:subClassOf as:Actor ;
-   rdfs:comment "a human being who can own and operate computer accounts"@en ;
-   rdfs:label "person"@en .
+   rdfs:comment "a human being who can own and operate computer accounts"@en , "en människa som kan äga och hantera datorkonton"@sv , "cilvēks, kas var piederēt un pārvaldīt datora kontus"@lv ;
+   rdfs:label "person"@en , "person"@sv , "persona"@lv .
 
 
 ###  https://node.town/2024/PlanSpecification
 nt:PlanSpecification rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000033> .
 
+###  https://node.town/2024/OperatingSystem
+nt:OperatingSystem rdf:type owl:Class ;
+   rdfs:subClassOf nt:ComputingEnvironment ;
+   rdfs:comment "a software environment that provides system services and interfaces"@en , "en mjukvarumiljö som tillhandahåller systemtjänster och gränssnitt"@sv , "programmatūras vide, kas nodrošina sistēmas pakalpojumus un saskarnes"@lv ;
+   rdfs:label "operating system"@en , "operativsystem"@sv , "operētājsistēma"@lv .
 
 ###  https://node.town/2024/PosixEnvironment
 nt:PosixEnvironment rdf:type owl:Class ;
    rdfs:subClassOf nt:ComputingEnvironment ;
-   rdfs:comment "a POSIX-compliant operating system environment"@en ;
-   rdfs:label "posix environment"@en .
+   rdfs:comment "a POSIX-compliant operating system environment"@en , "en POSIX-kompatibel operativsystemmiljö"@sv , "POSIX-saderīga operētājsistēmas vide"@lv ;
+   rdfs:label "POSIX environment"@en , "POSIX-miljö"@sv , "POSIX vide"@lv .
 
+###  https://node.town/2024/macOSEnvironment
+nt:macOSEnvironment rdf:type owl:Class ;
+   rdfs:subClassOf nt:PosixEnvironment ;
+   rdfs:comment "a macOS operating system environment"@en , "en macOS-operativsystemmiljö"@sv , "macOS operētājsistēmas vide"@lv ;
+   rdfs:label "macOS environment"@en , "macOS-miljö"@sv , "macOS vide"@lv .
 
 ###  https://node.town/2024/RandomAccessMemory
 nt:RandomAccessMemory rdf:type owl:Class ;
    rdfs:subClassOf nt:BoundedStore ;
-   rdfs:comment "random access memory is a hardware component that provides temporary high-speed data storage for running programs"@en ;
-   rdfs:label "memory"@en .
+   rdfs:comment "a hardware component that provides temporary high-speed data storage for running programs"@en , "hårdvarukomponent som tillhandahåller temporär höghastighetsdatalagring för körande program"@sv , "aparatūras komponents, kas nodrošina īslaicīgu ātrdarbīgu datu glabāšanu darbināmām programmām"@lv ;
+   rdfs:label "memory"@en , "primärminne"@sv , "atmiņa"@lv .
 
 
 ###  https://node.town/2024/Repository
 nt:Repository rdf:type owl:Class ;
    rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000310> ;
-   rdfs:comment "a repository is a Git repository that tracks the history of a bubble"@en ;
-   rdfs:label "repository"@en .
+   rdfs:comment "a repository is a Git repository that tracks the history of a bubble"@en , "ett arkiv är ett Git-arkiv som spårar historiken för en bubbla"@sv , "repozitorijs ir Git repozitorijs, kas seko burbuļa vēsturei"@lv ;
+   rdfs:label "repository"@en , "arkiv"@sv , "repozitorijs"@lv .
 
 
 ###  https://node.town/2024/Step
 nt:Step rdf:type owl:Class ;
    rdfs:subClassOf nt:PlanSpecification ;
-   rdfs:comment "a step is a transaction that changes the state of a bubble"@en ;
-   rdfs:label "step"@en .
+   rdfs:comment "a step is a transaction that changes the state of a bubble"@en , "ett steg är en transaktion som ändrar tillståndet för en bubbla"@sv , "solis ir transakcija, kas maina burbuļa stāvokli"@lv ;
+   rdfs:label "step"@en , "steg"@sv , "solis"@lv .
 
 
-###  https://node.town/2024/macOSEnvironment
-nt:macOSEnvironment rdf:type owl:Class ;
-   rdfs:subClassOf nt:ComputingEnvironment ;
-   rdfs:comment "an Apple macOS operating system environment"@en ;
-   rdfs:label "macos environment"@en .
+###  https://node.town/2024/Risk
+nt:Risk rdf:type owl:Class ;
+   rdfs:subClassOf owl:Thing ;
+   rdfs:comment "a type of risk associated with a thing"@en , "en typ av risk förknippad med en sak"@sv , "ar lietu saistīta riska veids"@lv ;
+   rdfs:label "risk"@en , "risk"@sv , "risks"@lv .
 
 
-###  https://node.town/2024/0006
-<https://node.town/2024/0006> rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000314> , [
-       rdf:type owl:Restriction ;
-       owl:onProperty <http://purl.obolibrary.org/obo/BFO_0000050> ;
-       owl:someValuesFrom nt:Bubble 
-   ] ;
-   <http://purl.org/dc/elements/1.1/creator> <https://orcid.org/0009-0006-0476-6996> ;
-   <http://purl.org/dc/elements/1.1/date> "2024-11-26T10:17:03Z"^^xsd:dateTime ;
-   rdfs:label "bubble surface"@en .
+###  https://node.town/2024/DoxxingRisk
+nt:DoxxingRisk rdf:type owl:Class ;
+   rdfs:subClassOf nt:Risk ;
+   rdfs:comment "risk of exposing personally identifiable information"@en , "risk för att exponera personligt identifierbar information"@sv , "personas identificējamas informācijas izpaušanas risks"@lv ;
+   rdfs:label "doxxing risk"@en , "avslöjanderisk"@sv , "deanonimizācijas risks"@lv .
 
 
 #################################################################
@@ -366,3 +403,10 @@ nt:architecture rdfs:comment "relates a CPU to its instruction set architecture"
 
 
 ###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi
+
+#################################################################
+#    Individuals
+#################################################################
+
+###  https://node.town/2024/serialNumber
+nt:serialNumber nt:hasRisk nt:DoxxingRisk .
