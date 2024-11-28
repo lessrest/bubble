@@ -20,10 +20,12 @@ jobs:
 
     - name: Install EYE reasoner
       run: |
-        mkdir -p /tmp/src && cd /tmp/src
+        mkdir -p /tmp/src
+        cd /tmp/src
         curl -L https://github.com/eyereasoner/eye/archive/refs/tags/v10.30.10.tar.gz -o eye.tar.gz
         tar xzf eye.tar.gz
-        cd eye* && sudo sh install.sh
+        cd eye-*
+        sudo sh install.sh
         sudo ln -s /opt/eye/bin/eye /usr/bin/eye
 
     - name: Install uv
