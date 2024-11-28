@@ -46,7 +46,7 @@ rendering_sensitive_data = contextvars.ContextVar(
 )
 
 language_preferences = contextvars.ContextVar(
-    "language_preferences", default=["lv", "sv", "en"]
+    "language_preferences", default=["en", "sv", "lv"]
 )
 
 
