@@ -63,6 +63,7 @@ dependencies = [
     "pytest-cov==6.*",
     # Parse and pretty-print HTML
     "beautifulsoup4==4.12.*",
+    "honcho>=2.0.0",
 ]
 
 [tool.uv.sources]

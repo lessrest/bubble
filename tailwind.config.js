@@ -4,12 +4,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'mono': ['iosevka extended', 'monospace'],
+        serif: ["Equity OT"],
+        mono: ["iosevka extended", "monospace"],
       },
     },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-  ],
-}
-
+  plugins: [require("@tailwindcss/forms")],
+};
