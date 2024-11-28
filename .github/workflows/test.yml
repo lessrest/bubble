@@ -32,8 +32,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
 
-    - name: Run tests
+    - name: Run tests with coverage
       run: |
-        pytest --md-report-output tmp.md
+        coverage run -m pytest --md-report-output tmp.md
+        coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
         cat tmp.md >> $GITHUB_STEP_SUMMARY
 
