@@ -13,11 +13,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.13-dev"
-
     - name: Install SWI-Prolog and EYE reasoner
       run: |
         sudo apt-get update
@@ -27,14 +22,24 @@ jobs:
         cd eye && sudo sh install.sh
         sudo ln -s /opt/eye/bin/eye /usr/bin/eye
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "0.5.5"
+
+    - name: Set up Python
+      run: uv python install
+      with:
+        python-version-file: "pyproject.toml"
+
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
+      run: uv sync --all-extras --dev
 
     - name: Run tests with coverage
       run: |
-        coverage run -m pytest --md-report-output tmp.md
-        coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+        uv run pytest --cov=bubble --cov-report=xml --md-report-output tmp.md
+        echo "## Test coverage" >> $GITHUB_STEP_SUMMARY
+        uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+        echo "## Test results" >> $GITHUB_STEP_SUMMARY
         cat tmp.md >> $GITHUB_STEP_SUMMARY
 
