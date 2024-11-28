@@ -1,10 +1,7 @@
 import platform
 import pytest
-from typing import TypedDict
 
 from bubble.macs import (
-    DiskInfo,
-    DiskList,
     disk_list,
     get_disk_info,
     all_disk_infos,

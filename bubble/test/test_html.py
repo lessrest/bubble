@@ -125,7 +125,7 @@ def test_fragment_xml():
 
 def test_hypermedia_response():
     """Test HypermediaResponse rendering"""
-    with document() as doc:
+    with document():
         with tag("div"):
             text("Test")
         response = HypermediaResponse(content=None)
@@ -135,7 +135,7 @@ def test_hypermedia_response():
 
 def test_xml_response():
     """Test XMLResponse rendering"""
-    with document() as doc:
+    with document():
         with tag("root"):
             text("Test")
         response = XMLResponse(content=None)
