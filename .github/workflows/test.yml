@@ -17,9 +17,13 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y swi-prolog
+
+    - name: Install EYE reasoner
+      run: |
         mkdir -p /tmp/src && cd /tmp/src
-        git clone https://github.com/eyereasoner/eye
-        cd eye && sudo sh install.sh
+        wget https://github.com/eyereasoner/eye/releases/download/v10.30.10/eye-v10.30.10.tar.gz
+        tar xzf eye-v10.30.10.tar.gz
+        cd eye-v10.30.10 && sudo sh install.sh
         sudo ln -s /opt/eye/bin/eye /usr/bin/eye
 
     - name: Install uv
