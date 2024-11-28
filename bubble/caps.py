@@ -124,7 +124,9 @@ async def do_shell(ctx: InvocationContext) -> None:
     )
 
     if result.returncode != 0:
-        raise Exception(f"Command '{command}' returned non-zero exit status {result.returncode}.")
+        raise Exception(
+            f"Command '{command}' returned non-zero exit status {result.returncode}."
+        )
 
     try:
         # Get metadata about output file and create result node in graph

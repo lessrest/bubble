@@ -11,14 +11,14 @@ from bubble.macs import (
 
 @pytest.mark.skipif(
     platform.system() != "Darwin",
-    reason="macOS disk tests only run on Darwin"
+    reason="macOS disk tests only run on Darwin",
 )
 @pytest.mark.slow
 @pytest.mark.trio
 async def test_disk_list():
     """Test retrieving list of disks"""
     disks = await disk_list()
-    
+
     assert isinstance(disks, dict)
     assert "AllDisks" in disks
     assert isinstance(disks["AllDisks"], list)
@@ -28,7 +28,7 @@ async def test_disk_list():
 
 @pytest.mark.skipif(
     platform.system() != "Darwin",
-    reason="macOS disk tests only run on Darwin"
+    reason="macOS disk tests only run on Darwin",
 )
 @pytest.mark.trio
 async def test_get_disk_info():
@@ -36,9 +36,9 @@ async def test_get_disk_info():
     # Get first disk from list
     disks = await disk_list()
     disk_id = disks["AllDisks"][0]
-    
+
     info = await get_disk_info(disk_id)
-    
+
     assert isinstance(info, dict)
     # Check required fields are present with correct types
     assert isinstance(info.get("Size"), int)
@@ -50,16 +50,16 @@ async def test_get_disk_info():
 
 @pytest.mark.skipif(
     platform.system() != "Darwin",
-    reason="macOS disk tests only run on Darwin"
+    reason="macOS disk tests only run on Darwin",
 )
 @pytest.mark.trio
 async def test_all_disk_infos():
     """Test retrieving info for all disks"""
     all_info = await all_disk_infos()
-    
+
     assert isinstance(all_info, dict)
     assert len(all_info) > 0
-    
+
     # Check first disk info
     first_disk = next(iter(all_info.values()))
     assert isinstance(first_disk, dict)
@@ -70,12 +70,12 @@ async def test_all_disk_infos():
 
 @pytest.mark.skipif(
     platform.system() != "Darwin",
-    reason="macOS disk tests only run on Darwin"
+    reason="macOS disk tests only run on Darwin",
 )
 @pytest.mark.trio
 async def test_computer_serial_number():
     """Test retrieving computer serial number"""
     serial = await computer_serial_number()
-    
+
     assert isinstance(serial, str)
     assert len(serial) > 0

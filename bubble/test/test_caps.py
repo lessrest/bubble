@@ -83,7 +83,9 @@ async def test_shell_capability_failure(graph, shell_capability):
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(Exception) as exc_info:
         await do_shell(shell_capability)
-    assert "Command 'exit 1' returned non-zero exit status 1" in str(exc_info.value)
+    assert "Command 'exit 1' returned non-zero exit status 1" in str(
+        exc_info.value
+    )
 
 
 @pytest.mark.trio
@@ -100,7 +102,7 @@ async def test_shell_no_output_file(graph, shell_capability):
 
     graph.parse(data=turtle_data, format="turtle")
     await do_shell(shell_capability)
-    
+
     # Verify no result node was created
     # When no output file is created, that's fine - there should be no result node
     results = shell_capability.select_one_row(
@@ -110,12 +112,14 @@ async def test_shell_no_output_file(graph, shell_capability):
             ?invocation nt:result ?result
         }
         """,
-        {"invocation": shell_capability.invocation}
+        {"invocation": shell_capability.invocation},
     )
-    assert int(results[0]) == 0  # Count should be 0 indicating no results
+    assert (
+        int(results[0]) == 0
+    )  # Count should be 0 indicating no results
 
 
-@pytest.mark.trio 
+@pytest.mark.trio
 async def test_shell_invalid_command(graph, shell_capability):
     """Test handling of invalid shell command"""
     turtle_data = """
@@ -130,7 +134,10 @@ async def test_shell_invalid_command(graph, shell_capability):
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(Exception) as exc_info:
         await do_shell(shell_capability)
-    assert "Command 'nonexistentcommand' returned non-zero exit status 127" in str(exc_info.value)
+    assert (
+        "Command 'nonexistentcommand' returned non-zero exit status 127"
+        in str(exc_info.value)
+    )
 
 
 async def test_shell_capability_with_stdin():
