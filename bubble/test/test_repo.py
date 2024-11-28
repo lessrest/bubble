@@ -1,19 +1,27 @@
+import logging
 import pytest
 import trio
 from rdflib import Graph, URIRef, RDF
-from bubble.repo import BubbleRepo
+from bubble.repo import using_bubble_at
+from bubble.prfx import NT
+from bubble.util import print_n3
+from bubble.vars import current_graph
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
 async def temp_repo(tmp_path):
     """Create a temporary repository for testing"""
-    repo = await BubbleRepo.open(trio.Path(tmp_path))
-    return repo
+    async with using_bubble_at(tmp_path) as repo:
+        yield repo
 
 
 @pytest.mark.trio
 async def test_repo_initialization(temp_repo):
     """Test that a new repository is properly initialized"""
+    logger.info("Testing repo initialization for %s", temp_repo.bubble)
+
     # Verify basic repo properties
     assert isinstance(temp_repo.bubble, URIRef)
     assert isinstance(temp_repo.graph, Graph)
@@ -22,6 +30,12 @@ async def test_repo_initialization(temp_repo):
 
     # Verify git initialization
     assert await trio.Path(temp_repo.workdir / ".git").exists()
+
+    print_n3(current_graph.get())
+    print_n3(temp_repo.graph)
+
+    # Verify bubble has type nt:Bubble
+    assert (temp_repo.bubble, RDF.type, NT.Bubble) in temp_repo.graph
 
 
 @pytest.mark.trio
@@ -76,3 +90,28 @@ async def test_repo_load_rules(temp_repo):
     await temp_repo.load_rules()
     # Verify rules were loaded
     assert len(temp_repo.graph) > 0
+
+
+@pytest.mark.trio
+async def test_repo_git_config(temp_repo):
+    """Test that Git configuration is set correctly"""
+    # Get the bubble's email from the graph
+    email = str(
+        temp_repo.graph.value(temp_repo.bubble, NT.emailAddress)
+    )
+    assert email.endswith(
+        "@swa.sh"
+    ), f"Email '{email}' should end with @swa.sh"
+
+    # Verify Git config
+    result = await trio.run_process(
+        ["git", "-C", str(temp_repo.workdir), "config", "user.name"],
+        capture_stdout=True,
+    )
+    assert result.stdout.decode().strip() == "Bubble"
+
+    result = await trio.run_process(
+        ["git", "-C", str(temp_repo.workdir), "config", "user.email"],
+        capture_stdout=True,
+    )
+    assert result.stdout.decode().strip() == email

@@ -1,5 +1,6 @@
 """Utility functions for N3 processing."""
 
+import sys
 from typing import Any, Optional
 
 
@@ -65,11 +66,15 @@ def print_n3(graph: Optional[Graph] = None) -> None:
     g = graph if graph is not None else current_graph.get()
     n3 = g.serialize(format="n3").replace("    ", "  ").strip()
 
-    print(
-        Panel(
-            Syntax(n3, "turtle", theme="zenburn"),
+    # only if connected to terminal do we use rich
+    if sys.stdout.isatty():
+        print(
+            Panel(
+                Syntax(n3, "turtle", theme="zenburn"),
+            )
         )
-    )
+    else:
+        print(n3)
 
 
 def get_single_subject(predicate, object):

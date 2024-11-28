@@ -13,13 +13,13 @@ The module uses RDF and the Notation3 format to represent all data.
 """
 
 from bubble.mint import fresh_iri
-from bubble.vars import bind_prefixes, langstr, quote, using_graph
+from bubble.vars import bind_prefixes, langstr, quote, current_graph
 from bubble.prfx import AS, NT, SWA, UUID
 from bubble.util import new
 from bubble.stat import gather_system_info
 
 
-from rdflib import OWL, RDFS, Graph, Literal
+from rdflib import OWL, RDFS, Literal
 from rdflib.graph import _SubjectType
 from trio import Path
 
@@ -39,26 +39,27 @@ async def construct_bubble_graph(path, info):
     step = fresh_iri()
     head = fresh_iri()
 
-    with using_graph(Graph()) as g:
-        bind_prefixes()
+    bind_prefixes()
 
-        machine = SWA[info["machine_id"]]
+    machine = SWA[info["machine_id"]]
 
-        filesystem = describe_filesystem(info)
+    filesystem = describe_filesystem(info)
 
-        home_dir = await describe_home_directory(info, filesystem)
-        bubble = describe_bubble(step, info)
-        user = describe_user_account(info, home_dir)
+    home_dir = await describe_home_directory(info, filesystem)
+    bubble = describe_bubble(step, info)
+    user = describe_user_account(info, home_dir)
 
-        describe_repository(path, filesystem, home_dir, bubble)
-        describe_machine(info, machine, filesystem, user)
-        describe_creation_event(user, bubble, path, info)
-        describe_steps(bubble, step, head, path)
-        describe_surface_addition(user, bubble, surface, path)
+    describe_repository(path, filesystem, home_dir, bubble)
+    describe_machine(info, machine, filesystem, user)
+    describe_creation_event(user, bubble, path, info)
+    describe_steps(bubble, step, head, path)
+    describe_surface_addition(user, bubble, surface, path)
 
-        g.serialize(destination=path / "root.n3", format="n3")
+    current_graph.get().serialize(
+        destination=path / "root.n3", format="n3"
+    )
 
-        return bubble
+    return bubble
 
 
 def describe_user_account(info, home_dir):
@@ -104,6 +105,10 @@ def describe_repository(path, filesystem, home_dir, bubble):
 
 
 def describe_bubble(step, info):
+    bubble = fresh_iri()
+    local_part = str(bubble).split("/")[
+        -1
+    ]  # Get the last part after the slash
     return new(
         NT.Bubble,
         {
@@ -111,7 +116,9 @@ def describe_bubble(step, info):
                 f"a bubble for {info['person_name']}",
             ),
             NT.head: step,
+            NT.emailAddress: f"{local_part}@swa.sh",
         },
+        subject=bubble,
     )
 
 

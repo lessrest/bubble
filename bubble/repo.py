@@ -7,6 +7,7 @@
 # If the repository is empty, it will be initialized as a new bubble.
 # Each bubble has a unique IRI minted on creation.
 
+from contextlib import asynccontextmanager
 import logging
 
 
@@ -23,8 +24,8 @@ from rdflib.graph import _SubjectType
 from bubble.boot import describe_new_bubble
 from bubble.mind import reason
 from bubble.prfx import NT
-from bubble.util import get_single_subject
-from bubble.vars import using_graph, current_graph
+from bubble.util import get_single_subject, print_n3
+from bubble.vars import using_graph
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +45,11 @@ class BubbleRepo:
     # The graph of the bubble
     graph: Graph
 
-    def __init__(self, path: Path, base: _SubjectType):
+    def __init__(self, path: Path, graph: Graph, base: _SubjectType):
         self.workdir = path
         self.rootpath = path / "root.n3"
         self.bubble = base
-        self.graph = current_graph.get()
+        self.graph = graph
 
     async def load_many(
         self,
@@ -97,30 +98,54 @@ class BubbleRepo:
 
     @staticmethod
     async def open(path: Path) -> "BubbleRepo":
-        if not await trio.Path(path).exists():
-            await trio.Path(path).mkdir(parents=True)
+        with using_graph(Graph()) as g:
+            if not await trio.Path(path).exists():
+                await trio.Path(path).mkdir(parents=True)
 
-        if not await trio.Path(path / "root.n3").exists():
-            bubble = await describe_new_bubble(path)
-            repo = BubbleRepo(path, bubble)
-            await repo.commit()
-            return repo
+            if not await trio.Path(path / "root.n3").exists():
+                bubble = await describe_new_bubble(path)
+                logger.info("Created new bubble %s at %s", bubble, path)
+                repo = BubbleRepo(path, g, bubble)
+                await repo.commit()
 
-        else:
-            g = Graph()
-            g.parse(path / "root.n3", format="n3")
-
-            with using_graph(g):
+            else:
+                g.parse(path / "root.n3", format="n3")
                 bubble = get_single_subject(RDF.type, NT.Bubble)
 
-            assert isinstance(bubble, URIRef)
-            return BubbleRepo(path, URIRef(bubble))
+                assert isinstance(bubble, URIRef)
+                repo = BubbleRepo(path, g, URIRef(bubble))
+
+        return repo
 
     async def commit(self) -> None:
         """Commit the bubble"""
         if not await trio.Path(self.workdir / ".git").exists():
             await trio.run_process(
                 ["git", "-C", str(self.workdir), "init"],
+            )
+            # Get the bubble's email address from its properties
+            email = str(self.graph.value(self.bubble, NT.emailAddress))
+
+            # Set Git configuration for this repository using the bubble's identity
+            await trio.run_process(
+                [
+                    "git",
+                    "-C",
+                    str(self.workdir),
+                    "config",
+                    "user.name",
+                    "Bubble",
+                ],
+            )
+            await trio.run_process(
+                [
+                    "git",
+                    "-C",
+                    str(self.workdir),
+                    "config",
+                    "user.email",
+                    email,
+                ],
             )
 
         # Add all files to the index
@@ -138,3 +163,11 @@ class BubbleRepo:
                 f"Initialize {self.bubble}",
             ]
         )
+
+
+@asynccontextmanager
+async def using_bubble_at(path: Path):
+    repo = await BubbleRepo.open(path)
+    print_n3(repo.graph)
+    with using_graph(repo.graph):
+        yield repo
