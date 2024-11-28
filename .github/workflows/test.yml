@@ -43,3 +43,5 @@ jobs:
         echo "## Test results" >> $GITHUB_STEP_SUMMARY
         cat tmp.md >> $GITHUB_STEP_SUMMARY
 
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
