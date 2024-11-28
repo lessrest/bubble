@@ -4,6 +4,6 @@
 
 @layer utilities {
   .small-caps {
-    font-variant-caps: small-caps;
+    font-variant-caps: all-petite-caps;
   }
 }

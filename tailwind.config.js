@@ -4,8 +4,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        serif: ["Equity OT"],
-        mono: ["iosevka extended", "monospace"],
+        serif: ["Equity OT", "Times New Roman", "serif"],
+        sans: ["Iosevka Aile", "sans-serif"],
+        mono: ["Iosevka Medium Extended", "monospace"],
       },
     },
   },
