@@ -25,6 +25,8 @@ from trio import Path
 
 
 import getpass
+import os
+import pwd
 
 
 async def describe_new_bubble(path: Path) -> _SubjectType:
@@ -127,6 +129,7 @@ async def describe_home_directory(info, filesystem):
 
 
 def describe_filesystem(info):
+    """Describe filesystem in a platform-independent way"""
     return new(
         NT.Filesystem,
         {
@@ -283,3 +286,11 @@ def describe_root_surface(bubble, surface, path):
         },
         subject=surface,
     )
+
+
+def get_user_info():
+    """Get user info in a platform-independent way"""
+    user_info = pwd.getpwuid(os.getuid())
+    # Handle cases where GECOS field might be empty
+    person_name = user_info.pw_gecos or user_info.pw_name
+    return user_info, person_name

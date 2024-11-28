@@ -2,7 +2,6 @@ import pytest
 import trio
 from rdflib import Graph, URIRef, RDF
 from bubble.repo import BubbleRepo
-from bubble.mint import Mint
 
 
 @pytest.fixture

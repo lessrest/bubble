@@ -5,16 +5,14 @@ import pwd
 import socket
 import psutil
 from rdflib import XSD, Literal
+import uuid
 
-from bubble.macs import computer_serial_number, get_disk_info
 from bubble.prfx import NT
-from bubble.mint import mintvar
+from bubble.disk import DiskInfo, get_disk_info
 
 from typing import TypedDict
 from pwd import struct_passwd
 from rdflib import URIRef
-
-from bubble.macs import DiskInfo
 
 
 class SystemInfo(TypedDict):
@@ -33,9 +31,59 @@ class SystemInfo(TypedDict):
     disk_uuid: str
 
 
+async def get_computer_serial() -> str:
+    """Get computer serial number in a platform-independent way"""
+    try:
+        if platform.system() == "Darwin":
+            from bubble.macs import computer_serial_number
+
+            return await computer_serial_number()
+        else:
+            # Try to get DMI info on Linux
+            try:
+                with open("/sys/class/dmi/id/product_serial") as f:
+                    return f.read().strip()
+            except (FileNotFoundError, PermissionError):
+                return str(
+                    uuid.getnode()
+                )  # Fallback to MAC address-based ID
+    except Exception:
+        return str(uuid.getnode())  # Final fallback
+
+
+async def get_machine_id() -> str:
+    """Get a stable machine identifier in a platform-independent way"""
+    # Try different methods in order of preference
+    try:
+        # Try reading machine-id on Linux/systemd systems
+        if os.path.exists("/etc/machine-id"):
+            with open("/etc/machine-id") as f:
+                return f.read().strip()
+
+        # Try reading Hardware UUID on macOS
+        if platform.system() == "Darwin":
+            from bubble.macs import get_hardware_uuid
+
+            try:
+                return await get_hardware_uuid()
+            except Exception:
+                pass
+
+        # Fallback: Use a combination of hostname and MAC address
+        # This should be stable across reboots
+        hostname = socket.gethostname()
+        mac = uuid.getnode()
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{hostname}:{mac}"))
+
+    except Exception:
+        # Final fallback: random UUID
+        # Note: This will change across reboots
+        return str(uuid.uuid4())
+
+
 async def gather_system_info() -> SystemInfo:
-    computer_serial = await computer_serial_number()
-    machine_id = mintvar.get().machine_id()
+    computer_serial = await get_computer_serial()
+    machine_id = await get_machine_id()
 
     now = get_timestamp()
     hostname, arch, system = get_system_info()
@@ -44,7 +92,8 @@ async def gather_system_info() -> SystemInfo:
     byte_size, gigabyte_size = get_memory_size()
     user_info, person_name = get_user_info()
 
-    disk_info = await get_disk_info("/System/Volumes/Data")
+    # Use platform-independent disk info gathering
+    disk_info = await get_disk_info()
     disk_uuid = disk_info["DiskUUID"]
 
     return SystemInfo(
@@ -89,11 +138,17 @@ def get_user_info():
 
 
 def resolve_system(system):
+    """Resolve system type and version in a platform-independent way"""
     match system:
         case "Darwin":
             system_type = NT.macOSEnvironment
             system_version = platform.mac_ver()[0]
-
+        case "Linux":
+            system_type = NT.LinuxEnvironment
+            system_version = platform.release()
+        case "Windows":
+            system_type = NT.WindowsEnvironment
+            system_version = platform.release()
         case _:
             raise ValueError(f"Unknown operating system: {system}")
     return system_type, system_version

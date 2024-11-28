@@ -27,5 +27,4 @@ async def test_gather_system_info():
     assert info["person_name"]
     assert info["user_info"].pw_name
     assert isinstance(info["disk_info"], dict)
-    assert "DiskUUID" in info["disk_info"]
     assert info["disk_uuid"] == info["disk_info"]["DiskUUID"]

@@ -77,9 +77,8 @@ async def disk_list() -> DiskList:
 
 
 async def get_disk_info(disk: str) -> DiskInfo:
-    """Get detailed information about a specific disk"""
+    """Get detailed information about a specific disk using diskutil"""
     cmd = ["diskutil", "info", "-plist", disk]
-    rich.print(cmd)
     output = await run_process(cmd, capture_stdout=True)
     return plistlib.loads(output.stdout)
 
@@ -107,6 +106,17 @@ async def computer_serial_number():
 
     data = json.loads(output.stdout)
     return data["SPHardwareDataType"][0]["serial_number"]
+
+
+async def get_hardware_uuid() -> str:
+    """Get the hardware UUID of this Mac using system_profiler"""
+    cmd = ["system_profiler", "SPHardwareDataType", "-json"]
+    output = await run_process(cmd, capture_stdout=True)
+
+    import json
+
+    data = json.loads(output.stdout)
+    return data["SPHardwareDataType"][0]["platform_UUID"]
 
 
 async def main():
