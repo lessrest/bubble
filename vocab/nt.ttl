@@ -1,15 +1,19 @@
-@prefix : <https://node.town/2024/> .
 @prefix as: <http://www.w3.org/ns/activitystreams#> .
+@prefix iaodev: <http://purl.obolibrary.org/obo/iao/dev/> .
 @prefix nt: <https://node.town/2024/> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xml: <http://www.w3.org/XML/1998/namespace> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
 @base <https://node.town/2024/> .
 
 <https://node.town/2024/> rdf:type owl:Ontology ;
-   owl:imports <http://purl.obolibrary.org/obo/iao/dev/iao-edit.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_OBI.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_PATO.owl> , <http://purl.obolibrary.org/obo/iao/dev/import_UO.owl> ;
+   owl:imports iaodev:iao-edit.owl ,
+   iaodev:import_OBI.owl ,
+   iaodev:import_PATO.owl ,
+   iaodev:import_UO.owl ;
    rdfs:label "Node.Town Ontology of Computer Systems"@en .
 
 #################################################################
@@ -17,7 +21,7 @@
 #################################################################
 
 ###  http://purl.obolibrary.org/obo/IAO_0000115
-<http://purl.obolibrary.org/obo/IAO_0000115> rdf:type owl:AnnotationProperty .
+obo:IAO_0000115 rdf:type owl:AnnotationProperty .
 
 #
 rdfs:subClassOf rdfs:label "is subclass of"@en , "är subklass av"@sv , "ir apakšklase no"@lv .
@@ -30,6 +34,11 @@ owl:Class rdfs:label "class"@en , "klass"@sv , "klase"@lv .
 owl:ObjectProperty rdfs:label "object property"@en , "egenskap (objekt)"@sv , "objekta īpašība"@lv .
 owl:DatatypeProperty rdfs:label "datatype property"@en , "egenskap (datatyp)"@sv , "datu tipa īpašība"@lv .
 owl:sameAs rdfs:label "is same as"@en , "är samma som"@sv , "ir vienāds ar"@lv .
+
+obo:BFO_0000020 rdfs:label "specifically dependent continuant"@en .
+obo:BFO_0000031 rdfs:label "generically dependent continuant"@en .
+obo:BFO_0000001 rdfs:label "entity"@en .
+obo:BFO_0000040 rdfs:label "material entity"@en .
 
 #################################################################
 #    Object Properties
@@ -217,29 +226,29 @@ nt:version rdf:type owl:DatatypeProperty ;
 #################################################################
 
 ###  http://purl.obolibrary.org/obo/BFO_0000002
-<http://purl.obolibrary.org/obo/BFO_0000002> owl:equivalentClass nt:Continuant .
+obo:BFO_0000002 owl:equivalentClass nt:Continuant .
 
 
 ###  http://purl.obolibrary.org/obo/BFO_0000030
-<http://purl.obolibrary.org/obo/BFO_0000030> owl:equivalentClass nt:Object .
+obo:BFO_0000030 owl:equivalentClass nt:Object .
 
 
 ###  http://purl.obolibrary.org/obo/IAO_0000030
-<http://purl.obolibrary.org/obo/IAO_0000030> owl:equivalentClass nt:InformationContentEntity .
+obo:IAO_0000030 owl:equivalentClass nt:InformationContentEntity .
 
 
 ###  http://purl.obolibrary.org/obo/IAO_0000104
-<http://purl.obolibrary.org/obo/IAO_0000104> owl:equivalentClass nt:PlanSpecification .
+obo:IAO_0000104 owl:equivalentClass nt:PlanSpecification .
 
 
 ###  http://www.w3.org/ns/activitystreams#Actor
 as:Actor rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000023> .
+   rdfs:subClassOf obo:BFO_0000023 .
 
 
 ###  http://www.w3.org/ns/activitystreams#Agent
 as:Agent rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000023> .
+   rdfs:subClassOf obo:BFO_0000023 .
 
 ###  http://www.w3.org/ns/activitystreams#Person
 as:Person rdf:type owl:Class ;
@@ -283,14 +292,13 @@ nt:ComputerMachine rdf:type owl:Class ;
 
 ###  https://node.town/2024/ComputingEnvironment
 nt:ComputingEnvironment rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000020> ;
+   rdfs:subClassOf obo:BFO_0000020 ;
    rdfs:comment "a computing environment is a software environment that provides system services and interfaces"@en , "en datormiljö är en mjukvarumiljö som tillhandahåller systemtjänster och gränssnitt"@sv , "skaitļošanas vide ir programmatūras vide, kas nodrošina sistēmas pakalpojumus un saskarnes"@lv ;
    rdfs:label "computing environment"@en , "datormiljö"@sv , "skaitļošanas vide"@lv .
 
-
 ###  https://node.town/2024/Continuant
 nt:Continuant rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000001> ;
+   rdfs:subClassOf obo:BFO_0000001 ;
    rdfs:comment "a continuant is an entity that continues to exist through time"@en , "en kontinuant är en entitet som fortsätter att existera genom tiden"@sv , "turpinājums ir entitāte, kas turpina pastāvēt laikā"@lv ;
    rdfs:label "continuant"@en , "kontinuant"@sv , "turpinājums"@lv .
 
@@ -318,14 +326,14 @@ nt:Filesystem rdf:type owl:Class ;
 
 ###  https://node.town/2024/InformationContentEntity
 nt:InformationContentEntity rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000031> ;
+   rdfs:subClassOf obo:BFO_0000031 ;
    rdfs:comment "an information content entity is a generically dependent continuant that is about something"@en , "en informationsinnehållsentitet är en generiskt beroende kontinuant som handlar om något"@sv , "informācijas satura entitāte ir ģenēriski atkarīgs turpinājums, kas ir par kaut ko"@lv ;
    rdfs:label "information content entity"@en , "informationsinnehållsentitet"@sv , "informācijas satura entitāte"@lv .
 
 
 ###  https://node.town/2024/Object
 nt:Object rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/BFO_0000040> ;
+   rdfs:subClassOf obo:BFO_0000040 ;
    rdfs:comment "an object is a material entity with coherence and integrity"@en , "ett objekt är en materiell entitet med sammanhang och integritet"@sv , "objekts ir materiāla entitāte ar saskaņotību un integritāti"@lv ;
    rdfs:label "object"@en , "objekt"@sv , "objekts"@lv .
 
@@ -339,7 +347,7 @@ nt:Person rdf:type owl:Class ;
 
 ###  https://node.town/2024/PlanSpecification
 nt:PlanSpecification rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000033> .
+   rdfs:subClassOf obo:IAO_0000033 .
 
 ###  https://node.town/2024/OperatingSystem
 nt:OperatingSystem rdf:type owl:Class ;
@@ -368,7 +376,7 @@ nt:RandomAccessMemory rdf:type owl:Class ;
 
 ###  https://node.town/2024/Repository
 nt:Repository rdf:type owl:Class ;
-   rdfs:subClassOf <http://purl.obolibrary.org/obo/IAO_0000310> ;
+   rdfs:subClassOf obo:IAO_0000310 ;
    rdfs:comment "a repository is a Git repository that tracks the history of a bubble"@en , "ett arkiv är ett Git-arkiv som spårar historiken för en bubbla"@sv , "repozitorijs ir Git repozitorijs, kas seko burbuļa vēsturei"@lv ;
    rdfs:label "repository"@en , "arkiv"@sv , "repozitorijs"@lv .
 
@@ -393,21 +401,9 @@ nt:DoxxingRisk rdf:type owl:Class ;
    rdfs:comment "risk of exposing personally identifiable information"@en , "risk för att exponera personligt identifierbar information"@sv , "personas identificējamas informācijas izpaušanas risks"@lv ;
    rdfs:label "doxxing risk"@en , "avslöjanderisk"@sv , "deanonimizācijas risks"@lv .
 
-
-#################################################################
-#    Annotations
-#################################################################
 nt:architecture rdfs:comment "relates a CPU to its instruction set architecture"@en ;
    rdfs:label "has architecture"@en , "har arkitektur"@sv , "ir arhitektūra"@lv .
 
-
-###  Generated by the OWL API (version 4.5.29.2024-05-13T12:11:03Z) https://github.com/owlcs/owlapi
-
-#################################################################
-#    Individuals
-#################################################################
-
-###  https://node.town/2024/serialNumber
 nt:serialNumber nt:hasRisk nt:DoxxingRisk .
 nt:ARM64 a nt:ARMArchitecture ;
    rdfs:label "ARM64"@en , "AArch64"@en ;
@@ -417,7 +413,7 @@ nt:ArmHoldings a nt:PublicCorporation ;
    rdfs:label "Arm Holdings plc"@en ;
    nt:headquartered nt:Cambridge ;
    nt:founded "1990-11-27"^^xsd:date .
-nt:headquartered rdf:type owl:ObjectProperty ;
+nt:headquartered a owl:ObjectProperty ;
    rdfs:domain nt:PublicCorporation ;
    rdfs:range nt:City ;
    rdfs:label "is headquartered in"@en , "har huvudkontor i"@sv , "ir galvenais kontors"@lv .
@@ -430,13 +426,13 @@ nt:England a nt:Country ;
    rdfs:label "England"@en .
 nt:Country a owl:Class ;
    rdfs:label "country"@en , "land"@sv , "valsts"@lv .
-nt:country rdf:type owl:ObjectProperty ;
+nt:country a owl:ObjectProperty ;
    rdfs:domain nt:City ;
    rdfs:range nt:Country ;
    rdfs:label "is in country"@en , "ligger i land"@sv , "atrodas valstī"@lv .
 nt:ARMArchitecture a owl:Class ;
    rdfs:label "ARM architecture"@en , "ARM-arkitektur"@sv , "ARM arhitektūra"@lv .
-nt:bitWidth rdf:type owl:DatatypeProperty ;
+nt:bitWidth a owl:DatatypeProperty ;
    rdfs:domain nt:Architecture ;
    rdfs:range xsd:integer ;
    rdfs:label "has bit width"@en , "har bitbredd"@sv , "ir bitu platums"@lv .

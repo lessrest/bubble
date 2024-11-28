@@ -561,7 +561,6 @@ def _render_string_literal(obj: Literal) -> None:
 @html.span(
     "text-emerald-600 dark:text-emerald-500 font-mono",
     "inline-block text-ellipsis overflow-hidden",
-    "whitespace-nowrap",
     "before:content-['«'] after:content-['»']",
 )
 def render_other_string(obj):
@@ -616,9 +615,7 @@ def _render_date_literal(obj: Literal) -> None:
         text(obj.value)
 
 
-@html.span(
-    "text-teal-600 dark:text-teal-400 inline-flex items-baseline"
-)
+@html.span("text-teal-600 dark:text-teal-400 inline items-baseline")
 def _render_language_literal(obj: Literal) -> None:
     assert obj.language
     if not inside_property_label.get():
