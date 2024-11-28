@@ -33,12 +33,20 @@ from fastapi.websockets import WebSocketState
 
 from bubble import mint
 
-logger = logging.getLogger(__name__)
+"""
+A module for building HTML/XML documents using Python context managers.
+Provides a declarative way to construct DOM trees with live-updating capabilities.
+"""
 
-live_router = APIRouter(prefix="/live")
+logger = logging.getLogger(__name__)
 
 
 class HTMLDecorators:
+    """
+    Provides a convenient API for creating HTML elements as decorators.
+    Usage: @html.div(class="container") or @html("div", class="container")
+    """
+
     def __getattr__(self, name: str) -> Callable[..., Any]:
         return lambda *args, **kwargs: element(name, *args, **kwargs)
 
@@ -65,17 +73,42 @@ def element(tag_name: str, *klasses: str, **kwargs):
 
 
 class Fragment:
+    """
+    Represents a collection of HTML/XML elements that can be rendered
+    as a complete document or XML fragment.
+    """
+
     def __init__(self):
         self.element = ET.Element("fragment")
 
     def __str__(self) -> str:
-        return "".join(
-            ET.tostring(child, encoding="unicode", method="html")
-            for child in self.element
-        )
+        return self.to_html()
 
-    def to_html(self) -> str:
-        return self.__str__()
+    def to_html(self, compact: bool = False) -> str:
+        if len(self.element) == 0:
+            return ""
+        elif len(self.element) > 1 and not compact:
+            raise ValueError(
+                "Pretty printing requires exactly one root element"
+            )
+
+        if compact:
+            return "".join(
+                ET.tostring(child, encoding="unicode", method="html")
+                for child in self.element
+            )
+
+        # For pretty printing, use BeautifulSoup
+        from bs4 import BeautifulSoup
+
+        element = (
+            self.element[0] if len(self.element) == 1 else self.element
+        )
+        rough_string = ET.tostring(
+            element, encoding="unicode", method="html"
+        )
+        soup = BeautifulSoup(rough_string, "html.parser")
+        return soup.prettify()
 
     def to_xml(self) -> str:
         if len(self.element) > 1:
@@ -93,9 +126,11 @@ def attr_name_to_xml(name: str) -> str:
     return name.replace("_", "-").removesuffix("-")
 
 
+# Context variables to track the current element and root document
 node: ContextVar[ET.Element] = ContextVar("node")
 root: ContextVar[Fragment] = ContextVar("root")
 
+# Maps live element IDs to their update functions and arguments
 livetags: Dict[
     str, tuple[Callable[..., Awaitable[Any]], tuple, dict]
 ] = {}
@@ -103,6 +138,7 @@ livetags: Dict[
 
 @contextmanager
 def document():
+    """Creates a new document context for building HTML/XML content"""
     doc = Fragment()
     token = root.set(doc)
     token2 = node.set(doc.element)
@@ -114,6 +150,10 @@ def document():
 
 
 def tag(tagname: str, **kwargs):
+    """
+    Creates a new HTML/XML element with the given tag name and attributes.
+    Returns a context manager for adding child elements.
+    """
     element = ET.Element(
         tagname,
         attrib={
@@ -173,8 +213,8 @@ def attr(name: str, value: str | bool | None = True):
 
 
 def classes(*names: str):
-    current = node.get().get("class", "")
-    if current:
+    current = node.get().get("class", "").strip()
+    if current and names:
         current += " "
     node.get().set("class", current + " ".join(names))
 
@@ -242,6 +282,11 @@ class LiveMessage:
 
 
 class LiveNode:
+    """
+    Manages live-updating DOM nodes through WebSocket connections.
+    Supports append, replace, and prepend operations.
+    """
+
     # wrap a send channel and allow appending
     def __init__(
         self, id: str, send: trio.MemorySendChannel[LiveMessage]
@@ -319,8 +364,16 @@ async def live_subscription(websocket, id: str):
             del live_cancel_scopes[id]
 
 
+# FastAPI router for the live update functionality
+live_router = APIRouter(prefix="/live")
+
+
 @live_router.websocket("/socket")
 async def live_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint that handles live updates to DOM elements.
+    Manages subscriptions to live elements and broadcasts updates.
+    """
     await websocket.accept()
 
     async with trio.open_nursery() as nursery:
@@ -409,6 +462,11 @@ async def get_livejs():
 
 # pure ASGI middleware
 class ErrorMiddleware:
+    """
+    ASGI middleware that catches exceptions and renders them as
+    rich HTML error pages with detailed tracebacks.
+    """
+
     def __init__(self, app: ASGIApp):
         self.app = app
 
