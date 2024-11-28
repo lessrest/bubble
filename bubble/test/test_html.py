@@ -1,5 +1,4 @@
 import pytest
-import xml.etree.ElementTree as ET
 
 from bubble.html import (
     document,
@@ -66,8 +65,8 @@ def test_classes():
             classes("foo", "bar")
             text("Content")
 
-    result = doc.to_html()
-    assert '<div class="foo bar">\n Content\n</div>\n' in result
+    result = doc.to_html(compact=True)
+    assert '<div class="foo bar">Content</div>' in result
 
 
 def test_dataset():
@@ -109,7 +108,7 @@ def test_nested_tags():
 </div>
 """
 
-    assert doc.to_html() == expected
+    assert doc.to_html(compact=False) == expected
 
 
 def test_fragment_xml():
@@ -130,7 +129,7 @@ def test_hypermedia_response():
             text("Test")
         response = HypermediaResponse(content=None)
         rendered = response.render(None)
-        assert b"<div>\n Test\n</div>\n" in rendered
+        assert b"<div>Test</div>" in rendered
 
 
 def test_xml_response():
@@ -167,7 +166,7 @@ def test_multiple_text_nodes():
             text("World")
 
     result = doc.to_html()
-    assert "<p>\n Hello World\n</p>\n" in result
+    assert "<p>Hello World</p>" in result
 
 
 def test_exact_html_document():
@@ -232,67 +231,7 @@ def test_exact_html_document():
 </html>
 """
 
-    assert doc.to_html() == expected
-
-
-def test_pretty_html():
-    """Test creating HTML with proper indentation and newlines (default)"""
-    with document() as doc:
-        with tag("html"):
-            with tag("head"):
-                with tag("title"):
-                    text("Test Page")
-            with tag("body"):
-                with tag("div", class_="container"):
-                    with tag("h1"):
-                        text("Hello")
-                    with tag("p"):
-                        text("This is a test")
-
-    expected = """\
-<html>
- <head>
-  <title>
-   Test Page
-  </title>
- </head>
- <body>
-  <div class="container">
-   <h1>
-    Hello
-   </h1>
-   <p>
-    This is a test
-   </p>
-  </div>
- </body>
-</html>
-"""
-
-    assert doc.to_html() == expected
-
-
-def test_elementtree_basics():
-    """Demonstrate how ElementTree creates and renders HTML"""
-    # Create elements
-    root = ET.Element("html")
-    head = ET.SubElement(root, "head")
-    title = ET.SubElement(head, "title")
-    title.text = "Test"
-
-    body = ET.SubElement(root, "body")
-    body.set("class", "content")
-
-    p = ET.SubElement(body, "p")
-    p.text = "Hello "
-    strong = ET.SubElement(p, "strong")
-    strong.text = "World"
-    strong.tail = "!"
-
-    # Convert to string
-    result = ET.tostring(root, encoding="unicode", method="html")
-    expected = '<html><head><title>Test</title></head><body class="content"><p>Hello <strong>World</strong>!</p></body></html>'
-    assert result == expected
+    assert doc.to_html(compact=False) == expected
 
 
 def test_html_decorator_variations():

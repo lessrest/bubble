@@ -7,9 +7,10 @@
 # If the repository is empty, it will be initialized as a new bubble.
 # Each bubble has a unique IRI minted on creation.
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 import logging
-
+from dataclasses import dataclass
 
 import trio
 
@@ -18,6 +19,7 @@ from rdflib import (
     RDF,
     Graph,
     URIRef,
+    Dataset,
 )
 from rdflib.graph import _SubjectType
 
@@ -25,11 +27,12 @@ from bubble.boot import describe_new_bubble
 from bubble.mind import reason
 from bubble.prfx import NT
 from bubble.util import get_single_subject, print_n3
-from bubble.vars import using_graph
+from bubble.vars import using, using_graph
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class BubbleRepo:
     """A repository of RDF/N3 documents"""
 
@@ -42,14 +45,25 @@ class BubbleRepo:
     # The bubble's IRI
     bubble: _SubjectType
 
-    # The graph of the bubble
+    # The dataset containing all graphs
+    dataset: Dataset
+
+    # The graph of the bubble's data
     graph: Graph
 
-    def __init__(self, path: Path, graph: Graph, base: _SubjectType):
+    # The graph containing vocabulary/ontology
+    vocab: Graph
+
+    def __init__(
+        self, path: Path, dataset: Dataset, base: _SubjectType
+    ):
         self.workdir = path
         self.rootpath = path / "root.n3"
         self.bubble = base
-        self.graph = graph
+
+        self.dataset = dataset
+        self.graph = self.dataset.graph(NT.bubble)
+        self.vocab = self.dataset.graph(NT.vocabulary)
 
     async def load_many(
         self,
@@ -77,9 +91,22 @@ class BubbleRepo:
         await self.load_many(path.parent, path.name, "graph")
 
     async def load_ontology(self) -> None:
-        """Load the ontology into the graph"""
+        """Load the ontology into the vocab graph"""
         vocab_dir = Path(__file__).parent.parent / "vocab"
-        await self.load_many(vocab_dir, "*.ttl", "ontology")
+        paths = []
+        files = await trio.Path(vocab_dir).glob("*.ttl")
+        paths.extend(files)
+
+        # clear any existing vocabulary
+        for triple in self.vocab:
+            logger.info(f"Removing ontology triple for {triple[0]}")
+            self.dataset.remove(triple)
+
+        for path in paths:
+            logger.info(f"Loading ontology from {path}")
+            graph = Graph().parse(str(path), format="turtle")
+            for s, p, o in graph:
+                self.dataset.add((s, p, o, self.vocab))
 
     async def load_surfaces(self) -> None:
         """Load all surfaces from the bubble into the graph"""
@@ -91,29 +118,38 @@ class BubbleRepo:
         await self.load_many(rules_dir, "*.n3", "rule")
 
     async def reason(self) -> Graph:
-        """Reason over the graph"""
-        conclusion = await reason([self.graph])
+        """Reason over the graphs"""
+        # Pass all graphs from dataset to the reasoner
+        conclusion = await reason(list(self.dataset.graphs()))
         logger.info(f"Conclusion has {len(conclusion)} triples")
         return conclusion
 
     @staticmethod
     async def open(path: Path) -> "BubbleRepo":
-        with using_graph(Graph()) as g:
-            if not await trio.Path(path).exists():
-                await trio.Path(path).mkdir(parents=True)
+        if not await trio.Path(path).exists():
+            await trio.Path(path).mkdir(parents=True)
 
-            if not await trio.Path(path / "root.n3").exists():
-                bubble = await describe_new_bubble(path)
-                logger.info("Created new bubble %s at %s", bubble, path)
-                repo = BubbleRepo(path, g, bubble)
-                await repo.commit()
+        should_commit = False
 
-            else:
-                g.parse(path / "root.n3", format="n3")
-                bubble = get_single_subject(RDF.type, NT.Bubble)
+        if not await trio.Path(path / "root.n3").exists():
+            graph = await describe_new_bubble(path)
+            graph.serialize(destination=path / "root.n3", format="n3")
+            should_commit = True
 
-                assert isinstance(bubble, URIRef)
-                repo = BubbleRepo(path, g, URIRef(bubble))
+        dataset = Dataset(default_union=True)
+
+        with using_graph(
+            Graph().parse(path / "root.n3", format="n3")
+        ) as graph:
+            bubble = get_single_subject(RDF.type, NT.Bubble)
+            bubble_graph = dataset.graph(NT.bubble)
+            for triple in graph:
+                bubble_graph.add(triple)
+
+        repo = BubbleRepo(path, dataset, URIRef(bubble))
+
+        if should_commit:
+            await repo.commit()
 
         return repo
 
@@ -165,9 +201,19 @@ class BubbleRepo:
         )
 
 
+current_bubble: ContextVar[BubbleRepo] = ContextVar("bubble")
+
+
+@contextmanager
+def using_bubble(bubble: BubbleRepo):
+    with using(current_bubble, bubble):
+        with using_graph(bubble.graph):
+            yield bubble
+
+
 @asynccontextmanager
 async def using_bubble_at(path: Path):
     repo = await BubbleRepo.open(path)
     print_n3(repo.graph)
-    with using_graph(repo.graph):
+    with using_bubble(repo):
         yield repo

@@ -109,3 +109,69 @@ async def test_repo_git_config(temp_repo):
         capture_stdout=True,
     )
     assert result.stdout.decode().strip() == email
+
+
+async def test_repo_separate_graphs(temp_repo):
+    """Test that vocab and data are kept in separate graphs"""
+    # Load some test data into main graph
+    test_file = trio.Path(temp_repo.workdir) / "test.n3"
+    await test_file.write_text("""
+        @prefix : <http://example.org/> .
+        :TestSubject a :TestType .
+    """)
+    await temp_repo.load_surfaces()
+
+    # Load ontology into vocab graph
+    await temp_repo.load_ontology()
+
+    # Get initial sizes
+    data_size = len(temp_repo.graph)
+    vocab_size = len(temp_repo.vocab)
+
+    assert data_size > 0, "Data graph should not be empty"
+    assert vocab_size > 0, "Vocab graph should not be empty"
+
+    # Reload ontology
+    await temp_repo.load_ontology()
+
+    # Verify data graph was unaffected
+    assert (
+        len(temp_repo.graph) == data_size
+    ), "Data graph should be unchanged"
+    assert (
+        len(temp_repo.vocab) == vocab_size
+    ), "Vocab should reload to same size"
+
+
+async def test_repo_dataset(temp_repo):
+    """Test that the dataset properly manages multiple graphs"""
+    # Load some test data into main graph
+    test_file = trio.Path(temp_repo.workdir) / "test.n3"
+    await test_file.write_text("""
+        @prefix : <http://example.org/> .
+        :TestSubject a :TestType .
+    """)
+    await temp_repo.load_surfaces()
+
+    # Load ontology into vocab graph
+    await temp_repo.load_ontology()
+
+    # Verify graphs are in dataset
+    assert temp_repo.graph.identifier == URIRef(
+        "https://node.town/2024/bubble"
+    )
+    assert temp_repo.vocab.identifier == URIRef(
+        "https://node.town/2024/vocabulary"
+    )
+
+    # Verify we can get graphs from dataset
+    assert temp_repo.dataset.graph(NT.bubble) == temp_repo.graph
+    assert temp_repo.dataset.graph(NT.vocabulary) == temp_repo.vocab
+
+    # Verify data is in correct graphs
+    assert len(temp_repo.graph) > 0
+    assert len(temp_repo.vocab) > 0
+
+    # Test quads access
+    quads = list(temp_repo.dataset.quads((None, None, None, None)))
+    assert len(quads) == len(temp_repo.graph) + len(temp_repo.vocab)

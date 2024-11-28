@@ -3,7 +3,7 @@ import json
 import logging
 import pathlib
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 import hypercorn.trio
 import trio
@@ -18,11 +18,8 @@ from bubble.html import (
 )
 from bubble.prfx import NT, RDF
 from bubble.rdfa import rdf_resource
-from bubble.repo import BubbleRepo
+from bubble.repo import BubbleRepo, using_bubble
 from bubble.util import get_single_subject
-from bubble.vars import using_graph
-from bubble.html import live_router
-from bubble.vars import current_graph
 
 import bubble.rdfa
 
@@ -31,18 +28,23 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("The application is starting.")
+    logger.info("The Bubble HTTP server is starting.")
+
     bubble = await BubbleRepo.open(
         trio.Path(pathlib.Path.home() / "bubble")
     )
-    current_graph.set(bubble.graph)
 
-    with using_graph(bubble.graph):
-        await bubble.load_surfaces()
-        await bubble.load_rules()
-        await bubble.load_ontology()
-        logger.info(f"Loaded {len(bubble.graph)} triples")
-        yield
+    app.state.bubble = bubble
+
+    await bubble.load_surfaces()
+    await bubble.load_rules()
+    await bubble.load_ontology()
+    logger.info(f"Loaded {len(bubble.graph)} bubble triples")
+    logger.info(f"Loaded {len(bubble.vocab)} ontology triples")
+
+    yield
+
+    logger.info("The Bubble HTTP server is shutting down.")
 
 
 """
@@ -55,19 +57,29 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def bubble_graph(request: Request, call_next):
+    with using_bubble(request.app.state.bubble):
+        logger.info(
+            f"Using graph with {len(request.app.state.bubble.graph)} triples"
+        )
+        try:
+            return await call_next(request)
+        finally:
+            logger.info("Leaving graph context")
+
+
+@app.middleware("http")
+async def reload_ontology(request: Request, call_next):
+    repo: BubbleRepo = request.app.state.bubble
+    logger.info("Reloading ontology")
+    await repo.load_ontology()
+    return await call_next(request)
+
+
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
 ]
-
-tailwind_config = {
-    "theme": {
-        "extend": {
-            "fontFamily": {
-                "mono": ["iosevka extended", "monospace"],
-            },
-        },
-    },
-}
 
 htmx_config = {
     "globalViewTransitions": True,
@@ -90,11 +102,12 @@ def base_html(title: str):
             tag("link", rel="stylesheet", href="/static/css/output.css")
             for script in cdn_scripts:
                 tag("script", src=script)
-            tag("script", src="/live/index.js")
             json_assignment_script("htmx.config", htmx_config)
-            json_assignment_script("tailwind.config", tailwind_config)
 
-        with tag("body", classes="bg-slate-900 text-white"):
+        with tag(
+            "body",
+            classes="bg-white dark:bg-slate-900 text-gray-900 dark:text-white",
+        ):
             yield
 
 
@@ -109,11 +122,8 @@ def mount_static(
     )
 
 
-# Mount static files directory
 mount_static(app, "bubble/static")
 
-# Include the live router for websocket/live updates
-app.include_router(live_router)
 app.include_router(bubble.rdfa.router)
 
 
@@ -138,13 +148,19 @@ def get_dashboard():
             if iri:
                 rdf_resource(iri)
             else:
-                with tag("div", classes="text-red-500"):
+                with tag(
+                    "div", classes="text-red-600 dark:text-red-500"
+                ):
                     text("No active session found. Please log in.")
+
+
+async def _serve_app(app: FastAPI, config: hypercorn.Config) -> None:
+    await hypercorn.trio.serve(app, config)  # type: ignore
 
 
 def run_server(app: FastAPI):
     config = hypercorn.Config()
-    trio.run(hypercorn.trio.serve, app, config)
+    trio.run(_serve_app, app, config)
 
 
 if __name__ == "__main__":

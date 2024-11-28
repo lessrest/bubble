@@ -22,23 +22,35 @@ from rdflib import (
 import rich
 
 from bubble.util import P, S
-from bubble.vars import current_graph
+from bubble.repo import current_bubble
 
 from bubble.prfx import NT
-from bubble.html import html, tag, attr, text, classes
+from bubble.html import (
+    HypermediaResponse,
+    html,
+    tag,
+    attr,
+    text,
+    classes,
+)
 
-router = APIRouter(prefix="/rdf")
+router = APIRouter(
+    prefix="/rdf", default_response_class=HypermediaResponse
+)
 
 logger = logging.getLogger(__name__)
 
 
-def get_label(dataset: Graph, uri: URIRef) -> Optional[S]:
+def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
+    logger.info(f"Getting label for {uri} from {dataset}")
+    for s, p, o, c in dataset.quads((None, RDFS.label, None, None)):
+        logger.info(f"Label: {o} for {s} in context {c}")
     labels = list(dataset.objects(uri, RDFS.label))
     return labels[0] if labels else None
 
 
 def get_subject_data(
-    dataset: Graph, subject: S, context: Optional[Graph] = None
+    dataset: Dataset, subject: S, context: Optional[Graph] = None
 ) -> Dict[str, Optional[S]]:
     data = {"type": None, "predicates": []}
     graph = context or dataset
@@ -69,7 +81,7 @@ def has_doxxing_risk(predicate: Optional[P]) -> bool:
     if predicate is None:
         return False
     return any(
-        current_graph.get().triples(
+        current_bubble.get().dataset.triples(
             (predicate, NT.hasRisk, NT.DoxxingRisk)
         )
     )
@@ -105,7 +117,7 @@ def group_triples(
 def render_subresource(
     subject: S, predicate: Optional[S] = None
 ) -> None:
-    dataset = current_graph.get()
+    dataset = current_bubble.get().dataset
     if isinstance(subject, BNode):
         if RDF.List in dataset.objects(subject, RDF.type):
             render_list(dataset.collection(subject), predicate)
@@ -116,10 +128,12 @@ def render_subresource(
 
 
 @html.div(
-    "bg-gray-800/30 px-2 py-1 border-l-4 border-gray-700 text-sm",
-    "hover:bg-gray-800/50 hover:border-gray-600",
+    "bg-gray-800/30 dark:bg-gray-800/30 bg-gray-100/50 px-2 py-1",
+    "border-l-4 border-gray-300 dark:border-gray-700",
+    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
+    "hover:border-gray-400 dark:hover:border-gray-600",
 )
-@html.button("text-white")
+@html.button("text-gray-900 dark:text-white")
 def render_expander(obj, predicate):
     attr("hx-get", resource_path(obj))
     attr("hx-swap", "outerHTML")
@@ -138,13 +152,17 @@ def get_rdf_resource(subject: str) -> None:
 
 
 @html.div(
-    "border-1 border-l-4 bg-gray-800/30 border-slate-700 pl-2",
-    "hover:bg-gray-800/50 hover:border-slate-600",
+    "border border-l-4",
+    "bg-gray-100/50 dark:bg-gray-800/30",
+    "border-slate-300 dark:border-slate-700",
+    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
+    "hover:border-slate-400 dark:hover:border-slate-600",
+    "px-2 py-1",
 )
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     logger.info(f"Rendering RDF resource for {subject}")
     if data is None:
-        data = get_subject_data(current_graph.get(), subject)
+        data = get_subject_data(current_bubble.get().dataset, subject)
     logger.info(f"Data: {data}")
 
     if data["type"] == NT.Image:
@@ -157,7 +175,7 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_default_resource(subject, data)
 
 
-@html.div("flex", "flex-col", "items-start", "gap-2")
+@html.div("flex", "flex-col", "items-start", "gap-1")
 def render_default_resource(subject: S, data: Optional[Dict] = None):
     render_resource_header(subject, data)
     render_properties(data)
@@ -226,10 +244,13 @@ def render_audio_player_and_header(subject, data, audio_url, duration):
     render_resource_header(subject, data)
 
 
-@html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 ml-4")
+@html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2")
 def render_properties(data):
-    for predicate, obj in data["predicates"]:
-        render_property(predicate, obj)
+    if data["predicates"]:
+        for predicate, obj in data["predicates"]:
+            render_property(predicate, obj)
+    else:
+        classes("contents")
 
 
 @html.div("flex flex-col")
@@ -238,9 +259,9 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
-@html.div("text-gray-500 text-sm opacity-80")
+@html.span("text-gray-600 dark:text-gray-400 opacity-80")
 def render_property_label(predicate):
-    dataset = current_graph.get()
+    dataset = current_bubble.get().dataset
     label = get_label(dataset, predicate)
     render_value(label or predicate)
 
@@ -249,12 +270,14 @@ def render_property_label(predicate):
 def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
-        dataset = current_graph.get()
+        dataset = current_bubble.get().dataset
         type_label = get_label(dataset, data["type"])
         render_value(type_label or data["type"])
 
 
-@html.ul("list-decimal flex flex-col gap-1 ml-4 text-cyan-500")
+@html.ul(
+    "list-decimal flex flex-col gap-1 ml-4 text-cyan-600 dark:text-cyan-500"
+)
 def render_list(
     collection: List[S], predicate: Optional[S] = None
 ) -> None:
@@ -263,9 +286,7 @@ def render_list(
             render_subresource(item, predicate)
 
 
-@html.div()
 def render_value(obj: S, predicate: Optional[P] = None) -> None:
-    logger.info(f"Rendering value: {obj}")
     if has_doxxing_risk(predicate):
         classes("blur-sm hover:blur-none transition-all duration-300")
 
@@ -280,25 +301,30 @@ def render_value(obj: S, predicate: Optional[P] = None) -> None:
 
 
 @html.a(
-    "text-blue-400 whitespace-nowrap font-mono", hx_swap="outerHTML"
+    "text-blue-600 dark:text-blue-400 whitespace-nowrap",
+    hx_swap="outerHTML",
 )
 def _render_uri(obj: URIRef) -> None:
     attr("hx-get", resource_path(obj))
 
     prefix, namespace, name = (
-        current_graph.get().namespace_manager.compute_qname(str(obj))
+        current_bubble.get().dataset.namespace_manager.compute_qname(str(obj))
     )
-    render_curie_prefix(prefix)
     text(name)
+    render_curie_prefix(prefix)
 
 
-@html.span("text-blue-500 inline-block pr-1")
+@html.span(
+    "text-blue-600 dark:text-blue-500",
+    "opacity-70 pl-1 text-sm small-caps",
+)
 def render_curie_prefix(prefix):
-    text(f"{prefix} ")
+    text(f"{prefix}")
 
 
 @html.a(
-    "text-cyan-600 font-mono border-b border-cyan-900",
+    "text-cyan-700 dark:text-cyan-600 font-mono border-b",
+    "border-cyan-300 dark:border-cyan-900",
     hx_swap="outerHTML",
 )
 def _render_bnode(obj: BNode) -> None:
@@ -345,7 +371,7 @@ def _render_json_literal(obj: Literal) -> None:
 
 @router.get("/json/{json_hash}")
 def get_json(json_hash: str):
-    dataset = current_graph.get()
+    dataset = current_bubble.get().dataset
     for s, p, o in dataset.triples((None, NT.payload, None)):
         literal = o
         dictionary = json.loads(literal)
@@ -369,7 +395,7 @@ def _render_string_literal(obj: Literal) -> None:
 
 
 @html.span(
-    "text-emerald-500 font-mono",
+    "text-emerald-600 dark:text-emerald-500 font-mono",
     "inline-block text-ellipsis overflow-hidden",
     "whitespace-nowrap",
     "before:content-['«'] after:content-['»']",
@@ -379,7 +405,7 @@ def render_other_string(obj):
 
 
 @html.a(
-    "text-blue-400 font-mono max-w-60",
+    "text-blue-600 dark:text-blue-400 font-mono max-w-60",
     "inline-block text-ellipsis overflow-hidden",
     "whitespace-nowrap",
     "before:content-['«'] after:content-['»']",
@@ -389,7 +415,7 @@ def render_linkish_string(obj):
     text(obj.value)
 
 
-@html.span("text-yellow-400 font-bold")
+@html.span("text-yellow-600 dark:text-yellow-400 font-bold")
 def _render_boolean_literal(obj: Literal) -> None:
     text(str(obj.value).lower())
 
@@ -403,14 +429,14 @@ def _render_numeric_literal(obj: Literal) -> None:
 def color_for_literal(obj):
     match obj.datatype:
         case XSD.integer:
-            return "text-purple-400"
+            return "text-purple-600 dark:text-purple-400"
         case XSD.double:
-            return "text-blue-400"
+            return "text-blue-600 dark:text-blue-400"
         case _:
-            return "text-indigo-400"
+            return "text-indigo-600 dark:text-indigo-400"
 
 
-@html.span("text-pink-400")
+@html.span("text-pink-600 dark:text-pink-400")
 def _render_date_literal(obj: Literal) -> None:
     if obj.datatype == XSD.dateTime:
         t = arrow.get(obj.value)
@@ -420,13 +446,13 @@ def _render_date_literal(obj: Literal) -> None:
         text(obj.value)
 
 
-@html.span("text-teal-400 font-sans")
+@html.span("text-teal-600 dark:text-teal-400")
 def _render_language_literal(obj: Literal) -> None:
     logger.info(f"Rendering language literal: {obj}")
     text(obj.value)
 
 
-@html.span("text-orange-400")
+@html.span("text-orange-600 dark:text-orange-400")
 def _render_default_literal(obj: Literal) -> None:
     logger.info(f"Rendering default literal: {obj}")
     text(f'"{obj.value}" ({obj.datatype})')
@@ -440,7 +466,8 @@ Value = Atom | Object | Array
 
 @html.dl(
     "flex flex-row flex-wrap gap-x-6 gap-y-2 px-2 py-1 ml-2",
-    "border-l-2 border-pink-700/40 bg-pink-900/20",
+    "border-l-2 border-pink-300/40 dark:border-pink-700/40",
+    "bg-pink-100/20 dark:bg-pink-900/20",
 )
 def render_json(data: Value) -> None:
     match data:
@@ -487,7 +514,9 @@ def render_dictionary_value(value: Value) -> None:
     render_complex_value(value)
 
 
-@html.dt("text-gray-400 text-sm opacity-80 font-mono")
+@html.dt(
+    "text-gray-600 dark:text-gray-400 text-sm opacity-80 font-mono"
+)
 def render_dictionary_key(key: str) -> None:
     text(key)
 
@@ -497,7 +526,7 @@ def render_json_list(data: Array) -> None:
         render_json_list_item(index, item)
 
 
-@html.div("flex flex-row items-baseline gap-2")
+@html.div("flex flex-row items-baseline gap-1")
 def render_json_list_item(index: int, item: Value) -> None:
     render_json_list_index(index)
     render_json_list_value(item)
@@ -530,7 +559,7 @@ def render_json_nested_value(value: Object | Array) -> None:
     render_json(value)
 
 
-@html.summary("cursor-pointer text-gray-500")
+@html.summary("cursor-pointer text-gray-600 dark:text-gray-500")
 def render_summary(value: Object | Array) -> None:
     text(f"{len(value)} entries")
 
@@ -552,33 +581,35 @@ def render_json_value(value: Atom) -> None:
             render_json_null()
 
 
-@html.span("text-amber-400")
+@html.span("text-amber-600 dark:text-amber-400")
 def render_json_null() -> None:
     text("∅")
 
 
-@html.span("text-yellow-400 font-bold")
+@html.span("text-yellow-600 dark:text-yellow-400 font-bold")
 def render_json_boolean(value: bool) -> None:
     text(str(value).lower())
 
 
-@html.span("text-indigo-400 font-mono")
+@html.span("text-indigo-600 dark:text-indigo-400 font-mono")
 def render_json_number(value: int | float) -> None:
     text(str(value))
 
 
-@html.span("text-teal-500 before:content-['«'] after:content-['»']")
+@html.span(
+    "text-teal-600 dark:text-teal-500 before:content-['«'] after:content-['»']"
+)
 def render_json_prose_string(value: str) -> None:
     text(value)
 
 
-@html.span("text-emerald-500 font-mono")
+@html.span("text-emerald-600 dark:text-emerald-500 font-mono")
 def render_json_symbol_string(value: str) -> None:
     text(value)
 
 
 @html.a(
-    "text-blue-400 font-mono underline truncate max-w-64 inline-block",
+    "text-blue-600 dark:text-blue-400 font-mono underline truncate max-w-64 inline-block",
     target="_blank",
     rel="noopener noreferrer",
 )

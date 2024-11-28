@@ -25,8 +25,8 @@ def using(var: ContextVar, value):
     Implements the dynamic scoping pattern - sets the value within the context
     and restores the previous value when exiting, even if an exception occurs.
     """
+    token = var.set(value)
     try:
-        token = var.set(value)
         yield value
     finally:
         var.reset(token)
