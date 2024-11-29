@@ -97,11 +97,3 @@ def join_sentences(*sentences):
 
 def wrap_with_tag(tag, content):
     return "".join([f"<{tag}>", content, f"</{tag}>"])
-
-
-def main():
-    app()
-
-
-if __name__ == "__main__":
-    main()
