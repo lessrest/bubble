@@ -58,7 +58,8 @@ def test(c: Context, coverage=False):
 @task
 def server(c: Context, watch=True, debug=True, bind="0.0.0.0:2024"):
     """Run Bubble web server."""
-    run(c,
+    run(
+        c,
         sh(
             "hypercorn",
             {"-k": "trio"},
@@ -71,7 +72,8 @@ def server(c: Context, watch=True, debug=True, bind="0.0.0.0:2024"):
         echo=True,
     )
 
+
 @task
 def shell(c: Context):
     """Run Bubble shell."""
-    run(c, sh("python -m bubble.main"), pty=True, echo=True)
+    run(c, sh("python -m bubble"), pty=True, echo=True)

@@ -1,6 +1,5 @@
-import os
 import anthropic
-
+from anthropic.types import MessageParam
 from rich.console import Console
 
 console = Console()
@@ -47,12 +46,12 @@ async def stream_normally(stream) -> str:
     return text
 
 
-def get_anthropic_credential():
-    return os.environ["ANTHROPIC_API_KEY"]
-
-
-def claude(messages):
-    client = anthropic.Client(api_key=get_anthropic_credential())
+def streaming_claude_request(
+    credential: str,
+    messages: list[MessageParam],
+) -> anthropic.MessageStreamManager:
+    """Stream a response from Anthropic."""
+    client = anthropic.Client(api_key=credential)
     return client.messages.stream(
         messages=messages,
         model="claude-3-5-sonnet-latest",

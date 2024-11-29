@@ -53,9 +53,7 @@ class BubbleRepo:
     # The graph containing vocabulary/ontology
     vocab: Graph
 
-    def __init__(
-        self, path: Path, dataset: Dataset, base: _SubjectType
-    ):
+    def __init__(self, path: Path, dataset: Dataset, base: _SubjectType):
         self.workdir = path
         self.rootpath = path / "root.n3"
         self.bubble = base
@@ -85,10 +83,6 @@ class BubbleRepo:
             logger.info(f"Loading {kind} from {path}")
             self.graph.parse(str(path))
 
-    async def load(self, path: Path) -> None:
-        """Load the graph from a file"""
-        await self.load_many(path.parent, path.name, "graph")
-
     async def load_ontology(self) -> None:
         """Load the ontology into the vocab graph"""
         vocab_dir = Path(__file__).parent.parent / "vocab"
@@ -109,6 +103,7 @@ class BubbleRepo:
     async def load_surfaces(self) -> None:
         """Load all surfaces from the bubble into the graph"""
         await self.load_many(self.workdir, "*.n3", "surface")
+        await self.load_many(self.workdir, "*.ttl", "surface")
 
     async def load_rules(self) -> None:
         """Load all rules from the system rules directory"""
@@ -198,6 +193,15 @@ class BubbleRepo:
             ]
         )
 
+    @classmethod
+    async def load(cls, path: Path) -> "BubbleRepo":
+        """Open and fully initialize a BubbleRepo with all required data loaded."""
+        bubble = await cls.open(path)
+        await bubble.load_surfaces()
+        await bubble.load_rules()
+        await bubble.load_ontology()
+        return bubble
+
 
 current_bubble = vars.Parameter["BubbleRepo"]("bubble")
 
@@ -213,5 +217,12 @@ def using_bubble(bubble: BubbleRepo):
 async def using_bubble_at(path: Path):
     repo = await BubbleRepo.open(path)
     print_n3(repo.graph)
+    with using_bubble(repo):
+        yield repo
+
+
+@asynccontextmanager
+async def loading_bubble_from(path: Path):
+    repo = await BubbleRepo.load(path)
     with using_bubble(repo):
         yield repo

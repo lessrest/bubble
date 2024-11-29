@@ -10,7 +10,7 @@ from rdflib.query import ResultRow
 
 from bubble.mint import fresh_uri
 from bubble import vars
-from bubble.prfx import NT, SWA, JSON
+from bubble.prfx import NT, SWA, JSON, AI
 
 
 S = _SubjectType
@@ -40,11 +40,7 @@ class New:
             for predicate, object in properties.items():
                 if isinstance(object, list):
                     for item in object:
-                        o = (
-                            item
-                            if isinstance(item, O)
-                            else Literal(item)
-                        )
+                        o = item if isinstance(item, O) else Literal(item)
                         self.graph.add((subject, predicate, o))
                 else:
                     o = (
@@ -102,7 +98,9 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
 def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
     """Select multiple rows from a query on the current graph"""
     results = vars.graph.get().query(
-        query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
+        query,
+        initBindings=bindings,
+        initNs={"nt": NT, "json": JSON, "ai": AI},
     )
     return [row for row in results if isinstance(row, ResultRow)]
 
