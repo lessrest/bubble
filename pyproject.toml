@@ -65,6 +65,7 @@ dependencies = [
     "beautifulsoup4==4.12.*",
     # Run tests in parallel
     "pytest-xdist>=3.6.1",
+    "invoke>=2.2.0",
 ]
 
 [tool.uv.sources]
@@ -88,7 +89,7 @@ include = ["bubble"]
 bubble = "bubble.main:main"
 
 [tool.ruff]
-line-length = 72         # slim fit
+line-length = 74         # slim fit
 target-version = "py313" # I'm not interested in old Python versions
 
 [tool.ruff.lint.isort]

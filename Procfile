@@ -1,3 +1,3 @@
-server: hypercorn -k trio --debug --reload --log-level debug bubble.http:app
-css: npm run watch
-test: pytest-watcher bubble
+server: uv run invoke server
+css: uv run invoke css --watch
+test: uv run invoke test --watch
