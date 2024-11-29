@@ -1,6 +1,7 @@
 from typing import NoReturn
 
 import anthropic
+from anthropic.types.tool_use_block import ToolUseBlock
 import rich
 import rich.panel
 import rich.table
@@ -11,6 +12,7 @@ from bubble.repo import current_bubble
 from bubble.vars import graph
 from bubble.slop import Claude
 from bubble.util import select_rows
+from bubble.bash import get_shell_tool_spec, handle_shell_tool
 
 from anthropic.types import (
     MessageParam,
@@ -74,26 +76,26 @@ class BubbleChat:
                 tools=self.tool_specs(),
                 system=system_message(),
             ):
-                if not self.handle_reply(reply):
+                if not await self.handle_reply(reply):
                     return
 
-    def handle_reply(self, reply):
+    async def handle_reply(self, reply: anthropic.MessageStreamEvent):
         match reply.type:
             case "text":
                 self.console.print(reply.text, end="")
 
             case "message_stop":
                 message = reply.message
-                return self.handle_message_stop(message)
+                return await self.handle_message_stop(message)
 
         return True
 
-    def handle_message_stop(self, message):
-        self.console.line()
+    async def handle_message_stop(self, message: anthropic.types.Message):
         self.record_assistant_message(message)
+        self.console.line()
 
         if message.stop_reason == "tool_use":
-            self.handle_tool_use(message)
+            await self.handle_tool_use(message)
             return True
         else:
             return False
@@ -107,24 +109,34 @@ class BubbleChat:
                     "type": "object",
                     "properties": {"sparqlQuery": {"type": "string"}},
                 },
-            }
+            },
+            get_shell_tool_spec(),
         ]
 
-    def handle_tool_use(self, message):
+    async def handle_tool_use(self, message: anthropic.types.Message):
         tool_use = self.extract_tool_use(message)
         tool_name = tool_use.name
-        tool_input = tool_use.input
+        param = tool_use.input
+
+        self.console.rule()
+
         if tool_name == "runSparqlSelectQuery":
-            self.process_sparql_query(tool_use, tool_input)
+            result = await self.process_sparql_query(param)
+        elif tool_name == "runShellCommand":
+            result = await self.process_shell_command(param)
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 
-    def extract_tool_use(self, message):
+        self.append_tool_result(tool_use, result)
+
+    def extract_tool_use(
+        self, message: anthropic.types.Message
+    ) -> ToolUseBlock:
         return next(
             block for block in message.content if block.type == "tool_use"
         )
 
-    def process_sparql_query(self, tool_use, tool_input):
+    async def process_sparql_query(self, tool_input) -> str:
         assert isinstance(tool_input, dict)
         assert "sparqlQuery" in tool_input
         with graph.bind(current_bubble.get().dataset):
@@ -151,7 +163,7 @@ class BubbleChat:
             self.console.print(table)
             self.console.rule()
 
-            self.append_tool_result(tool_use, rows)
+            return rows_to_text(rows)
 
     def append_tool_result(self, tool_use, rows):
         self.history.append(
@@ -161,11 +173,11 @@ class BubbleChat:
             )
         )
 
-    def tool_result_param(self, tool_use, rows) -> ToolResultBlockParam:
+    def tool_result_param(self, tool_use, result) -> ToolResultBlockParam:
         return ToolResultBlockParam(
             type="tool_result",
             tool_use_id=tool_use.id,
-            content=rows_to_text(rows),
+            content=result,
         )
 
     async def handle_user_input(self, user_message: str) -> None:
@@ -196,3 +208,7 @@ class BubbleChat:
         user_message = self.console.input("> ")
         self.console.rule()
         return user_message
+
+    async def process_shell_command(self, tool_input):
+        assert isinstance(tool_input, dict)
+        return await handle_shell_tool(tool_input)
