@@ -43,7 +43,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        uv run pytest --cov=bubble --md-report-output tmp.md
+        uv run pytest --cov=bubble --md-report --md-report-output tmp.md
         echo "## Test coverage" >> $GITHUB_STEP_SUMMARY
         uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
         echo "## Test results" >> $GITHUB_STEP_SUMMARY
