@@ -63,7 +63,8 @@ dependencies = [
     "pytest-cov==6.*",
     # Parse and pretty-print HTML
     "beautifulsoup4==4.12.*",
-    "honcho>=2.0.0",
+    # Run tests in parallel
+    "pytest-xdist>=3.6.1",
 ]
 
 [tool.uv.sources]
@@ -111,7 +112,7 @@ venv = ".venv"
 
 [tool.pytest.ini_options]
 trio_mode = true
-md_report = true
 md_report_verbose = 1
 mock_use_standalone_module = true
 markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
+addopts = "-n 4"
