@@ -34,7 +34,7 @@ async def reason(graphs: Sequence[Graph]) -> Graph:
         # Run EYE reasoner on temp files
         cmd = ["eye", "--nope", "--pass", *temp_files]
 
-        with trio.move_on_after(1):
+        with trio.fail_after(1):
             result = await trio.run_process(
                 cmd,
                 capture_stdout=True,
@@ -42,10 +42,9 @@ async def reason(graphs: Sequence[Graph]) -> Graph:
                 check=True,
             )
 
-        # Parse result into new graph
-        g = Graph()
-        g.parse(data=result.stdout.decode(), format="n3")
-        return g
+            g = Graph()
+            g.parse(data=result.stdout.decode(), format="n3")
+            return g
 
     finally:
         # Clean up temp files

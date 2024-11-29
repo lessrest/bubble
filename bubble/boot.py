@@ -13,11 +13,7 @@ The module uses RDF and the Notation3 format to represent all data.
 """
 
 from bubble.mint import fresh_iri
-from bubble.vars import (
-    bind_prefixes,
-    quote,
-    using_graph,
-)
+from bubble import vars
 from bubble.prfx import AS, NT, SWA, UUID
 from bubble.util import new
 from bubble.stat import gather_system_info
@@ -39,12 +35,12 @@ async def describe_new_bubble(path: Path) -> Graph:
 
 async def construct_bubble_graph(path, info):
     bubble = fresh_iri()
-    with using_graph(Graph(identifier=bubble)) as graph:
+    with vars.graph.bind(Graph(identifier=bubble)) as g:
         surface = fresh_iri()
         step = fresh_iri()
         head = fresh_iri()
 
-        bind_prefixes()
+        vars.bind_prefixes()
 
         machine = SWA[info["machine_id"]]
 
@@ -60,7 +56,7 @@ async def construct_bubble_graph(path, info):
         describe_steps(bubble, step, head, path)
         describe_surface_addition(user, bubble, surface, path)
 
-        return graph
+        return g
 
 
 def describe_user_account(info, home_dir):
@@ -210,7 +206,7 @@ def describe_next_step(bubble, step, head, path):
     new(
         NT.Step,
         {
-            NT.supposes: quote([(bubble, NT.head, head)]),
+            NT.supposes: vars.quote([(bubble, NT.head, head)]),
             NT.succeeds: step,
         },
         subject=head,
@@ -221,7 +217,7 @@ def describe_initial_step(bubble, step, path):
     new(
         NT.Step,
         {
-            NT.supposes: quote([(bubble, NT.head, step)]),
+            NT.supposes: vars.quote([(bubble, NT.head, step)]),
         },
         subject=step,
     )

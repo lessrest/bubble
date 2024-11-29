@@ -83,17 +83,6 @@ async def get_disk_info(disk: str) -> DiskInfo:
     return plistlib.loads(output.stdout)
 
 
-async def all_disk_infos() -> dict[str, DiskInfo]:
-    """
-    Get detailed information about all disks on the system.
-    Returns a mapping of disk identifiers to their full info.
-    """
-    disks = await disk_list()
-    return {
-        disk: await get_disk_info(disk) for disk in disks["AllDisks"]
-    }
-
-
 async def computer_serial_number():
     """
     Get the hardware serial number of this Mac using system_profiler.
@@ -119,12 +108,15 @@ async def get_hardware_uuid() -> str:
     return data["SPHardwareDataType"][0]["platform_UUID"]
 
 
-async def main():
+async def main() -> None:
     """
     Display a rich table showing key information about all disks.
     Particularly useful for understanding APFS volume relationships.
     """
-    info = await all_disk_infos()
+    info = []
+    for disk in (await disk_list())["AllDisks"]:
+        info.append(await get_disk_info(disk))
+
     rich.print(info)
 
     table = Table(title="Disk Information")
@@ -135,7 +127,7 @@ async def main():
     table.add_column("APFS ID")
     table.add_column("APFS Ref")
 
-    for disk in info.values():
+    for disk in info:
         table.add_row(
             str(disk.get("DiskUUID")),
             str(disk.get("VolumeName")),

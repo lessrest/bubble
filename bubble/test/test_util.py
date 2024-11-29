@@ -3,13 +3,13 @@ from rdflib import URIRef, Literal
 from rdflib.namespace import RDF
 
 from bubble.util import get_single_subject, print_n3, turtle
-from bubble.vars import using_graph
+from bubble import vars
 
 
 @pytest.fixture
 def test_graph():
     """Create a test graph with a simple triple"""
-    with using_graph(
+    with vars.graph.bind(
         turtle("""
         @prefix : <http://example.org/> .
 

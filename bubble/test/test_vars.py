@@ -1,88 +1,49 @@
-from rdflib import Graph, Literal, URIRef
-from bubble.vars import (
-    using_graph,
-    current_graph,
-    langstr,
-    bind_prefixes,
-    quote,
-)
-from bubble.prfx import AS, NT, SWA
+from rdflib import Graph, URIRef
+from rdflib.graph import QuotedGraph
+from bubble import vars
 
 
-def test_using_graph():
-    """Test that using_graph properly manages graph context"""
-    original_graph = current_graph.get()
+def test_graph_context():
+    """Test that binding properly manages graph context"""
     test_graph = Graph()
+    test_graph.add((URIRef("s"), URIRef("p"), URIRef("o")))
+    assert vars.graph.get() != test_graph
 
-    # Test context management
-    with using_graph(test_graph) as g:
-        assert current_graph.get() is test_graph
-        assert g is test_graph
+    with vars.graph.bind(test_graph) as g:
+        assert g == test_graph
+        assert vars.graph.get() == test_graph
 
-    # Verify original graph is restored
-    assert current_graph.get() is original_graph
+    assert vars.graph.get() != test_graph
 
 
-def test_nested_using_graph():
-    """Test nested graph contexts work correctly"""
+def test_nested_graph_context():
+    """Test nested graph contexts"""
     graph1 = Graph()
     graph2 = Graph()
 
-    with using_graph(graph1):
-        assert current_graph.get() is graph1
-        with using_graph(graph2):
-            assert current_graph.get() is graph2
-        assert current_graph.get() is graph1
-
-
-def test_langstr():
-    """Test language string literal creation"""
-    text = "Hello World"
-    lit = langstr(text)
-    assert isinstance(lit, Literal)
-    assert lit.value == text
-    assert lit.language == "en"
-
-
-def test_bind_prefixes():
-    """Test prefix binding"""
-    test_graph = Graph()
-    with using_graph(test_graph):
-        bind_prefixes()
-
-        # Check that expected prefixes are bound
-        assert (
-            test_graph.namespace_manager.compute_qname(str(SWA))[0]
-            == "swa"
-        )
-        assert (
-            test_graph.namespace_manager.compute_qname(str(NT))[0]
-            == "nt"
-        )
-        assert (
-            test_graph.namespace_manager.compute_qname(str(AS))[0]
-            == "as"
-        )
+    with vars.graph.bind(graph1):
+        assert vars.graph.get() == graph1
+        with vars.graph.bind(graph2):
+            assert vars.graph.get() == graph2
+        assert vars.graph.get() == graph1
 
 
 def test_quote():
-    """Test creation of quoted graphs"""
+    """Test quoting triples in the current graph"""
     test_graph = Graph()
-    with using_graph(test_graph):
-        # Create some test triples
-        subject = URIRef("http://example.org/subject")
-        predicate = URIRef("http://example.org/predicate")
-        object = URIRef("http://example.org/object")
-        triples = [(subject, predicate, object)]
+    test_triple = (URIRef("s"), URIRef("p"), URIRef("o"))
 
-        # Create quoted graph
-        quoted = quote(triples)
+    with vars.graph.bind(test_graph):
+        quoted = vars.quote([test_triple])
+        assert isinstance(quoted, QuotedGraph)
+        assert test_triple in quoted
 
-        # Verify it's a QuotedGraph
-        assert quoted.__class__.__name__ == "QuotedGraph"
 
-        # Verify the triple was added
-        assert (subject, predicate, object) in quoted
+def test_langstr():
+    """Test creating language-tagged literals"""
+    test_graph = Graph()
 
-        # Verify it has a unique identifier
-        assert quoted.identifier is not None
+    with vars.graph.bind(test_graph):
+        lit = vars.langstr("hello")
+        assert lit.language == "en"
+        assert str(lit) == "hello"

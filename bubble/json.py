@@ -4,7 +4,7 @@ from rdflib.collection import Collection
 from bubble.mint import fresh_uri
 from bubble.prfx import JSON, SWA
 from bubble.util import O, S, is_a, new, select_rows
-from bubble.vars import current_graph
+from bubble import vars
 
 
 def json_from_rdf(
@@ -18,7 +18,7 @@ def json_from_rdf(
 
     if is_a(node, JSON.Array):
         assert isinstance(node, IdentifiedNode)
-        list = Collection(current_graph.get(), node)
+        list = Collection(vars.graph.get(), node)
         return [json_from_rdf(item) for item in list]
     if is_a(node, JSON.Object):
         return {
@@ -68,9 +68,7 @@ def rdf_from_json(
         for item in value:
             items.append(rdf_from_json(item))
 
-        collection = Collection(
-            current_graph.get(), fresh_uri(SWA), items
-        )
+        collection = Collection(vars.graph.get(), fresh_uri(SWA), items)
 
         return new(JSON.Array, {}, collection.uri)
     else:

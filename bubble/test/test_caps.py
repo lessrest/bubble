@@ -6,7 +6,7 @@ import pytest
 from rdflib import Graph, URIRef, Literal
 from pytest_httpx import HTTPXMock
 
-from bubble.vars import using_graph
+from bubble import vars
 from bubble.prfx import NT
 from bubble.util import turtle
 from bubble.caps import (
@@ -22,7 +22,8 @@ from bubble.caps import (
 
 @pytest.fixture
 def graph():
-    with using_graph(Graph()) as g:
+    """Create a test graph with JSON data"""
+    with vars.graph.bind(Graph()) as g:
         g.bind("nt", NT)
         yield g
 
@@ -108,7 +109,7 @@ async def test_shell_no_output_file(graph, shell_capability):
     results = shell_capability.select_one_row(
         """
         SELECT (COUNT(*) as ?count)
-        WHERE { 
+        WHERE {
             ?invocation nt:result ?result
         }
         """,
@@ -142,7 +143,7 @@ async def test_shell_invalid_command(graph, shell_capability):
 
 async def test_shell_capability_with_stdin():
     """Test shell command with standard input"""
-    with using_graph(
+    with vars.graph.bind(
         turtle("""
         @prefix nt: <https://node.town/2024/> .
         @base <https://test.example/> .
@@ -191,7 +192,7 @@ async def test_file_handler_metadata(tmp_path):
 
 async def test_create_result_node():
     """Test creating a result node in the graph"""
-    with using_graph(Graph()) as graph:
+    with vars.graph.bind(Graph()) as graph:
         file_result = FileResult(
             path="/test/path", size=100, content_hash="abc123"
         )
@@ -220,7 +221,7 @@ async def test_http_request_capability(httpx_mock: HTTPXMock):
             json:has [ json:key "key" ; json:val "value" ] ] .
     """
 
-    with using_graph(Graph()) as graph:
+    with vars.graph.bind(Graph()) as graph:
         graph.parse(data=turtle_data, format="turtle")
         httpx_mock.add_response(
             url="https://example.com",

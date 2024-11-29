@@ -34,7 +34,7 @@ from bubble.html import (
     text,
     classes,
 )
-from bubble.vars import binding
+from bubble import vars
 
 router = APIRouter(
     prefix="/rdf", default_response_class=HypermediaResponse
@@ -374,19 +374,16 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
-inside_property_label = contextvars.ContextVar(
-    "inside_property_label", default=False
+inside_property_label = vars.ContextBinding(
+    "inside_property_label", False
 )
 
 
 def render_property_label(predicate):
     dataset = current_bubble.get().dataset
     label = get_label(dataset, predicate)
-    token = inside_property_label.set(True)
-    try:
+    with inside_property_label.bind(True):
         render_value(label or predicate)
-    finally:
-        inside_property_label.reset(token)
 
 
 @html.div(
@@ -398,7 +395,7 @@ def render_resource_header(subject, data):
     if data and data["type"]:
         dataset = current_bubble.get().dataset
         type_label = get_label(dataset, data["type"])
-        with binding(inside_property_label, True):
+        with inside_property_label.bind(True):
             render_value(type_label or data["type"])
 
 

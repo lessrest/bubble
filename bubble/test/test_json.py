@@ -13,13 +13,13 @@ from bubble.json import (
 )
 from bubble.prfx import JSON
 from bubble.util import is_a, new, select_rows
-from bubble.vars import using_graph
+from bubble import vars
 
 
 @pytest.fixture
 def graph():
     """Create a test graph with JSON data"""
-    with using_graph(Graph()) as g:
+    with vars.graph.bind(Graph()) as g:
         g.bind("json", JSON)
         yield g
 

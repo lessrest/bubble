@@ -9,7 +9,7 @@ from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
 from bubble.mint import fresh_uri
-from bubble.vars import current_graph, using_graph
+from bubble import vars
 from bubble.prfx import NT, SWA, JSON
 
 
@@ -63,7 +63,7 @@ def print_n3(graph: Optional[Graph] = None) -> None:
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    g = graph if graph is not None else current_graph.get()
+    g = graph if graph is not None else vars.graph.get()
     n3 = g.serialize(format="n3").replace("    ", "  ").strip()
 
     # only if connected to terminal do we use rich
@@ -87,7 +87,7 @@ def get_single_subject(predicate, object):
 
 def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
-    g = current_graph.get()
+    g = vars.graph.get()
     return list(g.subjects(predicate, object))
 
 
@@ -101,7 +101,7 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
 
 def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
     """Select multiple rows from a query on the current graph"""
-    results = current_graph.get().query(
+    results = vars.graph.get().query(
         query, initBindings=bindings, initNs={"nt": NT, "json": JSON}
     )
     return [row for row in results if isinstance(row, ResultRow)]
@@ -109,19 +109,19 @@ def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
 
 def turtle(src: str) -> Graph:
     """Parse turtle data into the current graph"""
-    with using_graph(Graph()) as graph:
+    with vars.graph.bind(Graph()) as graph:
         graph.parse(data=src, format="n3")
         graph.bind("nt", NT)
         return graph
 
 
 def new(*args, **kwargs):
-    return New(current_graph.get())(*args, **kwargs)
+    return New(vars.graph.get())(*args, **kwargs)
 
 
 def is_a(subject: S, type: S) -> bool:
     if isinstance(subject, IdentifiedNode):
-        return type in current_graph.get().objects(subject, RDF.type)
+        return type in vars.graph.get().objects(subject, RDF.type)
     elif isinstance(subject, Literal):
         return subject.datatype == type
     else:

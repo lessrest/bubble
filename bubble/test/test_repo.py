@@ -4,8 +4,9 @@ import trio
 from rdflib import Graph, URIRef, RDF
 from bubble.repo import using_bubble_at
 from bubble.prfx import NT
-from bubble.util import print_n3
-from bubble.vars import current_graph
+from bubble.util import get_single_subject, print_n3
+
+from bubble import vars
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ async def test_repo_initialization(temp_repo):
     # Verify git initialization
     assert await trio.Path(temp_repo.workdir / ".git").exists()
 
-    print_n3(current_graph.get())
+    print_n3(vars.graph.get())
     print_n3(temp_repo.graph)
 
     # Verify bubble has type nt:Bubble
@@ -175,3 +176,10 @@ async def test_repo_dataset(temp_repo):
     # Test quads access
     quads = list(temp_repo.dataset.quads((None, None, None, None)))
     assert len(quads) == len(temp_repo.graph) + len(temp_repo.vocab)
+
+
+def test_get_single_subject():
+    """Test getting a single subject from a triple pattern"""
+    g = vars.graph.get()
+    g.add((URIRef("s"), URIRef("p"), URIRef("o")))
+    assert get_single_subject(URIRef("p"), URIRef("o")) == URIRef("s")

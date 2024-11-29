@@ -8,7 +8,6 @@
 # Each bubble has a unique IRI minted on creation.
 
 from contextlib import asynccontextmanager, contextmanager
-from contextvars import ContextVar
 import logging
 from dataclasses import dataclass
 
@@ -27,7 +26,7 @@ from bubble.boot import describe_new_bubble
 from bubble.mind import reason
 from bubble.prfx import NT
 from bubble.util import get_single_subject, print_n3
-from bubble.vars import binding, using_graph
+from bubble import vars
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +137,7 @@ class BubbleRepo:
 
         dataset = Dataset(default_union=True)
 
-        with using_graph(
+        with vars.graph.bind(
             Graph().parse(path / "root.n3", format="n3")
         ) as graph:
             bubble = get_single_subject(RDF.type, NT.Bubble)
@@ -201,13 +200,13 @@ class BubbleRepo:
         )
 
 
-current_bubble: ContextVar[BubbleRepo] = ContextVar("bubble")
+current_bubble = vars.ContextBinding["BubbleRepo"]("bubble")
 
 
 @contextmanager
 def using_bubble(bubble: BubbleRepo):
-    with binding(current_bubble, bubble):
-        with using_graph(bubble.graph):
+    with current_bubble.bind(bubble):
+        with vars.graph.bind(bubble.graph):
             yield bubble
 
 
