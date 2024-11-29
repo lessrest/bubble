@@ -15,7 +15,7 @@ from bubble.slop import Claude
 
 FORMAT = "%(message)s"
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format=FORMAT,
     datefmt="[%X]",
     handlers=[RichHandler()],
