@@ -88,15 +88,6 @@ async def get_file_metadata(path: str) -> FileResult:
 
 @capability(NT.ShellCapability)
 async def do_shell(ctx: InvocationContext) -> None:
-    """Execute a shell command with optional standard input.
-
-    The command output is saved to a file and metadata about that file is added to the graph.
-
-    Args:
-        graph: The RDF graph containing the command details
-        invocation: URI reference to the invocation node in the graph
-    """
-
     temp_dir = tempfile.mkdtemp()
     output_file = f"{temp_dir}/out"
 
@@ -114,7 +105,7 @@ async def do_shell(ctx: InvocationContext) -> None:
         """
     )
 
-    result = await trio.run_process(
+    await trio.run_process(
         command,
         shell=True,
         cwd=temp_dir,
@@ -122,11 +113,6 @@ async def do_shell(ctx: InvocationContext) -> None:
         capture_stderr=True,
         stdin=stdin.encode() if stdin else None,
     )
-
-    if result.returncode != 0:
-        raise Exception(
-            f"Command '{command}' returned non-zero exit status {result.returncode}."
-        )
 
     try:
         # Get metadata about output file and create result node in graph
