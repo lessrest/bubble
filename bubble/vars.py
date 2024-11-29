@@ -18,7 +18,7 @@ from bubble.prfx import AS, NT, SWA
 T = TypeVar("T")
 
 
-class ContextBinding(Generic[T]):
+class Parameter(Generic[T]):
     """A class that manages a context variable with binding capability."""
 
     _var: ContextVar[T]
@@ -29,9 +29,12 @@ class ContextBinding(Generic[T]):
         else:
             self._var = ContextVar(name, default=default)
 
-    def get(self) -> T:
+    def get(self, default: Optional[T] = None) -> T:
         """Get the current value, raising an error if it is not set."""
-        return self._var.get()
+        if default is None:
+            return self._var.get()
+        else:
+            return self._var.get(default)
 
     @contextmanager
     def bind(self, value: T) -> Generator[T, Any, None]:
@@ -43,7 +46,7 @@ class ContextBinding(Generic[T]):
             self._var.reset(token)
 
 
-graph = ContextBinding("graph", Graph())
+graph = Parameter("graph", Graph())
 
 
 def quote(triples: Sequence[_TripleType]) -> QuotedGraph:

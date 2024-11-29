@@ -98,7 +98,6 @@ class BubbleRepo:
 
         # clear any existing vocabulary
         for triple in self.vocab:
-            logger.info(f"Removing ontology triple for {triple[0]}")
             self.dataset.remove(triple)
 
         for path in paths:
@@ -200,7 +199,7 @@ class BubbleRepo:
         )
 
 
-current_bubble = vars.ContextBinding["BubbleRepo"]("bubble")
+current_bubble = vars.Parameter["BubbleRepo"]("bubble")
 
 
 @contextmanager

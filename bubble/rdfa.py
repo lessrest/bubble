@@ -3,9 +3,8 @@ import hashlib
 import logging
 import re
 import urllib.parse
-import contextvars
 import contextlib
-from typing import Dict, List, Tuple, Optional, Sequence
+from typing import Dict, List, Tuple, Optional
 
 import arrow
 
@@ -42,39 +41,23 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
-rendering_sensitive_data = contextvars.ContextVar(
+rendering_sensitive_data = vars.Parameter(
     "rendering_sensitive_data", default=False
 )
 
-language_preferences = contextvars.ContextVar(
+language_preferences = vars.Parameter(
     "language_preferences", default=["en", "sv", "lv"]
 )
 
-expansion_depth = contextvars.ContextVar("expansion_depth", default=0)
-visited_resources = contextvars.ContextVar(
-    "visited_resources", default=set()
-)
+expansion_depth = vars.Parameter("expansion_depth", default=0)
+visited_resources = vars.Parameter("visited_resources", default=set())
 
 
 @contextlib.contextmanager
-def language_context(langs: Sequence[str]):
-    token = language_preferences.set(list(langs))
-    try:
-        yield
-    finally:
-        language_preferences.reset(token)
-
-
-@contextlib.contextmanager
-def expansion_context(depth: int):
+def autoexpanding(depth: int):
     """Context manager for controlling resource expansion depth."""
-    depth_token = expansion_depth.set(depth)
-    visited_token = visited_resources.set(set())
-    try:
+    with expansion_depth.bind(depth), visited_resources.bind(set()):
         yield
-    finally:
-        expansion_depth.reset(depth_token)
-        visited_resources.reset(visited_token)
 
 
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
@@ -190,12 +173,6 @@ def render_subresource(
         render_value(subject, predicate)
 
 
-# @html.div(
-#     "bg-gray-800/30 dark:bg-gray-800/30 bg-gray-100/50 px-2 py-1",
-#     "border-l-4 border-gray-300 dark:border-gray-700",
-#     "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
-#     "hover:border-gray-400 dark:hover:border-gray-600",
-# )
 def render_expander(obj, predicate):
     current_depth = expansion_depth.get()
     visited = visited_resources.get()
@@ -203,7 +180,7 @@ def render_expander(obj, predicate):
     # If we have depth remaining and haven't seen this resource yet
     if current_depth > 0 and obj not in visited:
         visited.add(obj)
-        with expansion_context(current_depth - 1):
+        with expansion_depth.bind(current_depth - 1):
             rdf_resource(obj)
     else:
         # Render as expandable button if we're at depth 0 or already visited
@@ -374,9 +351,7 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
-inside_property_label = vars.ContextBinding(
-    "inside_property_label", False
-)
+inside_property_label = vars.Parameter("inside_property_label", False)
 
 
 def render_property_label(predicate):
@@ -412,11 +387,8 @@ def render_list(
 
 @contextlib.contextmanager
 def sensitive_context():
-    token = rendering_sensitive_data.set(True)
-    try:
+    with rendering_sensitive_data.bind(True):
         yield
-    finally:
-        rendering_sensitive_data.reset(token)
 
 
 def render_value(obj: S, predicate: Optional[P] = None) -> None:

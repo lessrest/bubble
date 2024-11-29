@@ -146,7 +146,7 @@ def get_dashboard():
         with tag("div", classes="flex flex-col gap-4 p-4"):
             iri = get_single_subject(RDF.type, NT.ComputerMachine)
             if iri:
-                with bubble.rdfa.expansion_context(2):
+                with bubble.rdfa.autoexpanding(2):
                     rdf_resource(iri)
             else:
                 with tag(
