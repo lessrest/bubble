@@ -3,7 +3,9 @@ from typing import NoReturn
 import anthropic
 import rich
 import rich.panel
+import rich.table
 import rich.json
+import rich.syntax
 import rich.progress_bar
 from bubble.repo import current_bubble
 from bubble.vars import graph
@@ -126,8 +128,30 @@ class BubbleChat:
         assert isinstance(tool_input, dict)
         assert "sparqlQuery" in tool_input
         with graph.bind(current_bubble.get().dataset):
+            self.console.print(
+                rich.panel.Panel(
+                    rich.syntax.Syntax(
+                        tool_input["sparqlQuery"],
+                        "sparql",
+                        theme="zenburn",
+                    ),
+                    title="SPARQL Query",
+                )
+            )
             rows = select_rows(tool_input["sparqlQuery"])
-        self.append_tool_result(tool_use, rows)
+            n_columns = len(rows[0])
+            table = rich.table.Table(
+                *[
+                    rich.table.Column(header=f"Column {i}")
+                    for i in range(n_columns)
+                ],
+            )
+            for row in rows:
+                table.add_row(*row)
+            self.console.print(table)
+            self.console.rule()
+
+            self.append_tool_result(tool_use, rows)
 
     def append_tool_result(self, tool_use, rows):
         self.history.append(
