@@ -2,14 +2,9 @@ from typing import NoReturn
 
 import rich
 from bubble.repo import current_bubble
-from bubble.slop import streaming_claude_request, stream_normally
-from bubble.util import select_one_row
+from bubble.slop import Claude
 
 from anthropic.types import MessageParam
-
-
-class MissingCredentialError(LookupError):
-    pass
 
 
 def initial_message(n3_representation) -> str:
@@ -38,24 +33,10 @@ def wrap_with_tag(tag, content) -> str:
 
 
 class BubbleChat:
-    def __init__(self, console: rich.console.Console):
+    def __init__(self, claude: Claude, console: rich.console.Console):
+        self.claude = claude
         self.console = console
         self.history: list[MessageParam] = []
-
-    async def get_anthropic_credential(self) -> str:
-        query = """
-            SELECT ?value
-            WHERE {
-                ?account a nt:ServiceAccount ;
-                    nt:forService ai:AnthropicService ;
-                    nt:hasPart [ a nt:BearerToken ;
-                                nt:hasValue ?value ] .
-            }
-        """
-        try:
-            return select_one_row(query)[0]
-        except ValueError:
-            raise MissingCredentialError()
 
     async def run(self) -> None:
         n3_representation = current_bubble.get().graph.serialize(
@@ -75,12 +56,9 @@ class BubbleChat:
             await self.handle_user_input(user_message)
 
     async def stream_assistant_reply(self) -> None:
-        with streaming_claude_request(
-            credential=await self.get_anthropic_credential(),
-            messages=self.history,
-        ) as stream:
-            reply = await stream_normally(stream)
-        self.record_assistant_message(reply)
+        async for reply in self.claude.stream(self.history):
+            self.console.print(reply, end="")
+            self.record_assistant_message(reply)
 
     async def handle_user_input(self, user_message: str) -> None:
         if user_message == "/reason":

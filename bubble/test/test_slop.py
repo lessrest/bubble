@@ -1,5 +1,5 @@
+from typing import AsyncGenerator
 import pytest
-from anthropic import TextEvent
 from bubble.slop import stream_sentences, stream_normally
 import hypothesis.strategies as st
 from hypothesis import given
@@ -13,12 +13,10 @@ sentence = st.text("abc, \n").flatmap(
 )
 
 
-def create_text_stream(*chunks):
+async def create_text_stream(*chunks: str) -> AsyncGenerator[str, None]:
     """Create a mock Anthropic text stream from text chunks"""
-    return [
-        TextEvent(type="text", text=chunk, snapshot="")
-        for chunk in chunks
-    ]
+    for chunk in chunks:
+        yield chunk
 
 
 @pytest.fixture
@@ -58,9 +56,7 @@ async def test_stream_normally(text_stream):
 @given(st.text())
 async def test_sentence_stream_yields_same_text(text: str):
     events = create_text_stream(text)
-    sentences = [
-        sentence async for sentence in stream_sentences(events)
-    ]
+    sentences = [sentence async for sentence in stream_sentences(events)]
     assert "".join(sentences).strip() == text.strip()
 
 
@@ -84,25 +80,19 @@ async def test_sentence_stream_on_list_of_sentences_with_newlines(
 
 async def test_sentence_stream_handles_no_sentence_ending():
     events = create_text_stream("This is a test")
-    sentences = [
-        sentence async for sentence in stream_sentences(events)
-    ]
+    sentences = [sentence async for sentence in stream_sentences(events)]
     assert sentences == ["This is a test"]
 
 
 async def test_sentence_stream_handles_ellipsis():
     events = create_text_stream("This is a test... This is a test.")
-    sentences = [
-        sentence async for sentence in stream_sentences(events)
-    ]
+    sentences = [sentence async for sentence in stream_sentences(events)]
     assert sentences == ["This is a test...", "This is a test."]
 
 
 async def test_sentence_stream_handles_newlines():
     events = create_text_stream("This is a test.\nThis is a test.")
-    sentences = [
-        sentence async for sentence in stream_sentences(events)
-    ]
+    sentences = [sentence async for sentence in stream_sentences(events)]
     assert sentences == ["This is a test.", "This is a test."]
 
 

@@ -87,11 +87,25 @@ def get_subjects(predicate, object):
     return list(g.subjects(predicate, object))
 
 
+class QueryError(Exception):
+    pass
+
+
+class NoResultsFoundError(QueryError):
+    pass
+
+
+class MultipleResultsError(QueryError):
+    pass
+
+
 def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
     """Select a single row from a query"""
     rows = select_rows(query, bindings)
-    if len(rows) != 1:
-        raise ValueError("No result row found")
+    if len(rows) == 0:
+        raise NoResultsFoundError(query)
+    elif len(rows) != 1:
+        raise MultipleResultsError(query, len(rows))
     return rows[0]
 
 

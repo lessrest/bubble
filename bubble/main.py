@@ -9,7 +9,9 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from bubble.chat import BubbleChat
+from bubble.cred import get_anthropic_credential
 from bubble.repo import loading_bubble_from
+from bubble.slop import Claude
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -37,7 +39,9 @@ def chat(
 
     async def run():
         async with loading_bubble_from(trio.Path(bubble_path)):
-            bubble_chat = BubbleChat(console)
+            credential = await get_anthropic_credential()
+            claude = Claude(credential)
+            bubble_chat = BubbleChat(claude, console)
             await bubble_chat.run()
 
     trio.run(run)
