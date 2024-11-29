@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 import pytest
 from rdflib import Graph, URIRef
 
@@ -35,9 +36,10 @@ async def test_get_service_credential_success(graph):
     graph.parse(data=turtle_data, format="turtle")
 
     credential = await get_service_credential(URIRef(AI.AnthropicService))
-    print(f"Type of credential: {type(credential)}")
-    print(f"Value of credential: {credential!r}")
-    assert str(credential) == "test-api-key"
+    assert isinstance(credential, SecretStr)
+    assert credential.get_secret_value() == "test-api-key"
+    assert credential == SecretStr("test-api-key")
+    assert str(credential) == "**********"
 
 
 async def test_get_service_credential_missing(graph):
