@@ -18,19 +18,16 @@ class TooManyCredentialsError(CredentialError):
 
 
 async def get_service_credential(service: URIRef) -> str:
-    query = (
-        """
+    query = """
         SELECT ?value
         WHERE {
             ?account a nt:ServiceAccount ;
-                nt:forService <%s> ;
+                nt:forService ?service ;
                 nt:hasPart [ a nt:BearerToken ;
                             nt:hasValue ?value ] .
         }
     """
-        % service
-    )
-    return select_one_row(query)[0].toPython()
+    return select_one_row(query, {"service": service})[0].toPython()
 
 
 async def get_anthropic_credential() -> str:
