@@ -5,6 +5,7 @@ from rdflib import Graph, URIRef
 from bubble import vars
 from bubble.prfx import NT, AI
 from bubble.cred import (
+    InsecureCredentialError,
     get_service_credential,
 )
 
@@ -66,4 +67,23 @@ async def test_multiple_credentials(graph):
     """
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(MultipleResultsError):
+        await get_service_credential(URIRef(AI.AnthropicService))
+
+
+# check that it fails if the credential is not a SecretToken literal
+async def test_credential_not_secret_token(graph):
+    """Test handling of non-SecretToken credentials"""
+    turtle_data = """
+    @prefix nt: <https://node.town/2024/> .
+    @prefix ai: <https://node.town/2024/ai/#> .
+
+    [] a nt:ServiceAccount ;
+        nt:forService ai:AnthropicService ;
+        nt:hasPart [
+            a nt:BearerToken ;
+            nt:hasValue "test-api-key"
+        ] .
+    """
+    graph.parse(data=turtle_data, format="turtle")
+    with pytest.raises(InsecureCredentialError):
         await get_service_credential(URIRef(AI.AnthropicService))

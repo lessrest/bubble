@@ -18,6 +18,10 @@ class TooManyCredentialsError(CredentialError):
     pass
 
 
+class InsecureCredentialError(CredentialError):
+    pass
+
+
 async def get_service_credential(service: URIRef) -> SecretStr:
     query = """
         SELECT ?value
@@ -30,10 +34,13 @@ async def get_service_credential(service: URIRef) -> SecretStr:
     """
     value = select_one_row(query, {"service": service})[0]
     if isinstance(value, Literal):
-        assert isinstance(value.value, SecretStr)
+        if not isinstance(value.value, SecretStr):
+            raise InsecureCredentialError(
+                f"credential for {service} is not a nt:SecretToken"
+            )
         return value.value
     else:
-        raise ValueError(f"Unexpected credential type: {value}")
+        raise CredentialError(f"Unexpected credential type: {value}")
 
 
 async def get_anthropic_credential() -> SecretStr:
