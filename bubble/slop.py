@@ -1,6 +1,7 @@
 from typing import AsyncGenerator
 import anthropic
 from anthropic.types import MessageParam
+from pydantic import SecretStr
 from rich.console import Console
 
 console = Console()
@@ -48,11 +49,11 @@ async def stream_normally(stream: AsyncGenerator[str, None]) -> str:
 
 
 def streaming_claude_request(
-    credential: str,
+    credential: SecretStr,
     messages: list[MessageParam],
 ) -> anthropic.AsyncMessageStreamManager:
     """Stream a response from Anthropic."""
-    client = anthropic.AsyncClient(api_key=credential)
+    client = anthropic.AsyncClient(api_key=credential.get_secret_value())
     return client.messages.stream(
         messages=messages,
         model="claude-3-5-sonnet-latest",
@@ -61,7 +62,7 @@ def streaming_claude_request(
 
 
 class Claude:
-    def __init__(self, credential: str):
+    def __init__(self, credential: SecretStr):
         self.credential = credential
 
     async def stream(

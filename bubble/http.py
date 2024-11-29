@@ -117,9 +117,7 @@ def mount_static(
     """
     Mount a static files directory to the FastAPI application.
     """
-    app.mount(
-        mount_path, StaticFiles(directory=directory), name="static"
-    )
+    app.mount(mount_path, StaticFiles(directory=directory), name="static")
 
 
 mount_static(app, "bubble/static")
@@ -144,14 +142,12 @@ app.middleware("http")(log_middleware)
 def get_dashboard():
     with base_html("Bubble"):
         with tag("div", classes="flex flex-col gap-4 p-4"):
-            iri = get_single_subject(RDF.type, NT.ComputerMachine)
+            iri = get_single_subject(RDF.type, NT.ServiceAccount)
             if iri:
                 with bubble.rdfa.autoexpanding(2):
                     rdf_resource(iri)
             else:
-                with tag(
-                    "div", classes="text-red-600 dark:text-red-500"
-                ):
+                with tag("div", classes="text-red-600 dark:text-red-500"):
                     text("No active session found. Please log in.")
 
 

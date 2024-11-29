@@ -158,9 +158,7 @@ def group_triples(
     return sorted(grouped_triples.items())
 
 
-def render_subresource(
-    subject: S, predicate: Optional[P] = None
-) -> None:
+def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
     dataset = current_bubble.get().dataset
     if isinstance(subject, BNode):
         if RDF.List in dataset.objects(subject, RDF.type):
@@ -268,19 +266,11 @@ def render_video_element(href):
 @html.div("flex flex-col items-start gap-2")
 def render_voice_recording_resource(subject: S, data: Dict) -> None:
     audio_url = next(
-        (
-            obj
-            for pred, obj in data["predicates"]
-            if pred == NT.audioUrl
-        ),
+        (obj for pred, obj in data["predicates"] if pred == NT.audioUrl),
         None,
     )
     duration = next(
-        (
-            obj
-            for pred, obj in data["predicates"]
-            if pred == NT.duration
-        ),
+        (obj for pred, obj in data["predicates"] if pred == NT.duration),
         None,
     )
     render_audio_player_and_header(subject, data, audio_url, duration)
@@ -317,9 +307,7 @@ def render_properties(data):
 
             if all_literals and len(objects) > 1:
                 # Render multiple literals together
-                render_property_with_multiple_literals(
-                    predicate, objects
-                )
+                render_property_with_multiple_literals(predicate, objects)
             else:
                 # Render each object separately
                 for obj in objects:
@@ -432,8 +420,8 @@ def _render_uri(obj: URIRef) -> None:
         #     text(f"({prefix}:{name})")
     else:
         # If no label, show the CURIE as before
-        prefix, namespace, name = (
-            dataset.namespace_manager.compute_qname(str(obj))
+        prefix, namespace, name = dataset.namespace_manager.compute_qname(
+            str(obj)
         )
         # Only truncate IDs from the SWA namespace
         if prefix == "swa" and not any(c in name for c in "/."):
@@ -478,6 +466,7 @@ def _render_literal(obj: Literal) -> None:
         XSD.date: _render_date_literal,
         XSD.dateTime: _render_date_literal,
         RDF.JSON: _render_json_literal,
+        NT.SecretToken: _render_secret_token_literal,
     }
 
     if obj.datatype:
@@ -608,6 +597,17 @@ def _render_default_literal(obj: Literal) -> None:
     text(f'"{obj.value}" ({obj.datatype})')
 
 
+@html.span(
+    "text-red-600 dark:text-red-400",
+)
+def _render_secret_token_literal(obj: Literal) -> None:
+    with tag("button"):
+        classes(
+            "text-red-600 dark:text-red-400 bg-red-100/70 dark:bg-red-900/70 border border-red-300 dark:border-red-700 px-1"
+        )
+        text(str(obj.value))
+
+
 Atom = str | int | float | bool | None
 Object = dict[str, "Value"]
 Array = list["Value"]
@@ -664,9 +664,7 @@ def render_dictionary_value(value: Value) -> None:
     render_complex_value(value)
 
 
-@html.dt(
-    "text-gray-600 dark:text-gray-400 text-sm opacity-80 font-mono"
-)
+@html.dt("text-gray-600 dark:text-gray-400 text-sm opacity-80 font-mono")
 def render_dictionary_key(key: str) -> None:
     text(key)
 

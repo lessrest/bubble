@@ -29,13 +29,15 @@ async def test_get_service_credential_success(graph):
     [] a nt:ServiceAccount ;
         nt:forService ai:AnthropicService ;
         nt:hasPart [ a nt:BearerToken ;
-                     nt:hasValue "test-api-key" ] .
+                     nt:hasValue "test-api-key"^^nt:SecretToken ] .
     """
 
     graph.parse(data=turtle_data, format="turtle")
 
     credential = await get_service_credential(URIRef(AI.AnthropicService))
-    assert credential == "test-api-key"
+    print(f"Type of credential: {type(credential)}")
+    print(f"Value of credential: {credential!r}")
+    assert str(credential) == "test-api-key"
 
 
 async def test_get_service_credential_missing(graph):
@@ -53,12 +55,12 @@ async def test_multiple_credentials(graph):
     [] a nt:ServiceAccount ;
         nt:forService ai:AnthropicService ;
         nt:hasPart [ a nt:BearerToken ;
-                     nt:hasValue "test-api-key" ] .
+                     nt:hasValue "test-api-key-1"^^nt:SecretToken ] .
 
     [] a nt:ServiceAccount ;
         nt:forService ai:AnthropicService ;
         nt:hasPart [ a nt:BearerToken ;
-                     nt:hasValue "test-api-key-2" ] .
+                     nt:hasValue "test-api-key-2"^^nt:SecretToken ] .
     """
     graph.parse(data=turtle_data, format="turtle")
     with pytest.raises(MultipleResultsError):

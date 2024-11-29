@@ -66,6 +66,7 @@ dependencies = [
     # Run tests in parallel
     "pytest-xdist>=3.6.1",
     "invoke>=2.2.0",
+    "pydantic>=2.10.1",
 ]
 
 [tool.uv.sources]
