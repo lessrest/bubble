@@ -1,3 +1,8 @@
+
+@prefix protege: <http://protege.stanford.edu/plugins/owl/protege#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix as: <http://www.w3.org/ns/activitystreams#> .
 @prefix iaodev: <http://purl.obolibrary.org/obo/iao/dev/> .
 @prefix nt: <https://node.town/2024/> .
@@ -6,6 +11,9 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix swrl: <http://www.w3.org/2003/11/swrl#> .
+@prefix ai: <https://node.town/2024/ai/#> .
+@prefix recraft: <https://node.town/2024/recraft/#> .
 
 @base <https://node.town/2024/> .
 
@@ -39,6 +47,55 @@ obo:BFO_0000020 rdfs:label "specifically dependent continuant"@en .
 obo:BFO_0000031 rdfs:label "generically dependent continuant"@en .
 obo:BFO_0000001 rdfs:label "entity"@en .
 obo:BFO_0000040 rdfs:label "material entity"@en .
+
+rdf:Property rdfs:label "property"@en .
+owl:AnnotationProperty rdfs:label "annotation property"@en .
+owl:Axiom rdfs:label "axiom"@en .
+owl:FunctionalProperty rdfs:label "functional property"@en .
+owl:InverseFunctionalProperty rdfs:label "inverse functional property"@en .
+owl:IrreflexiveProperty rdfs:label "irreflexive property"@en .
+owl:Ontology rdfs:label "ontology"@en .
+owl:Restriction rdfs:label "restriction"@en .
+owl:TransitiveProperty rdfs:label "transitive property"@en .
+
+swrl:AtomList rdfs:label "atom list"@en .
+swrl:ClassAtom rdfs:label "class atom"@en .
+swrl:Imp rdfs:label "implication"@en .
+swrl:IndividualPropertyAtom rdfs:label "individual property atom"@en .
+swrl:Variable rdfs:label "variable"@en .
+
+as:Add rdfs:label "add"@en .
+as:Create rdfs:label "create"@en .
+
+nt:BearerToken rdfs:label "bearer token"@en .
+nt:City rdfs:label "city"@en .
+nt:ServiceAccount rdfs:label "service account"@en .
+nt:Surface rdfs:label "surface"@en .
+nt:WebService rdfs:label "web service"@en .
+ai:ImageModel rdfs:label "image model"@en .
+recraft:RecraftV3Style rdfs:label "Recraft v3 style"@en .
+
+protege:defaultLanguage rdfs:label "has default language"@en .
+
+obo:IAO_0000113 rdfs:label "has branch"@en .
+obo:IAO_0000114 rdfs:label "has curation status"@en .
+obo:IAO_0000231 rdfs:label "has obsolescence reason"@en .
+obo:IAO_0000233 rdfs:label "has term tracker item"@en .
+obo:IAO_0000234 rdfs:label "has term editor"@en .
+
+obo:OBI_0000293 rdfs:label "has specified input"@en .
+obo:OBI_0000299 rdfs:label "has specified output"@en .
+
+obo:RO_0001900 rdfs:label "has temporal interpretation"@en .
+
+dc:contributor rdfs:label "has contributor"@en .
+dc:member rdfs:label "has member"@en .
+dcterms:license rdfs:label "has license"@en .
+dcterms:source rdfs:label "has source"@en .
+
+foaf:homepage rdfs:label "has homepage"@en .
+foaf:mbox rdfs:label "has mailbox"@en .
+foaf:page rdfs:label "has page"@en .
 
 #################################################################
 #    Object Properties

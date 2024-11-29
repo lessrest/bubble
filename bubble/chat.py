@@ -1,14 +1,19 @@
 from typing import NoReturn
 
+import anthropic
 import rich
 import rich.panel
 import rich.json
 import rich.progress_bar
 from bubble.repo import current_bubble
+from bubble.vars import graph
 from bubble.slop import Claude
 from bubble.util import select_rows
 
-from anthropic.types import MessageParam
+from anthropic.types import (
+    MessageParam,
+    ToolResultBlockParam,
+)
 from anthropic.types.message import Message
 
 from rdflib.query import ResultRow
@@ -22,9 +27,8 @@ def row_to_text(row: ResultRow) -> str:
     return ", ".join([repr(x) for x in row])
 
 
-def initial_message(n3_representation) -> str:
+def system_message() -> str:
     instructions = [
-        "Your task is to describe this knowledge graph in prose.",
         "The prose should use short sentences.",
         "It should accurately convey the contents of the graph.",
         "The reader is the person whose user is described in the graph"
@@ -34,7 +38,6 @@ def initial_message(n3_representation) -> str:
     ]
 
     return join_sentences(
-        wrap_with_tag("graph", n3_representation),
         *instructions,
     )
 
@@ -63,7 +66,38 @@ class BubbleChat:
             await self.stream_assistant_reply()
 
     async def stream_assistant_reply(self) -> None:
-        tools = [
+        while True:
+            async for reply in self.claude.stream_events(
+                self.history,
+                tools=self.tool_specs(),
+                system=system_message(),
+            ):
+                if not self.handle_reply(reply):
+                    return
+
+    def handle_reply(self, reply):
+        match reply.type:
+            case "text":
+                self.console.print(reply.text, end="")
+
+            case "message_stop":
+                message = reply.message
+                return self.handle_message_stop(message)
+
+        return True
+
+    def handle_message_stop(self, message):
+        self.console.line()
+        self.record_assistant_message(message)
+
+        if message.stop_reason == "tool_use":
+            self.handle_tool_use(message)
+            return True
+        else:
+            return False
+
+    def tool_specs(self) -> list[anthropic.types.ToolParam]:
+        return [
             {
                 "name": "runSparqlSelectQuery",
                 "description": "Run a SPARQL SELECT query",
@@ -73,67 +107,42 @@ class BubbleChat:
                 },
             }
         ]
-        while True:
-            async for reply in self.claude.stream_events(
-                self.history, tools=tools
-            ):
-                progressbar = None
-                match reply.type:
-                    case "text":
-                        self.console.print(reply.text, end="")
-                    # case "content_block_start":
-                    #     if reply.content_block.type == "tool_use":
-                    #         progressbar = rich.progress_bar.ProgressBar(
-                    #             total=None
-                    #         )
-                    #         self.console.print(progressbar)
-                    #         self.console.file.write("\r")
-                    # case "input_json":
-                    #     if progressbar is not None:
-                    #         progressbar.update(0.5)
-                    #         self.console.print(progressbar)
-                    #         self.console.file.write("\r")
 
-                    case "message_stop":
-                        self.console.line()
-                        message = reply.message
-                        self.record_assistant_message(message)
+    def handle_tool_use(self, message):
+        tool_use = self.extract_tool_use(message)
+        tool_name = tool_use.name
+        tool_input = tool_use.input
+        if tool_name == "runSparqlSelectQuery":
+            self.process_sparql_query(tool_use, tool_input)
+        else:
+            raise ValueError(f"Unknown tool: {tool_name}")
 
-                        if message.stop_reason == "tool_use":
-                            tool_use = next(
-                                block
-                                for block in message.content
-                                if block.type == "tool_use"
-                            )
-                            tool_name = tool_use.name
-                            tool_input = tool_use.input
-                            if tool_name == "runSparqlSelectQuery":
-                                assert isinstance(tool_input, dict)
-                                assert "sparqlQuery" in tool_input
-                                rows = select_rows(
-                                    tool_input["sparqlQuery"]
-                                )
-                                #                                self.console.print(rows)
-                                self.history.append(
-                                    MessageParam(
-                                        role="user",
-                                        content=[
-                                            {
-                                                "type": "tool_result",
-                                                "tool_use_id": tool_use.id,
-                                                "content": rows_to_text(
-                                                    rows
-                                                ),
-                                            }
-                                        ],
-                                    )
-                                )
-                            else:
-                                raise ValueError(
-                                    f"Unknown tool: {tool_name}"
-                                )
-                        else:
-                            return
+    def extract_tool_use(self, message):
+        return next(
+            block for block in message.content if block.type == "tool_use"
+        )
+
+    def process_sparql_query(self, tool_use, tool_input):
+        assert isinstance(tool_input, dict)
+        assert "sparqlQuery" in tool_input
+        with graph.bind(current_bubble.get().dataset):
+            rows = select_rows(tool_input["sparqlQuery"])
+        self.append_tool_result(tool_use, rows)
+
+    def append_tool_result(self, tool_use, rows):
+        self.history.append(
+            MessageParam(
+                role="user",
+                content=[self.tool_result_param(tool_use, rows)],
+            )
+        )
+
+    def tool_result_param(self, tool_use, rows) -> ToolResultBlockParam:
+        return ToolResultBlockParam(
+            type="tool_result",
+            tool_use_id=tool_use.id,
+            content=rows_to_text(rows),
+        )
 
     async def handle_user_input(self, user_message: str) -> None:
         if user_message == "/reason":
