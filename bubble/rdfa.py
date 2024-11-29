@@ -34,7 +34,7 @@ from bubble.html import (
     text,
     classes,
 )
-from bubble.vars import using
+from bubble.vars import binding
 
 router = APIRouter(
     prefix="/rdf", default_response_class=HypermediaResponse
@@ -398,7 +398,7 @@ def render_resource_header(subject, data):
     if data and data["type"]:
         dataset = current_bubble.get().dataset
         type_label = get_label(dataset, data["type"])
-        with using(inside_property_label, True):
+        with binding(inside_property_label, True):
             render_value(type_label or data["type"])
 
 

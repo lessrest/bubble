@@ -19,7 +19,7 @@ current_graph = ContextVar("graph", default=Graph())
 
 
 @contextmanager
-def using(var: ContextVar, value):
+def binding(var: ContextVar, value):
     """Context manager for temporarily setting a context variable.
 
     Implements the dynamic scoping pattern - sets the value within the context
@@ -39,7 +39,7 @@ def using_graph(graph: Graph):
     This is a convenience wrapper around using() for the common case
     of injecting a graph dependency.
     """
-    with using(current_graph, graph):
+    with binding(current_graph, graph):
         yield graph
 
 

@@ -27,7 +27,7 @@ from bubble.boot import describe_new_bubble
 from bubble.mind import reason
 from bubble.prfx import NT
 from bubble.util import get_single_subject, print_n3
-from bubble.vars import using, using_graph
+from bubble.vars import binding, using_graph
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ current_bubble: ContextVar[BubbleRepo] = ContextVar("bubble")
 
 @contextmanager
 def using_bubble(bubble: BubbleRepo):
-    with using(current_bubble, bubble):
+    with binding(current_bubble, bubble):
         with using_graph(bubble.graph):
             yield bubble
 
