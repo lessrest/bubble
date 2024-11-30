@@ -4,11 +4,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        serif: ["Equity OT", "Times New Roman", "serif"],
-        sans: ["Iosevka Aile", "sans-serif"],
+        serif: ["Equity OT", "Big Caslon", "Times New Roman", "serif"],
         mono: ["Iosevka Medium Extended", "monospace"],
       },
     },
   },
   plugins: [require("@tailwindcss/forms")],
-};
+}
