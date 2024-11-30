@@ -11,6 +11,8 @@ import trio
 from bubble.html import (
     ErrorMiddleware,
     HypermediaResponse,
+    attr,
+    classes,
     log_middleware,
     document,
     tag,
@@ -101,12 +103,15 @@ def base_html(title: str):
                 text(title)
             tag("link", rel="stylesheet", href="/static/css/output.css")
             for script in cdn_scripts:
-                tag("script", src=script)
+                with tag("script", src=script):
+                    attr("async")
+            tag("script", type="module", src="/static/type-writer.js")
+            tag("script", type="module", src="/static/voice-writer.js")
             json_assignment_script("htmx.config", htmx_config)
 
         with tag(
             "body",
-            classes="bg-white dark:bg-slate-900 text-gray-900 dark:text-white",
+            classes="bg-white dark:bg-slate-950 text-gray-900 dark:text-stone-50",
         ):
             yield
 
@@ -141,14 +146,38 @@ app.middleware("http")(log_middleware)
 @app.get("/", response_class=HypermediaResponse)
 def get_dashboard():
     with base_html("Bubble"):
-        with tag("div", classes="flex flex-col gap-4 p-4"):
-            iri = get_single_subject(RDF.type, NT.ServiceAccount)
-            if iri:
-                with bubble.rdfa.autoexpanding(2):
-                    rdf_resource(iri)
-            else:
-                with tag("div", classes="text-red-600 dark:text-red-500"):
-                    text("No active session found. Please log in.")
+        with tag("div", classes="flex flex-col gap-4"):
+            with tag("div"):
+                classes(
+                    "font-serif px-4 py-1 bg-white dark:bg-slate-800",
+                    "border-b border-gray-200 dark:border-slate-700",
+                )
+                tag(
+                    "voice-writer",
+                    language="en-US",
+                    server="wss://swa.sh",
+                )
+            with tag("div", classes="p-2"):
+                iri = get_single_subject(RDF.type, NT.ServiceAccount)
+                if iri:
+                    with bubble.rdfa.autoexpanding(2):
+                        rdf_resource(iri)
+
+
+@app.get("/voice", response_class=HypermediaResponse)
+def get_voice_page():
+    with base_html("Voice Writer"):
+        with tag(
+            "div",
+            classes="flex font-serif",
+        ):
+            tag(
+                "voice-writer",
+                language="en-US",
+                server="wss://swa.sh",
+                debug=True,
+                classes="w-full",
+            )
 
 
 async def _serve_app(app: FastAPI, config: hypercorn.Config) -> None:
