@@ -3,7 +3,7 @@ import json
 import logging
 import pathlib
 
-from fastapi import FastAPI, Query, Request, Response
+from fastapi import FastAPI, Form, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import hypercorn.trio
@@ -182,15 +182,23 @@ def get_voice_page():
             )
 
 
-@app.get("/sparql")
-async def get_sparql(request: Request, query: str = Query(default="")):
+@app.get("/{bubble_id}/sparql")
+async def get_sparql(
+    request: Request,
+    query: str = Query(default=""),
+    bubble_id: str = Path(),
+):
     console = rich.console.Console()
+    bubble = request.app.state.bubble
+    assert isinstance(bubble, BubbleRepo)
+    if bubble_id != "foo":
+        return JSONResponse(
+            status_code=404, content={"error": "Bubble not found"}
+        )
     console.print(f"Query: {query}")
     if query:
         try:
-            results = bubble.repo.current_bubble.get().dataset.query(
-                query
-            )
+            results = bubble.dataset.query(query)
             return Response(
                 content=results.serialize(format="json"),
                 media_type="application/sparql-results+json",
@@ -204,6 +212,15 @@ async def get_sparql(request: Request, query: str = Query(default="")):
         return JSONResponse(
             status_code=400, content={"error": "No query provided"}
         )
+
+
+@app.post("/{bubble_id}/sparql")
+async def post_sparql(
+    request: Request,
+    query: str = Form(),
+    bubble_id: str = Path(),
+):
+    return await get_sparql(request, query, bubble_id)
 
 
 async def _serve_app(app: FastAPI, config: hypercorn.Config) -> None:
