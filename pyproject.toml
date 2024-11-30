@@ -78,14 +78,8 @@ rdflib = { git = "https://github.com/RDFLib/rdflib" }
 httptools = { git = "https://github.com/tacaswell/httptools", branch = "patch-1" }
 
 [build-system]
-# I don't know why I have to choose this or what it does,
-# but I'll make my best guess on how many releases until it breaks.
-requires = ["setuptools >= 61"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-# otherwise it complains about non-package directories
-include = ["bubble"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project.scripts]
 bubble = "bubble.main:main"
@@ -100,6 +94,7 @@ lines-between-types = 1
 length-sort = true
 
 [tool.uv]
+package = true
 dev-dependencies = [
     "ruff==0.*",
     "pytest==8.*",
