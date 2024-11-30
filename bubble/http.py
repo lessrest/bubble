@@ -3,9 +3,11 @@ import json
 import logging
 import pathlib
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import hypercorn.trio
+import rich
 import trio
 
 from bubble.html import (
@@ -178,6 +180,30 @@ def get_voice_page():
                 debug=True,
                 classes="w-full",
             )
+
+
+@app.get("/sparql")
+async def get_sparql(request: Request, query: str = Query(default="")):
+    console = rich.console.Console()
+    console.print(f"Query: {query}")
+    if query:
+        try:
+            results = bubble.repo.current_bubble.get().dataset.query(
+                query
+            )
+            return Response(
+                content=results.serialize(format="json"),
+                media_type="application/sparql-results+json",
+            )
+        except Exception as e:
+            console.print_exception()
+            return JSONResponse(
+                status_code=500, content={"error": str(e)}
+            )
+    else:
+        return JSONResponse(
+            status_code=400, content={"error": "No query provided"}
+        )
 
 
 async def _serve_app(app: FastAPI, config: hypercorn.Config) -> None:

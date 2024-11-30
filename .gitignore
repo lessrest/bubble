@@ -18,3 +18,4 @@ coverage.xml
 
 node_modules
 bubble/static/css/output.css
+.idea/rdfandsparql.xml
