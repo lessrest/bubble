@@ -85,7 +85,7 @@ class BubbleRepo:
 
     async def load_ontology(self) -> None:
         """Load the ontology into the vocab graph"""
-        vocab_dir = Path(__file__).parent.parent / "vocab"
+        vocab_dir = Path(__file__).parent.parent.parent / "vocab"
         paths = []
         files = await trio.Path(vocab_dir).glob("*.ttl")
         paths.extend(files)
@@ -108,6 +108,7 @@ class BubbleRepo:
     async def load_rules(self) -> None:
         """Load all rules from the system rules directory"""
         rules_dir = Path(__file__).parent / "rule"
+        # TODO: test this
         await self.load_many(rules_dir, "*.n3", "rule")
 
     async def reason(self) -> Graph:
