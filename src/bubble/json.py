@@ -1,6 +1,7 @@
 import logging
 from rdflib import IdentifiedNode, Literal
 from rdflib.collection import Collection
+import structlog
 from bubble.mint import fresh_uri
 from bubble.prfx import JSON, SWA
 from bubble.util import O, S, is_a, new, select_rows
@@ -36,7 +37,7 @@ def json_from_rdf(
         }
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 def rdf_from_json(

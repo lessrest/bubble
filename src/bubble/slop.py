@@ -23,7 +23,7 @@ async def stream_sentences(
 
         # Keep extracting complete sentences while we have them
         while match := re.search(
-            r"^(.*?[.!?])[ \n](.*)$", current_sentence, re.DOTALL
+            r"^(.*?[.!?][ \n])(.*)$", current_sentence, re.DOTALL
         ):
             # Extract the complete sentence and yield it
             sentence_content = match.group(1)

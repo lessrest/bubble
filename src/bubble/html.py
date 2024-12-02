@@ -13,6 +13,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 
 import rich
+import structlog
 import trio
 import starlette
 import starlette.middleware
@@ -31,7 +32,7 @@ A module for building HTML/XML documents using Python context managers.
 Provides a declarative way to construct DOM trees with live-updating capabilities.
 """
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class HTMLDecorators:
@@ -310,7 +311,5 @@ class ErrorMiddleware:
 async def log_middleware(request: Request, call_next):
     logger.debug(f"{request.method} {request.url}")
     response = await call_next(request)
-    logger.info(
-        f"{response.status_code} {request.method} {request.url}"
-    )
+    logger.info(f"{response.status_code} {request.method} {request.url}")
     return response

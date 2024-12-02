@@ -38,8 +38,8 @@ async def test_stream_sentences(text_stream):
         sentences.append(sentence)
 
     assert sentences == [
-        "First sentence.",
-        "Second sentence.",
+        "First sentence. ",
+        "Second sentence. ",
         "Third sentence.",
     ]
 
@@ -65,8 +65,10 @@ async def test_sentence_stream_on_list_of_sentences(
     sentences: list[str],
 ):
     events = create_text_stream(" ".join(sentences))
-    streamed = [sentence async for sentence in stream_sentences(events)]
-    assert streamed == sentences
+    streamed = [
+        sentence.strip() async for sentence in stream_sentences(events)
+    ]
+    assert streamed == [sentence.strip() for sentence in sentences]
 
 
 @given(st.lists(sentence))
@@ -74,32 +76,36 @@ async def test_sentence_stream_on_list_of_sentences_with_newlines(
     sentences: list[str],
 ):
     events = create_text_stream("\n".join(sentences))
-    streamed = [sentence async for sentence in stream_sentences(events)]
-    assert streamed == sentences
+    streamed = [
+        sentence.strip() async for sentence in stream_sentences(events)
+    ]
+    assert streamed == [sentence.strip() for sentence in sentences]
 
 
 async def test_sentence_stream_handles_no_sentence_ending():
     events = create_text_stream("This is a test")
-    sentences = [sentence async for sentence in stream_sentences(events)]
+    sentences = [
+        sentence.strip() async for sentence in stream_sentences(events)
+    ]
     assert sentences == ["This is a test"]
 
 
 async def test_sentence_stream_handles_ellipsis():
     events = create_text_stream("This is a test... This is a test.")
-    sentences = [sentence async for sentence in stream_sentences(events)]
+    sentences = [
+        sentence.strip() async for sentence in stream_sentences(events)
+    ]
     assert sentences == ["This is a test...", "This is a test."]
 
 
 async def test_sentence_stream_handles_newlines():
     events = create_text_stream("This is a test.\nThis is a test.")
     sentences = [sentence async for sentence in stream_sentences(events)]
-    assert sentences == ["This is a test.", "This is a test."]
+    assert sentences == ["This is a test.\n", "This is a test."]
 
 
 @given(
-    sentence.flatmap(
-        lambda s: st.integers(1, len(s)).map(lambda n: (s, n))
-    )
+    sentence.flatmap(lambda s: st.integers(1, len(s)).map(lambda n: (s, n)))
 )
 async def test_foo(x):
     (sentence, n) = x

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import hypercorn.trio
 import rich
+import structlog
 import trio
 
 from bubble.html import (
@@ -26,17 +27,21 @@ from bubble.repo import BubbleRepo, using_bubble
 from bubble.util import get_single_subject
 
 import bubble.rdfa
+from bubble.vars import Parameter
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
+
+bubble_path = Parameter("bubble_path", str(pathlib.Path.home() / "bubble"))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    static_dir = pathlib.Path(__file__).parent / "static"
+    mount_static(app, str(static_dir))
+
     logger.info("The Bubble HTTP server is starting.")
 
-    bubble = await BubbleRepo.open(
-        trio.Path(pathlib.Path.home() / "bubble")
-    )
+    bubble = await BubbleRepo.open(trio.Path(bubble_path.get()))
 
     app.state.bubble = bubble
 
@@ -118,16 +123,12 @@ def base_html(title: str):
             yield
 
 
-def mount_static(
-    app: FastAPI, directory: str, mount_path: str = "/static"
-):
+def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
     """
     Mount a static files directory to the FastAPI application.
     """
     app.mount(mount_path, StaticFiles(directory=directory), name="static")
 
-
-mount_static(app, "bubble/static")
 
 app.include_router(bubble.rdfa.router)
 
@@ -205,9 +206,7 @@ async def get_sparql(
             )
         except Exception as e:
             console.print_exception()
-            return JSONResponse(
-                status_code=500, content={"error": str(e)}
-            )
+            return JSONResponse(status_code=500, content={"error": str(e)})
     else:
         return JSONResponse(
             status_code=400, content={"error": "No query provided"}
@@ -223,14 +222,9 @@ async def post_sparql(
     return await get_sparql(request, query, bubble_id)
 
 
-async def _serve_app(app: FastAPI, config: hypercorn.Config) -> None:
+async def serve(config: hypercorn.Config) -> None:
     await hypercorn.trio.serve(app, config)  # type: ignore
 
 
-def run_server(app: FastAPI):
-    config = hypercorn.Config()
-    trio.run(_serve_app, app, config)
-
-
 if __name__ == "__main__":
-    run_server(app)
+    trio.run(serve, hypercorn.Config())

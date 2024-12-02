@@ -17,14 +17,15 @@ from . import (
     json,
     macs,
     main,
+    http,
 )
 
 import rdflib.term
 
 from pydantic import SecretStr
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 rdflib.term.bind(prfx.NT.SecretToken, SecretStr)
@@ -47,4 +48,5 @@ __all__ = [
     "json",
     "macs",
     "main",
+    "http",
 ]

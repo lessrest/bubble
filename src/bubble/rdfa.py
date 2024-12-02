@@ -20,6 +20,7 @@ from rdflib import (
     Literal,
 )
 import rich
+import structlog
 
 from bubble.util import P, S
 from bubble.repo import current_bubble
@@ -35,11 +36,9 @@ from bubble.html import (
 )
 from bubble import vars
 
-router = APIRouter(
-    prefix="/rdf", default_response_class=HypermediaResponse
-)
+router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 rendering_sensitive_data = vars.Parameter(
     "rendering_sensitive_data", default=False
@@ -146,9 +145,7 @@ def group_triples(
         if predicate == RDF.type:
             grouped_triples[subject]["type"] = obj
         else:
-            grouped_triples[subject]["predicates"].append(
-                (predicate, obj)
-            )
+            grouped_triples[subject]["predicates"].append((predicate, obj))
 
     for data in grouped_triples.values():
         data["predicates"].sort(
@@ -301,9 +298,7 @@ def render_properties(data):
     with tag("dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2"):
         for predicate, objects in grouped_predicates.items():
             # Check if all objects are literals
-            all_literals = all(
-                isinstance(obj, Literal) for obj in objects
-            )
+            all_literals = all(isinstance(obj, Literal) for obj in objects)
 
             if all_literals and len(objects) > 1:
                 # Render multiple literals together
@@ -365,9 +360,7 @@ def render_resource_header(subject, data):
 @html.ul(
     "list-decimal flex flex-col gap-1 ml-4 text-cyan-600 dark:text-cyan-500"
 )
-def render_list(
-    collection: List[S], predicate: Optional[P] = None
-) -> None:
+def render_list(collection: List[S], predicate: Optional[P] = None) -> None:
     for item in collection:
         with tag("li"):
             render_subresource(item, predicate)

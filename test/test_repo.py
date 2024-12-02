@@ -1,5 +1,6 @@
 import logging
 import pytest
+import structlog
 import trio
 from rdflib import Graph, URIRef, RDF
 from bubble.repo import using_bubble_at
@@ -8,7 +9,7 @@ from bubble.util import get_single_subject, print_n3
 
 from bubble import vars
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 @pytest.fixture
@@ -91,9 +92,7 @@ async def test_repo_load_rules(temp_repo):
 async def test_repo_git_config(temp_repo):
     """Test that Git configuration is set correctly"""
     # Get the bubble's email from the graph
-    email = str(
-        temp_repo.graph.value(temp_repo.bubble, NT.emailAddress)
-    )
+    email = str(temp_repo.graph.value(temp_repo.bubble, NT.emailAddress))
     assert email.endswith(
         "@swa.sh"
     ), f"Email '{email}' should end with @swa.sh"

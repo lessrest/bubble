@@ -39,13 +39,10 @@ keywords = [
 dependencies = [
     # Structured concurrency library for managing async code
     "trio==0.27.*",
-
     # Python library for working with RDF (Resource Description Framework)
     "rdflib==7.*",
-
     # Data validation using type annotations
     "pydantic==2.10.*",
-
     # Modern, fast web framework for building APIs with Python
     "fastapi==0.115.*",
     # ASGI framework used by FastAPI
@@ -53,31 +50,27 @@ dependencies = [
     "python-multipart==0.0.*",
     # ASGI server for Trio
     "hypercorn==0.17.*",
-
     # Rich text and beautiful formatting in the terminal
     "rich==13.*",
     # CLI framework; the FastAPI of CLI apps
     "typer==0.*",
-
     # Modern async HTTP client
     "httpx==0.*",
-
     # Various AI inference SDKs
     "replicate==1.*",
     "openai==1.55.*",
     "anthropic==0.39.*",
-
     # Better date and time manipulation for Python
     "arrow==1.*",
     # Parse and pretty-print HTML
     "beautifulsoup4==4.12.*",
-
     # Globally unique ID generator
     "py-xid==1.*",
     # Cross-platform unique machine ID generator
     "py-machineid==0.*",
     # Cross-platform library for retrieving system information
     "psutil==6.*",
+    "structlog>=24.4.0",
 ]
 
 [tool.uv.sources]
@@ -85,7 +78,7 @@ dependencies = [
 rdflib = { git = "https://github.com/RDFLib/rdflib" }
 
 [project.scripts]
-bubble = "bubble.main:main"
+bubble = "bubble.main:app"
 
 [tool.uv]
 package = true

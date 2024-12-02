@@ -1,6 +1,7 @@
 from typing import Optional
 import httpx
 import rich
+import structlog
 import trio
 import logging
 from pydantic import SecretStr
@@ -10,7 +11,7 @@ from bubble.prfx import AI  # You'll need to add TG namespace to prfx.py
 from bubble.repo import loading_bubble_from
 import pathlib
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 console = rich.console.Console()
 

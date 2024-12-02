@@ -8,9 +8,9 @@
 # Each bubble has a unique IRI minted on creation.
 
 from contextlib import asynccontextmanager, contextmanager
-import logging
 from dataclasses import dataclass
 
+import structlog
 import trio
 
 from trio import Path
@@ -28,7 +28,7 @@ from bubble.prfx import NT
 from bubble.util import get_single_subject, print_n3
 from bubble import vars
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -75,12 +75,17 @@ class BubbleRepo:
             pattern: Glob pattern to match
             kind: Description of what's being loaded for logging
         """
-        paths = []
+        paths: list[Path] = []
         files = await trio.Path(directory).glob(pattern)
         paths.extend(files)
 
         for path in paths:
-            logger.info(f"Loading {kind} from {path}")
+            logger.info(
+                "Loading triples",
+                kind=kind,
+                source=path.as_uri(),
+                graph=self.graph.identifier,
+            )
             self.graph.parse(str(path))
 
     async def load_ontology(self) -> None:
@@ -95,7 +100,12 @@ class BubbleRepo:
             self.dataset.remove(triple)
 
         for path in paths:
-            logger.info(f"Loading ontology from {path}")
+            logger.info(
+                "Loading triples",
+                kind="ontology",
+                source=path.as_uri(),
+                graph=self.vocab.identifier,
+            )
             graph = Graph().parse(str(path), format="turtle")
             for s, p, o in graph:
                 self.dataset.add((s, p, o, self.vocab))
