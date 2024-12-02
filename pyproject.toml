@@ -1,108 +1,134 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/lessrest/bubble"
+"Bug Tracker" = "https://github.com/lessrest/bubble/issues"
+Repository = "https://github.com/lessrest/bubble"
+
 [project]
 name = "bubble"
-version = "0.1.0"
-description = "Add your description here"
-authors = []
-readme = "README.md"
+version = "0.2.0"
+description = "a Node.Town bubble server"
+authors = [
+    { name = "Mikael Brockman", email = "mikael@brockman.se" }
+]
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.13"
+license = { file = "LICENSE.md" }
+classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Framework :: Trio",
+    "Programming Language :: Python :: 3.13",
+]
+keywords = [
+    "bubble",
+    "rdf",
+    "logic",
+    "llm",
+    "git",
+    "async",
+    "trio",
+]
 
 dependencies = [
     # Structured concurrency library for managing async code
     "trio==0.27.*",
-    # Rich text and beautiful formatting in the terminal
-    "rich==13.*",
-    # Modern async HTTP client with support for HTTP/2
-    "httpx==0.*",
+
     # Python library for working with RDF (Resource Description Framework)
     "rdflib==7.*",
-    # Popular Python testing framework
-    "pytest==8.*",
-    # Pytest plugin for testing async code using Trio
-    "pytest-trio==0.*",
-    # Generates Markdown reports from pytest results
-    "pytest-md-report==0.6.*",
-    # Client library for Replicate's AI model hosting platform
+
+    # Data validation using type annotations
+    "pydantic==2.10.*",
+
+    # Modern, fast web framework for building APIs with Python
+    "fastapi==0.115.*",
+    # ASGI framework used by FastAPI
+    "starlette==0.41.*",
+    "python-multipart==0.0.*",
+    # ASGI server for Trio
+    "hypercorn==0.17.*",
+
+    # Rich text and beautiful formatting in the terminal
+    "rich==13.*",
+    # CLI framework; the FastAPI of CLI apps
+    "typer==0.*",
+
+    # Modern async HTTP client
+    "httpx==0.*",
+
+    # Various AI inference SDKs
     "replicate==1.*",
-    # Official OpenAI API client for GPT models
     "openai==1.55.*",
-    # Official Anthropic API client for Claude models
     "anthropic==0.39.*",
+
+    # Better date and time manipulation for Python
+    "arrow==1.*",
+    # Parse and pretty-print HTML
+    "beautifulsoup4==4.12.*",
+
     # Globally unique ID generator
     "py-xid==1.*",
     # Cross-platform unique machine ID generator
     "py-machineid==0.*",
-    # Modern CLI framework built on Click
-    "typer==0.*",
-    # Static type checker for Python
-    "pyright==1.*",
-    # Auto-rerun pytest on file changes
-    "pytest-watcher==0.*",
     # Cross-platform library for retrieving system information
     "psutil==6.*",
-    # Thin wrapper around the mock package for pytest
-    "pytest-mock==3.*",
-    # Mocking and testing library
-    "mock==5.*",
-    # Pytest plugin for mocking httpx requests
-    "pytest-httpx==0.*",
-    # Used only for comment wrapping functionality
-    "autopep8==2.*",
-    # Code coverage measurement tool
-    "coverage==7.*",
-    # ASGI framework for building high-performance web services
-    "starlette==0.41.*",
-    # Modern, fast web framework for building APIs with Python
-    "fastapi==0.115.*",
-    # ASGI server with HTTP/2 support
-    "hypercorn==0.17.*",
-    # Better date and time manipulation for Python
-    "arrow==1.*",
-    # Property-based testing framework
-    "hypothesis==6.*",
-    # Coverage reporting plugin for pytest
-    "pytest-cov==6.*",
-    # Parse and pretty-print HTML
-    "beautifulsoup4==4.12.*",
-    # Run tests in parallel
-    "pytest-xdist>=3.6.1",
-    "invoke>=2.2.0",
-    "pydantic>=2.10.1",
-    "python-multipart>=0.0.18",
 ]
 
 [tool.uv.sources]
 # stay current with rdflib
 rdflib = { git = "https://github.com/RDFLib/rdflib" }
 
-# I don't remember but this was necessary at some point for something
-httptools = { git = "https://github.com/tacaswell/httptools", branch = "patch-1" }
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project.scripts]
 bubble = "bubble.main:main"
-
-[tool.ruff]
-line-length = 74         # slim fit
-target-version = "py313" # I'm not interested in old Python versions
-
-[tool.ruff.lint.isort]
-# Use a single line between direct and from import.
-lines-between-types = 1
-length-sort = true
 
 [tool.uv]
 package = true
 dev-dependencies = [
+    # Linter and formatter
     "ruff==0.*",
+    # Static type checker
+    "pyright==1.*",
+    # Task runner, see tasks.py
+    "invoke==2.2.*",
+    # Property-based testing framework
+    "hypothesis==6.*",
+    # Mocking and testing library
+    "mock==5.*",
+    # Popular Python testing framework
     "pytest==8.*",
-    "pytest-trio==0.*", # async testing for trio structured concurrency
+    # Pytest plugin for testing async code using Trio
+    "pytest-trio==0.*",
+    # Generates Markdown reports from pytest results
+    "pytest-md-report==0.6.*",
+    # Auto-rerun pytest on file changes
+    "pytest-watcher==0.*",
+    # Thin wrapper around the mock package for pytest
+    "pytest-mock==3.*",
+    # Pytest plugin for mocking httpx requests
+    "pytest-httpx==0.*",
+    # Run tests in parallel
+    "pytest-xdist==3.6.1",
+    # Coverage reporting plugin for pytest
+    "pytest-cov==6.*",
+    # Code coverage measurement tool
+    "coverage==7.*",
+    # Used only for comment wrapping functionality
+    "autopep8==2.*",    
 ]
 
-python-preference = "managed"
-python-downloads = "automatic"
+[tool.ruff]
+line-length = 76
+target-version = "py313"
+
+[tool.ruff.lint.isort]
+lines-between-types = 1
+length-sort = true
 
 [tool.pyright]
 venvPath = "."
@@ -113,4 +139,6 @@ trio_mode = true
 md_report_verbose = 1
 mock_use_standalone_module = true
 markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
+
+# Run tests in parallel
 addopts = "-n 4"
