@@ -17,5 +17,5 @@ coverage.xml
 .hypothesis
 
 node_modules
-bubble/static/css/output.css
+src/bubble/static/css/output.css
 .idea/rdfandsparql.xml

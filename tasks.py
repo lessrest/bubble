@@ -40,8 +40,8 @@ def run(c: Context, command: Command, **kwargs):
 @task
 def css(c: Context, watch=False):
     """Build Tailwind CSS."""
-    src = "./bubble/static/css/input.css"
-    dst = "./bubble/static/css/output.css"
+    src = "./src/bubble/static/css/input.css"
+    dst = "./src/bubble/static/css/output.css"
     cmd = sh("bunx tailwindcss", {"-i": src, "-o": dst, "--watch": watch})
     run(c, cmd)
 
