@@ -266,7 +266,7 @@ class ErrorMiddleware:
                             src="https://unpkg.com/htmx.org@2",
                         )
                     with tag("body"):
-                        classes("bg-gray-800 text-white p-4")
+                        classes("bg-slate-950 text-white p-4")
                         for e in eg.exceptions:
                             self.render_error(e)
                             logger.error(
@@ -285,7 +285,7 @@ class ErrorMiddleware:
 
     def render_error(self, e):
         with tag("pre"):
-            classes("font-mono bg-gray-800 leading-tight")
+            classes("font-mono bg-slate-950 leading-tight")
             console = rich.console.Console(
                 file=StringIO(),
                 force_terminal=True,

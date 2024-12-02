@@ -161,7 +161,7 @@ def get_dashboard():
                     server="wss://swa.sh",
                 )
             with tag("div", classes="p-2"):
-                iri = get_single_subject(RDF.type, NT.ServiceAccount)
+                iri = get_single_subject(RDF.type, NT.ComputerMachine)
                 if iri:
                     with bubble.rdfa.autoexpanding(2):
                         rdf_resource(iri)
@@ -172,7 +172,7 @@ def get_voice_page():
     with base_html("Voice Writer"):
         with tag(
             "div",
-            classes="flex font-serif",
+            classes="flex font-serif max-w-prose mx-auto py-4",
         ):
             tag(
                 "voice-writer",

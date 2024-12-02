@@ -211,6 +211,11 @@ sheet.replaceSync(`
       text-decoration: none;
       opacity: 0.6;
     }
+
+    voice-writer br {
+      display: block;
+      content: " ";
+    }
   `)
 
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
