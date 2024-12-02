@@ -77,3 +77,20 @@ def server(c: Context, watch=True, debug=True, bind="0.0.0.0:2024"):
 def shell(c: Context):
     """Run Bubble shell."""
     run(c, sh("python -m bubble"), pty=True, echo=True)
+
+
+@task
+def clean(c: Context):
+    """Clean up."""
+    patterns = [
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "dist",
+        "*.egg-info",
+        ".venv",
+        ".coverage",
+    ]
+    for pattern in patterns:
+        run(c, sh("rm -rf", pattern))
+    run(c, sh("git status"))
