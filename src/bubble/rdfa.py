@@ -22,6 +22,7 @@ from rdflib import (
 import rich
 import structlog
 
+from bubble.pill import render_audio_charm
 from bubble.util import P, S
 from bubble.repo import current_bubble
 
@@ -216,8 +217,18 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_video_resource(subject, data)
     elif data["type"] == NT.VoiceRecording:
         render_voice_recording_resource(subject, data)
+    elif data["type"] == NT.PacketIngress:
+        render_packet_ingress_resource(subject, data)
     else:
         render_default_resource(subject, data)
+
+
+def render_packet_ingress_resource(subject: S, data: Dict):
+    render_resource_header(subject, data)
+    render_properties(data)
+    render_audio_charm()
+    with tag("voice-writer", server="wss://swa.sh"):
+        pass
 
 
 @html.div("flex", "flex-col", "gap-1")

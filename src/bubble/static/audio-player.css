@@ -1,0 +1,91 @@
+:host {
+  display: inline-block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+}
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+:host(:state(playing)) .container,
+:host(:state(recording)) .container {
+  background-color: rgba(96, 165, 250, 0.1);
+  animation: pulse 2s infinite;
+  transform: scale(1.2);
+}
+.play-icon {
+  display: none;
+}
+.pause-icon {
+  display: none;
+}
+.record-icon {
+  display: block;
+}
+:host(:state(playing)) .play-icon {
+  display: none;
+}
+:host(:state(playing)) .pause-icon {
+  display: block;
+}
+:host(:state(recording)) .record-icon {
+  display: none;
+}
+:host(:state(recording)) .pause-icon {
+  display: block;
+}
+:host([src]) .record-icon {
+  display: none;
+}
+:host([src]:not(:state(playing))) .play-icon {
+  display: block;
+}
+@keyframes pulse {
+  0%, 100% {
+    background-color: rgba(96, 165, 250, 0.1);
+  }
+  50% {
+    background-color: rgba(96, 165, 250, 0.2);
+  }
+}
+.circular-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.circular-progress circle {
+  fill: none;
+  stroke-width: 8;
+}
+.progress-bg {
+  stroke: #4b5563;
+}
+.progress-bar {
+  stroke: #60a5fa;
+  stroke-dasharray: 283; /* Circumference of the circle (2 * π * r), where r = 45 */
+  stroke-dashoffset: 283; /* Initially set to full circumference to hide the progress */
+}
+.play-pause {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: none;
+  border: none;
+  padding: 0;
+  width: 70%;
+  height: 70%;
+  pointer-events: none;
+}
+.play-pause svg {
+  width: 100%;
+  height: 100%;
+}

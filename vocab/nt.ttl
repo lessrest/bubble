@@ -1,27 +1,22 @@
-
-@prefix protege: <http://protege.stanford.edu/plugins/owl/protege#> .
+@prefix ai: <https://node.town/2024/ai/#> .
+@prefix as: <http://www.w3.org/ns/activitystreams#> .
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix as: <http://www.w3.org/ns/activitystreams#> .
 @prefix iaodev: <http://purl.obolibrary.org/obo/iao/dev/> .
 @prefix nt: <https://node.town/2024/> .
 @prefix obo: <http://purl.obolibrary.org/obo/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix protege: <http://protege.stanford.edu/plugins/owl/protege#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix swrl: <http://www.w3.org/2003/11/swrl#> .
-@prefix ai: <https://node.town/2024/ai/#> .
 @prefix recraft: <https://node.town/2024/recraft/#> .
-
+@prefix swrl: <http://www.w3.org/2003/11/swrl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @base <https://node.town/2024/> .
 
 <https://node.town/2024/> rdf:type owl:Ontology ;
-   owl:imports iaodev:iao-edit.owl ,
-   iaodev:import_OBI.owl ,
-   iaodev:import_PATO.owl ,
-   iaodev:import_UO.owl ;
+   owl:imports iaodev:iao-edit.owl , iaodev:import_OBI.owl , iaodev:import_PATO.owl , iaodev:import_UO.owl ;
    rdfs:label "Node.Town Ontology of Computer Systems"@en .
 
 #################################################################
@@ -42,12 +37,10 @@ owl:Class rdfs:label "class"@en , "klass"@sv , "klase"@lv .
 owl:ObjectProperty rdfs:label "object property"@en , "egenskap (objekt)"@sv , "objekta īpašība"@lv .
 owl:DatatypeProperty rdfs:label "datatype property"@en , "egenskap (datatyp)"@sv , "datu tipa īpašība"@lv .
 owl:sameAs rdfs:label "is same as"@en , "är samma som"@sv , "ir vienāds ar"@lv .
-
 obo:BFO_0000020 rdfs:label "specifically dependent continuant"@en .
 obo:BFO_0000031 rdfs:label "generically dependent continuant"@en .
 obo:BFO_0000001 rdfs:label "entity"@en .
 obo:BFO_0000040 rdfs:label "material entity"@en .
-
 rdf:Property rdfs:label "property"@en .
 owl:AnnotationProperty rdfs:label "annotation property"@en .
 owl:Axiom rdfs:label "axiom"@en .
@@ -57,16 +50,13 @@ owl:IrreflexiveProperty rdfs:label "irreflexive property"@en .
 owl:Ontology rdfs:label "ontology"@en .
 owl:Restriction rdfs:label "restriction"@en .
 owl:TransitiveProperty rdfs:label "transitive property"@en .
-
 swrl:AtomList rdfs:label "atom list"@en .
 swrl:ClassAtom rdfs:label "class atom"@en .
 swrl:Imp rdfs:label "implication"@en .
 swrl:IndividualPropertyAtom rdfs:label "individual property atom"@en .
 swrl:Variable rdfs:label "variable"@en .
-
 as:Add rdfs:label "add"@en .
 as:Create rdfs:label "create"@en .
-
 nt:BearerToken rdfs:label "bearer token"@en .
 nt:City rdfs:label "city"@en .
 nt:ServiceAccount rdfs:label "service account"@en .
@@ -74,25 +64,59 @@ nt:Surface rdfs:label "surface"@en .
 nt:WebService rdfs:label "web service"@en .
 ai:ImageModel rdfs:label "image model"@en .
 recraft:RecraftV3Style rdfs:label "Recraft v3 style"@en .
-
+nt:OpusPacket20ms a owl:Class ;
+   rdfs:label "20ms Opus packet"@en ;
+   rdfs:comment "a 20ms raw Opus packet"@en ;
+   rdfs:subClassOf nt:Packet .
+nt:PacketIngress a owl:Class ;
+   rdfs:label "packet ingress"@en ;
+   rdfs:comment "an ingress point for packets"@en .
+nt:hasWebSocketURI a owl:DatatypeProperty ;
+   rdfs:label "has WebSocket URI"@en ;
+   rdfs:comment "the WebSocket URI of a packet ingress"@en ;
+   rdfs:domain nt:PacketIngress ;
+   rdfs:range xsd:anyURI .
+nt:hasPacketType a owl:ObjectProperty ;
+   rdfs:label "has packet type"@en ;
+   rdfs:comment "the type of packet of a packet ingress"@en ;
+   rdfs:domain nt:PacketIngress ;
+   rdfs:range owl:Class .
+nt:AudioPacketStream a owl:Class ;
+   rdfs:label "audio packet stream"@en ;
+   rdfs:comment "an audio packet stream"@en .
+nt:wasCreatedAt a owl:DatatypeProperty ;
+   rdfs:label "was created at"@en ;
+   rdfs:comment "the timestamp something was created"@en ;
+   rdfs:domain owl:Thing ;
+   rdfs:range xsd:dateTime .
+nt:hasSampleRate a owl:DatatypeProperty ;
+   rdfs:label "has sample rate"@en ;
+   rdfs:comment "the sample rate of an audio packet stream"@en ;
+   rdfs:domain nt:AudioPacketStream ;
+   rdfs:range xsd:integer .
+nt:hasChannelCount a owl:DatatypeProperty ;
+   rdfs:label "has channel count"@en ;
+   rdfs:comment "the number of channels in an audio packet stream"@en ;
+   rdfs:domain nt:AudioPacketStream ;
+   rdfs:range xsd:integer .
+nt:hasPacketIngress a owl:ObjectProperty ;
+   rdfs:label "has packet ingress"@en ;
+   rdfs:comment "the packet ingress of an audio packet stream"@en ;
+   rdfs:domain nt:AudioPacketStream ;
+   rdfs:range nt:PacketIngress .
 protege:defaultLanguage rdfs:label "has default language"@en .
-
 obo:IAO_0000113 rdfs:label "has branch"@en .
 obo:IAO_0000114 rdfs:label "has curation status"@en .
 obo:IAO_0000231 rdfs:label "has obsolescence reason"@en .
 obo:IAO_0000233 rdfs:label "has term tracker item"@en .
 obo:IAO_0000234 rdfs:label "has term editor"@en .
-
 obo:OBI_0000293 rdfs:label "has specified input"@en .
 obo:OBI_0000299 rdfs:label "has specified output"@en .
-
 obo:RO_0001900 rdfs:label "has temporal interpretation"@en .
-
 dc:contributor rdfs:label "has contributor"@en .
 dc:member rdfs:label "has member"@en .
 dcterms:license rdfs:label "has license"@en .
 dcterms:source rdfs:label "has source"@en .
-
 foaf:homepage rdfs:label "has homepage"@en .
 foaf:mbox rdfs:label "has mailbox"@en .
 foaf:page rdfs:label "has page"@en .
@@ -457,10 +481,8 @@ nt:DoxxingRisk rdf:type owl:Class ;
    rdfs:subClassOf nt:Risk ;
    rdfs:comment "risk of exposing personally identifiable information"@en , "risk för att exponera personligt identifierbar information"@sv , "personas identificējamas informācijas izpaušanas risks"@lv ;
    rdfs:label "doxxing risk"@en , "avslöjanderisk"@sv , "deanonimizācijas risks"@lv .
-
 nt:architecture rdfs:comment "relates a CPU to its instruction set architecture"@en ;
    rdfs:label "has architecture"@en , "har arkitektur"@sv , "ir arhitektūra"@lv .
-
 nt:serialNumber nt:hasRisk nt:DoxxingRisk .
 nt:ARM64 a nt:ARMArchitecture ;
    rdfs:label "ARM64"@en , "AArch64"@en ;

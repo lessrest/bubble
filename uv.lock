@@ -103,6 +103,8 @@ dependencies = [
     { name = "py-machineid" },
     { name = "py-xid" },
     { name = "pydantic" },
+    { name = "pydub" },
+    { name = "pyogg" },
     { name = "python-multipart" },
     { name = "rdflib" },
     { name = "replicate" },
@@ -145,6 +147,8 @@ requires-dist = [
     { name = "py-machineid", specifier = "==0.*" },
     { name = "py-xid", specifier = "==1.*" },
     { name = "pydantic", specifier = "==2.10.*" },
+    { name = "pydub", specifier = ">=0.25.1" },
+    { name = "pyogg", specifier = ">=0.6.14a1" },
     { name = "python-multipart", specifier = "==0.0.*" },
     { name = "rdflib", git = "https://github.com/RDFLib/rdflib" },
     { name = "replicate", specifier = "==1.*" },
@@ -655,12 +659,31 @@ wheels = [
 ]
 
 [[package]]
+name = "pydub"
+version = "0.25.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/9a/e6bca0eed82db26562c73b5076539a4a08d3cffd19c3cc5913a3e61145fd/pydub-0.25.1.tar.gz", hash = "sha256:980a33ce9949cab2a569606b65674d748ecbca4f0796887fd6f46173a7b0d30f", size = 38326 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/53/d78dc063216e62fc55f6b2eebb447f6a4b0a59f55c8406376f76bf959b08/pydub-0.25.1-py2.py3-none-any.whl", hash = "sha256:65617e33033874b59d87db603aa1ed450633288aefead953b30bded59cb599a6", size = 32327 },
+]
+
+[[package]]
 name = "pygments"
 version = "2.18.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8e/62/8336eff65bcbc8e4cb5d05b55faf041285951b6e80f33e2bff2024788f31/pygments-2.18.0.tar.gz", hash = "sha256:786ff802f32e91311bff3889f6e9a86e81505fe99f2735bb6d60ae0c5004f199", size = 4891905 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/3f/01c8b82017c199075f8f788d0d906b9ffbbc5a47dc9918a945e13d5a2bda/pygments-2.18.0-py3-none-any.whl", hash = "sha256:b8e6aca0523f3ab76fee51799c488e38782ac06eafcf95e7ba832985c8e7b13a", size = 1205513 },
+]
+
+[[package]]
+name = "pyogg"
+version = "0.6.14a1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/13/07358440dc3e94a71f3cd0f734e90b41392cc125de1571a99c4f8b594ccb/PyOgg-0.6.14a1.tar.gz", hash = "sha256:8294b34aa59c90200c4630c2cc4a5b84407209141e8e5d069d7a5be358e94262", size = 35091 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/b8/aa50bedf5628dc66a88a3aa6554b91a3f931baf2b221ece3a8525278b667/PyOgg-0.6.14a1-py2.py3-none-win32.whl", hash = "sha256:794db340fb5833afb4f493b40f91e3e0f594606fd4b31aea0ebf5be2de9da964", size = 1037870 },
+    { url = "https://files.pythonhosted.org/packages/52/14/34b6b82684f26e517f6947d9c1d43e64dbf1630954f284ffd9912f4c46c8/PyOgg-0.6.14a1-py2.py3-none-win_amd64.whl", hash = "sha256:40f79b288b3a667309890885f4cf53371163b7dae17eb17567fb24ab467eca26", size = 1099508 },
 ]
 
 [[package]]

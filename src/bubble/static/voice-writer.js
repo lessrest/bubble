@@ -41,11 +41,12 @@ export class VoiceWriter extends HTMLElement {
     this.writer = document.createElement("type-writer")
     this.writer.className = "block"
     this.appendChild(this.writer)
-
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => this.beginListening(stream))
-      .catch(console.error)
+    this.addEventListener("click", () => {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => this.beginListening(stream))
+        .catch(console.error)
+    })
   }
 
   disconnectedCallback() {
@@ -56,8 +57,8 @@ export class VoiceWriter extends HTMLElement {
     this.ws?.close()
   }
 
-  async connectWebSocket() {
-    try {
+  connectWebSocket() {
+    return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.wsUrl)
       this.ws.binaryType = "arraybuffer"
 
@@ -66,6 +67,7 @@ export class VoiceWriter extends HTMLElement {
         console.log("🎤 Connected to transcription service")
         this.reconnectAttempts = 0
         this.reconnectDelay = 1000
+        resolve()
       })
 
       this.ws.addEventListener("close", () => {
@@ -75,10 +77,9 @@ export class VoiceWriter extends HTMLElement {
 
       this.ws.addEventListener("error", (error) => {
         console.error("🎤 WebSocket error:", error)
+        reject(error)
       })
-    } catch (error) {
-      console.error("🎤 Failed to connect:", error)
-    }
+    })
   }
 
   attemptReconnect() {
@@ -100,7 +101,8 @@ export class VoiceWriter extends HTMLElement {
     // Initialize audio context and processing pipeline
     this.context = new AudioContext()
     this.source = this.context.createMediaStreamSource(stream)
-    const channels = stream.getAudioTracks()[0].getSettings().channelCount ?? 1
+    const channels =
+      stream.getAudioTracks()[0].getSettings().channelCount ?? 1
     this.processor = this.context.createScriptProcessor(16384, channels, 1)
 
     // Configure audio encoder
@@ -207,6 +209,10 @@ export class VoiceWriter extends HTMLElement {
 // Add styles for interim transcriptions
 const sheet = new CSSStyleSheet()
 sheet.replaceSync(`
+    voice-writer {
+      display: block;
+    }
+
     voice-writer ins {
       text-decoration: none;
       opacity: 0.6;

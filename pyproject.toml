@@ -71,6 +71,8 @@ dependencies = [
     # Cross-platform library for retrieving system information
     "psutil==6.*",
     "structlog>=24.4.0",
+    "pyogg>=0.6.14a1",
+    "pydub>=0.25.1",
 ]
 
 [tool.uv.sources]

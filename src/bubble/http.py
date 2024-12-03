@@ -1,5 +1,4 @@
-from contextlib import asynccontextmanager, contextmanager
-import json
+from contextlib import asynccontextmanager
 import logging
 import pathlib
 
@@ -11,15 +10,14 @@ import rich
 import structlog
 import trio
 
+from bubble.base_html import base_html
 from bubble.html import (
     ErrorMiddleware,
     HypermediaResponse,
-    attr,
     classes,
     log_middleware,
     document,
     tag,
-    text,
 )
 from bubble.prfx import NT, RDF
 from bubble.rdfa import rdf_resource
@@ -27,6 +25,8 @@ from bubble.repo import BubbleRepo, using_bubble
 from bubble.util import get_single_subject
 
 import bubble.rdfa
+import bubble.opus
+
 from bubble.vars import Parameter
 
 logger = structlog.get_logger()
@@ -86,43 +86,6 @@ async def reload_ontology(request: Request, call_next):
     return await call_next(request)
 
 
-cdn_scripts = [
-    "https://unpkg.com/htmx.org@2",
-]
-
-htmx_config = {
-    "globalViewTransitions": True,
-}
-
-
-def json_assignment_script(variable_name: str, value: dict):
-    with tag("script"):
-        text(
-            f"Object.assign({variable_name}, {json.dumps(value, indent=2)});"
-        )
-
-
-@contextmanager
-def base_html(title: str):
-    with tag("html"):
-        with tag("head"):
-            with tag("title"):
-                text(title)
-            tag("link", rel="stylesheet", href="/static/css/output.css")
-            for script in cdn_scripts:
-                with tag("script", src=script):
-                    attr("async")
-            tag("script", type="module", src="/static/type-writer.js")
-            tag("script", type="module", src="/static/voice-writer.js")
-            json_assignment_script("htmx.config", htmx_config)
-
-        with tag(
-            "body",
-            classes="bg-white dark:bg-slate-950 text-gray-900 dark:text-stone-50",
-        ):
-            yield
-
-
 def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
     """
     Mount a static files directory to the FastAPI application.
@@ -131,6 +94,7 @@ def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
 
 
 app.include_router(bubble.rdfa.router)
+app.include_router(bubble.opus.router)
 
 
 @app.middleware("http")
