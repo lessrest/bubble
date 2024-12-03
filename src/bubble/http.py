@@ -5,6 +5,7 @@ import pathlib
 from fastapi import FastAPI, Form, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.websockets import WebSocket
 import hypercorn.trio
 import rich
 import structlog
@@ -66,6 +67,12 @@ app = FastAPI(
 )
 
 
+@app.middleware("websocket")
+async def websocket_middleware(websocket: WebSocket, call_next):
+    with using_bubble(websocket.app.state.bubble):
+        return await call_next(websocket)
+
+
 @app.middleware("http")
 async def bubble_graph(request: Request, call_next):
     with using_bubble(request.app.state.bubble):
@@ -120,16 +127,15 @@ def get_dashboard():
                     "m-2",
                     "rounded-2",
                 )
-                tag(
-                    "voice-recorder-writer",
-                    language="en-US",
-                    server="wss://swa.sh",
-                )
-            # with tag("div", classes="p-2"):
-            #     iri = get_single_subject(RDF.type, NT.ComputerMachine)
-            #     if iri:
-            #         with bubble.rdfa.autoexpanding(2):
-            #             rdf_resource(iri)
+                voice_writer()
+
+
+def voice_writer():
+    tag(
+        "voice-recorder-writer",
+        language="en-US",
+        endpoint=app.url_path_for("create_stream"),
+    )
 
 
 @app.get("/voice", response_class=HypermediaResponse)

@@ -138,6 +138,12 @@ def document():
         node.reset(token2)
 
 
+def strs(value: str | list[str]) -> str:
+    if isinstance(value, list):
+        return " ".join(value)
+    return value
+
+
 def tag(tagname: str, **kwargs):
     """
     Creates a new HTML/XML element with the given tag name and attributes.
@@ -146,7 +152,7 @@ def tag(tagname: str, **kwargs):
     element = ET.Element(
         tagname,
         attrib={
-            attr_name_to_xml(k): "" if v is True else str(v)
+            attr_name_to_xml(k): "" if v is True else strs(v)
             for k, v in kwargs.items()
             if v
         },

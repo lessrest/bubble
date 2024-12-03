@@ -23,7 +23,7 @@ import rich
 import structlog
 
 from bubble.pill import render_audio_charm
-from bubble.util import P, S
+from bubble.util import P, S, select_one_row
 from bubble.repo import current_bubble
 
 from bubble.prfx import NT
@@ -197,14 +197,6 @@ def get_rdf_resource(subject: str) -> None:
     rdf_resource(subject)
 
 
-@html.div(
-    "border border-l-4",
-    "bg-gray-100/50 dark:bg-gray-800/30",
-    "border-slate-300 dark:border-slate-700",
-    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
-    "hover:border-slate-400 dark:hover:border-slate-600",
-    "mt-1",
-)
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     logger.info(f"Rendering RDF resource for {subject}")
     if data is None:
@@ -219,6 +211,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_voice_recording_resource(subject, data)
     elif data["type"] == NT.PacketIngress:
         render_packet_ingress_resource(subject, data)
+    elif data["type"] == NT.AudioPacketStream:
+        render_audio_packet_stream_resource(subject, data)
     else:
         render_default_resource(subject, data)
 
@@ -227,11 +221,47 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
 def render_packet_ingress_resource(subject: S, data: Dict):
     render_resource_header(subject, data)
     render_properties(data)
-    render_audio_charm()
-    with tag("voice-writer", server="wss://swa.sh"):
+
+
+@html.div("flex flex-col pb-2 gap-2")
+def render_audio_packet_stream_resource(subject: S, data: Dict):
+    with tag("div", classes="flex flex-col items-stretch"):
+        render_resource_header(subject, data)
+        with tag(
+            "div",
+            classes=[
+                "flex flex-col items-stretch gap-1 py-1",
+                "border-t-0",
+                "text-sm opacity-70",
+            ],
+        ):
+            render_properties(data)
+    endpoint_row = select_one_row(
+        """SELECT ?endpoint WHERE { 
+            ?stream nt:hasPacketIngress ?ingress . 
+            ?ingress nt:hasWebSocketURI ?endpoint 
+        }""",
+        {"stream": subject},
+    )
+    endpoint = endpoint_row[0]
+    with tag(
+        "voice-recorder-writer",
+        classes=[
+            "px-8 text-lg font-serif py-1",
+        ],
+        endpoint=str(endpoint),
+    ):
         pass
 
 
+@html.div(
+    "border border-l-4",
+    "bg-gray-100/50 dark:bg-gray-800/30",
+    "border-slate-300 dark:border-slate-700",
+    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
+    "hover:border-slate-400 dark:hover:border-slate-600",
+    "mt-1",
+)
 @html.div("flex", "flex-col", "gap-1")
 def render_default_resource(subject: S, data: Optional[Dict] = None):
     render_resource_header(subject, data)
@@ -358,15 +388,16 @@ def render_property_label(predicate):
 
 @html.div(
     "flex flex-row gap-2 px-2 justify-between bg-blue-100/50 dark:bg-blue-700/10",
-    "border-b border-gray-300 dark:border-gray-700",
+    "border border-gray-300 dark:border-slate-900",
 )
 def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
-        dataset = current_bubble.get().dataset
-        type_label = get_label(dataset, data["type"])
-        with inside_property_label.bind(True):
-            render_value(type_label or data["type"])
+        with tag("span", classes="small-caps"):
+            dataset = current_bubble.get().dataset
+            type_label = get_label(dataset, data["type"])
+            with inside_property_label.bind(True):
+                render_value(type_label or data["type"])
 
 
 @html.ul(

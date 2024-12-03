@@ -1,3 +1,4 @@
+import os
 import random
 import struct
 import sqlite3
@@ -15,8 +16,13 @@ from bubble.html import HypermediaResponse, tag, text
 from bubble.mint import fresh_id, fresh_uri
 from bubble.prfx import NT, WS, SWA
 from bubble.rdfa import rdf_resource
-from bubble.util import new, select_one_row
+from bubble.repo import using_bubble
+from bubble.util import S, new, select_one_row, select_rows
 from bubble.base_html import base_html
+
+import structlog
+
+logger = structlog.get_logger()
 
 
 @dataclass
@@ -254,7 +260,7 @@ class AudioStreamManager:
 
     def create_stream(
         self, socket_url: URL, sample_rate: int = 48000, channels: int = 1
-    ) -> str:
+    ) -> S:
         """Create a new audio stream and return its ID"""
         timestamp = datetime.now(UTC)
         ingress = new(
@@ -347,45 +353,99 @@ async def get_index():
             "form",
             method="post",
             hx_post=router.url_path_for("create_stream"),
-            hx_swap="afterend",
+            hx_swap="outerHTML",
+            classes="flex flex-col gap-2 min-h-screen items-start mt-4 mx-2",
         ):
-            with tag("button", type="submit"):
-                text("Create Stream")
-    return
+            with tag(
+                "button",
+                type="submit",
+                classes=[
+                    "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
+                    "px-2 py-1",
+                    "border border-gray-300 text-center",
+                    "shadow-md shadow-slate-300 dark:shadow-slate-800/50",
+                    "hover:border-gray-400 hover:bg-gray-50",
+                    "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:border-indigo-500",
+                    "active:bg-gray-100 active:border-gray-500",
+                    "transition-colors duration-150 ease-in-out",
+                    "dark:border-slate-900 dark:bg-slate-900/50",
+                    "dark:hover:bg-slate-900 dark:hover:border-slate-800",
+                    "dark:focus:ring-indigo-600 dark:focus:border-indigo-600",
+                    "dark:active:bg-slate-800 dark:text-slate-200",
+                ],
+            ):
+                # with tag("voice-recorder-writer"):
+                #     pass
+                with tag(
+                    "span",
+                    classes="font-medium",
+                ):
+                    text("New Voice Memo")
 
 
 @router.websocket("/opus/{ingress_id}")
-async def stream_audio(websocket: WebSocket, stream_id: str):
+async def stream_audio(websocket: WebSocket, ingress_id: str):
     """WebSocket endpoint for streaming OPUS frames"""
     await websocket.accept()
 
     audio_manager = AudioStreamManager()
-    sequence_number = 0
-    stream = select_one_row(
-        """
-        SELECT ?stream WHERE {
-            ?stream nt:hasPacketIngress ?ingress .
-        }
-        """,
-        bindings={"ingress": websocket.url},
-    )[0]
 
-    try:
-        while True:
-            frame_data = await websocket.receive_bytes()
+    with using_bubble(websocket.app.state.bubble):
+        stream = select_one_row(
+            """
+          SELECT ?stream WHERE {
+              ?stream nt:hasPacketIngress ?ingress .
+              ?ingress nt:hasWebSocketURI ?endpoint .
+          }
+          """,
+            bindings={
+                "endpoint": Literal(websocket.url, datatype=XSD.anyURI)
+            },
+        )[0]
 
-            audio_manager.add_frame(
-                stream_id=stream,
-                sequence_number=sequence_number,
-                frame_data=frame_data,
-            )
+        logger.info("Stream created", stream=stream)
 
-            sequence_number += 1
+        from trio_websocket import open_websocket_url
+        import trio
 
-    except Exception as e:
-        print(f"Error in WebSocket connection: {e}")
-    finally:
-        await websocket.close()
+        async with open_websocket_url(
+            "wss://api.deepgram.com/v1/listen?model=nova-2&encoding=opus&sample_rate=48000&channels=1&language=en-US&interim_results=true&punctuate=true&diarize=true",
+            extra_headers=[
+                (
+                    "Authorization",
+                    f"Token {os.environ['DEEPGRAM_API_KEY']}",
+                )
+            ],
+        ) as ws:
+            async with trio.open_nursery() as nursery:
+
+                async def receiver():
+                    sequence_number = 0
+                    while True:
+                        frame_data = await websocket.receive_bytes()
+                        await ws.send_message(frame_data)
+
+                        audio_manager.add_frame(
+                            stream_id=stream,
+                            sequence_number=sequence_number,
+                            frame_data=frame_data,
+                        )
+
+                        sequence_number += 1
+                        if sequence_number % 100 == 0:
+                            logger.info("Added 100 frames", stream=stream)
+
+                async def deepgram_receiver():
+                    while True:
+                        frame_data = await ws.get_message()
+                        logger.info(
+                            "Deepgram message", frame_data=frame_data
+                        )
+                        await websocket.send_text(frame_data)
+
+                nursery.start_soon(receiver)
+                nursery.start_soon(deepgram_receiver)
+
         audio_manager.close_stream(stream)
 
 

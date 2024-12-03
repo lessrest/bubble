@@ -73,6 +73,8 @@ dependencies = [
     "structlog>=24.4.0",
     "pyogg>=0.6.14a1",
     "pydub>=0.25.1",
+    "deepgram-sdk>=3.7.7",
+    "trio-websocket>=0.11.1",
 ]
 
 [tool.uv.sources]

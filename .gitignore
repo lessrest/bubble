@@ -19,3 +19,4 @@ coverage.xml
 node_modules
 src/bubble/static/css/output.css
 .idea/rdfandsparql.xml
+audio_packets.db

@@ -19,19 +19,19 @@ export class VoiceRecorderWriter extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ["language", "server"]
+    return ["language", "endpoint"]
   }
 
   get language() {
     return this.getAttribute("language") ?? "en-US"
   }
 
-  get server() {
-    return this.getAttribute("server") ?? "wss://swa.sh"
+  get endpoint() {
+    return this.getAttribute("endpoint") ?? "wss://swa.sh"
   }
 
   get wsUrl() {
-    return `${this.server}/transcribe?language=${this.language}`
+    return this.endpoint
   }
 
   connectedCallback() {
@@ -80,6 +80,10 @@ export class VoiceRecorderWriter extends HTMLElement {
         border-radius: 50%;
         overflow: hidden;
         border-color: oklab(0.49 0.14 0.06 / 0.7);
+        box-shadow: 0px 0px 6mm #aaa3;
+      }
+
+      .recording .wave-container {
         box-shadow: 0px 0px 6mm #aaa8;
       }
 

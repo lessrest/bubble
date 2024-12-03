@@ -43,11 +43,7 @@ class New:
                         o = item if isinstance(item, O) else Literal(item)
                         self.graph.add((subject, predicate, o))
                 else:
-                    o = (
-                        object
-                        if isinstance(object, O)
-                        else Literal(object)
-                    )
+                    o = object if isinstance(object, O) else Literal(object)
                     self.graph.add((subject, predicate, o))
 
         return subject
@@ -103,6 +99,7 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
     """Select a single row from a query"""
     rows = select_rows(query, bindings)
     if len(rows) == 0:
+        print(bindings)
         raise NoResultsFoundError(query)
     elif len(rows) != 1:
         raise MultipleResultsError(query, len(rows))
