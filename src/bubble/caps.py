@@ -27,9 +27,7 @@ capability_map = {}
 class InvocationContext:
     invocation: _SubjectType
 
-    def select_one_row(
-        self, query: str, bindings: dict = {}
-    ) -> ResultRow:
+    def select_one_row(self, query: str, bindings: dict = {}) -> ResultRow:
         bindings = bindings.copy()
         bindings["invocation"] = self.invocation
 

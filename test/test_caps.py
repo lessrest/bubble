@@ -115,9 +115,7 @@ async def test_shell_no_output_file(graph, shell_capability):
         """,
         {"invocation": shell_capability.invocation},
     )
-    assert (
-        int(results[0]) == 0
-    )  # Count should be 0 indicating no results
+    assert int(results[0]) == 0  # Count should be 0 indicating no results
 
 
 @pytest.mark.trio

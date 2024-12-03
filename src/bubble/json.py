@@ -1,4 +1,3 @@
-import logging
 from rdflib import IdentifiedNode, Literal
 from rdflib.collection import Collection
 import structlog

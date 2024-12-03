@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-import logging
 import pathlib
 
 from fastapi import FastAPI, Form, Path, Query, Request, Response
@@ -20,10 +19,7 @@ from bubble.html import (
     document,
     tag,
 )
-from bubble.prfx import NT, RDF
-from bubble.rdfa import rdf_resource
 from bubble.repo import BubbleRepo, using_bubble
-from bubble.util import get_single_subject
 
 import bubble.rdfa
 import bubble.opus

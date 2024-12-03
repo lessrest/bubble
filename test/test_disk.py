@@ -12,9 +12,7 @@ async def test_get_disk_info_basic():
 
     # Check the returned type and structure
     assert isinstance(info, dict)
-    assert all(
-        key in info for key in ("Size", "VolumeName", "DiskUUID")
-    )
+    assert all(key in info for key in ("Size", "VolumeName", "DiskUUID"))
 
     # Check value types
     assert isinstance(info["Size"], int)

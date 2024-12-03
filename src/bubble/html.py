@@ -1,4 +1,3 @@
-import logging
 import functools
 import xml.etree.ElementTree as ET
 

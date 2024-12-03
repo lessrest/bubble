@@ -1,15 +1,12 @@
-import logging
 import pathlib
 
 import hypercorn
-from rich import inspect
 import structlog
 import trio
 import typer
 
 from typer import Option
 from rich.console import Console
-from rich.logging import RichHandler
 
 import bubble
 from bubble.chat import BubbleChat

@@ -7,17 +7,16 @@ from typing import Union, BinaryIO, Optional, Generator
 from datetime import UTC, datetime
 from dataclasses import dataclass
 
-from fastapi.responses import RedirectResponse
 from starlette.datastructures import URL
-from rdflib import XSD, Literal, URIRef
+from rdflib import XSD, Literal
 from fastapi import APIRouter, Request, WebSocket
 
 from bubble.html import HypermediaResponse, tag, text
-from bubble.mint import fresh_id, fresh_uri
-from bubble.prfx import NT, WS, SWA
+from bubble.mint import fresh_id
+from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
 from bubble.repo import using_bubble
-from bubble.util import S, new, select_one_row, select_rows
+from bubble.util import S, new, select_one_row
 from bubble.base_html import base_html
 
 import structlog

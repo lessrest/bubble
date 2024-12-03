@@ -49,6 +49,4 @@ def test_get_single_subject(test_graph):
         )
     )
     with pytest.raises(ValueError, match="Expected 1 subject, got 2"):
-        get_single_subject(
-            RDF.type, URIRef("http://example.org/TestType")
-        )
+        get_single_subject(RDF.type, URIRef("http://example.org/TestType"))

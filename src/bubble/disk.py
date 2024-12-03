@@ -60,9 +60,7 @@ async def get_disk_info(
             for p in psutil.disk_partitions()
             if p.mountpoint == mount_point
         )
-        device_uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, partition.device)
-        )
+        device_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, partition.device))
 
     except Exception:
         # Fallback to using mount point for UUID generation

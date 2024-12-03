@@ -3,7 +3,6 @@ import httpx
 import rich
 import structlog
 import trio
-import logging
 from pydantic import SecretStr
 from rdflib import URIRef
 from bubble.cred import get_service_credential

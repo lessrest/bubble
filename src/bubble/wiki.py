@@ -19,9 +19,7 @@ SCHEMA = Namespace("http://schema.org/")
 class WikidataSPARQLClient:
     """A simple async SPARQL client for Wikidata that works with RDFLib."""
 
-    def __init__(
-        self, endpoint: str = "https://query.wikidata.org/sparql"
-    ):
+    def __init__(self, endpoint: str = "https://query.wikidata.org/sparql"):
         self.endpoint = endpoint
         self.headers = {
             "Accept": "application/sparql-results+json,application/rdf+xml",
