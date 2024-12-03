@@ -13,6 +13,9 @@ export class VoiceRecorderWriter extends HTMLElement {
     this.maxReconnectAttempts = 5
     this.reconnectDelay = 1000
     this.lastTranscriptTime = 0
+    this.packetEma = 0
+    this.emaAlpha = 0.1
+    this.speechThreshold = 130
   }
 
   static get observedAttributes() {
@@ -99,7 +102,6 @@ export class VoiceRecorderWriter extends HTMLElement {
       }
 
       .recording .wave-container {
-        animation: waveSpin 5s linear infinite;
         transform-origin: center;
       }
 
@@ -132,6 +134,20 @@ export class VoiceRecorderWriter extends HTMLElement {
 
         to {
           transform: rotate(0deg);
+        }
+      }
+
+      @keyframes blurwait {
+        from {
+          filter: blur(0px);
+        }
+
+        50% {
+          filter: blur(3px);
+        }
+
+        to {
+          filter: blur(0px);
         }
       }
 

@@ -125,11 +125,11 @@ def get_dashboard():
                     language="en-US",
                     server="wss://swa.sh",
                 )
-            with tag("div", classes="p-2"):
-                iri = get_single_subject(RDF.type, NT.ComputerMachine)
-                if iri:
-                    with bubble.rdfa.autoexpanding(2):
-                        rdf_resource(iri)
+            # with tag("div", classes="p-2"):
+            #     iri = get_single_subject(RDF.type, NT.ComputerMachine)
+            #     if iri:
+            #         with bubble.rdfa.autoexpanding(2):
+            #             rdf_resource(iri)
 
 
 @app.get("/voice", response_class=HypermediaResponse)
