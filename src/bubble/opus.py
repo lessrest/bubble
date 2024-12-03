@@ -1,25 +1,25 @@
 import os
-from datetime import UTC, datetime
+
 from typing import Generator
+from datetime import UTC, datetime
 
-from starlette.datastructures import URL
+import trio
+import structlog
+
 from rdflib import XSD, Literal
-from fastapi import APIRouter, Request, WebSocket
+from fastapi import Request, APIRouter, WebSocket
+from trio_websocket import open_websocket_url
+from starlette.datastructures import URL
 
-from bubble.oggw import OggWriter
-from bubble.html import HypermediaResponse, tag
+from bubble.blob import BlobStore
+from bubble.html import HypermediaResponse, tag, text
 from bubble.mint import fresh_id
+from bubble.oggw import OggWriter, TimedAudioPacket
+from bubble.page import base_html, action_button
 from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
 from bubble.repo import using_bubble
-from bubble.util import S, new, select_one_row
-from bubble.page import action_button, base_html
-from bubble.blob import BlobStore
-
-from trio_websocket import open_websocket_url
-import trio
-
-import structlog
+from bubble.util import S, new, select_rows, select_one_row
 
 logger = structlog.get_logger()
 
@@ -105,21 +105,59 @@ def generate_socket_url(request: Request) -> URL:
     return socket_url
 
 
+audiodb = AudioPacketDatabase()
+
+
 @router.get("/opus")
 async def get_index():
     """Get the main page"""
     with base_html("Audio Streams"):
         with tag(
-            "form",
-            method="post",
-            hx_post=router.url_path_for("create_stream"),
-            hx_swap="outerHTML",
-            classes="flex flex-col gap-2 min-h-screen items-start mt-4 mx-2",
+            "div",
+            classes="flex flex-col gap-4 min-h-screen items-start mt-4 mx-2",
         ):
-            action_button("New Voice Memo", type="submit")
+            # Form for creating new stream
+            with tag(
+                "form",
+                method="post",
+                hx_post=router.url_path_for("create_stream"),
+                hx_swap="outerHTML",
+                classes="w-full",
+            ):
+                action_button("New Voice Memo", type="submit")
 
+            # Get streams with audio packets
+            streams_with_packets = (
+                audiodb.blob_store.get_streams_with_blobs()
+            )
 
-audiodb = AudioPacketDatabase()
+            if streams_with_packets:
+                # Get creation times for these streams
+                stream_info = select_rows(
+                    """
+                    SELECT ?stream ?created WHERE {
+                        ?stream a nt:AudioPacketStream ;
+                               nt:wasCreatedAt ?created .
+                    }
+                    ORDER BY DESC(?created)
+                    """
+                )
+
+                logger.info(
+                    "Stream info",
+                    stream_info=stream_info,
+                    streams_with_packets=streams_with_packets,
+                )
+
+                with tag("div", classes="w-full"):
+                    with tag("h2", classes="text-xl font-bold mb-2"):
+                        text("Existing Recordings")
+                    with tag("ul", classes="space-y-2"):
+                        for stream_id, created_str in stream_info:
+                            if stream_id not in streams_with_packets:
+                                continue
+
+                            rdf_resource(stream_id)
 
 
 @router.websocket("/opus/{ingress_id}")
@@ -190,8 +228,8 @@ def retrieve_websocket_stream(websocket):
     )[0]
 
 
-@router.get("/opus/{stream_id}")
-async def get_audio_segment(stream_id: str, t0: float, t1: float):
+@router.get("/opus/{path:path}")
+async def get_audio_segment(path: str, t0: float, t1: float):
     """Retrieve an audio segment as an OGG file"""
     from io import BytesIO
 
@@ -200,9 +238,7 @@ async def get_audio_segment(stream_id: str, t0: float, t1: float):
     from_seq = int(t0 / 0.02)
     to_seq = int(t1 / 0.02)
 
-    frames = [
-        frame for frame in audiodb.get_frames(stream_id, from_seq, to_seq)
-    ]
+    frames = [frame for frame in audiodb.get_frames(path, from_seq, to_seq)]
 
     if not frames:
         return Response(content=b"", media_type="audio/ogg")
@@ -220,8 +256,10 @@ async def get_audio_segment(stream_id: str, t0: float, t1: float):
 
     # Write each frame as an RTP packet
     for i, frame_data in enumerate(frames):
-        packet = {"payload": frame_data, "timestamp": (i + 1) * 960}
-        writer.write_rtp(packet)
+        packet = TimedAudioPacket(
+            payload=frame_data, timestamp=(i + 1) * 960
+        )
+        writer.write_packet(packet)
 
     # Close the writer to finalize the OGG file
     writer.close()
@@ -233,7 +271,4 @@ async def get_audio_segment(stream_id: str, t0: float, t1: float):
     return Response(
         content=ogg_data,
         media_type="audio/ogg",
-        headers={
-            "Content-Disposition": f"attachment; filename={stream_id}.ogg"
-        },
     )

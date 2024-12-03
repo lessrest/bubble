@@ -1,5 +1,6 @@
 import sqlite3
 from typing import Generator
+from rdflib import URIRef
 import structlog
 
 logger = structlog.get_logger()
@@ -51,6 +52,12 @@ class BlobStore:
             )
             result = cursor.fetchone()[0]
             return result if result is not None else -1
+
+    def get_streams_with_blobs(self) -> list[URIRef]:
+        """Get list of stream IDs that have blobs stored"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT DISTINCT stream_id FROM blobs")
+            return [URIRef(row[0]) for row in cursor.fetchall()]
 
     def delete_stream(self, stream_id: str):
         """Delete all blobs for a given stream"""

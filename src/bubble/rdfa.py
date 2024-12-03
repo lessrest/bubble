@@ -234,6 +234,10 @@ def render_audio_packet_stream_resource(subject: S, data: Dict):
             ],
         ):
             render_properties(data)
+
+        with tag("audio", controls=True):
+            attr("src", f"/opus/{subject}?t0=0&t1=1000")
+
     endpoint_row = select_one_row(
         """SELECT ?endpoint WHERE {
             ?stream nt:hasPacketIngress ?ingress .
