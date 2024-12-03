@@ -116,11 +116,12 @@ def get_dashboard():
         with tag("div", classes="flex flex-col gap-4"):
             with tag("div"):
                 classes(
-                    "font-serif px-4 py-1 bg-white dark:bg-slate-800",
-                    "border-b border-gray-200 dark:border-slate-700",
+                    "font-serif px-1 py-1",
+                    "m-2",
+                    "rounded-2",
                 )
                 tag(
-                    "voice-writer",
+                    "voice-recorder-writer",
                     language="en-US",
                     server="wss://swa.sh",
                 )

@@ -38,3 +38,8 @@ def base_html(title: str):
         ):
             yield
             tag("script", type="module", src="/static/audio-player.js")
+            tag(
+                "script",
+                type="module",
+                src="/static/voice-recorder-writer.js",
+            )

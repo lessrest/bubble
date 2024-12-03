@@ -223,6 +223,7 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_default_resource(subject, data)
 
 
+@html.div("flex flex-col items-start gap-1")
 def render_packet_ingress_resource(subject: S, data: Dict):
     render_resource_header(subject, data)
     render_properties(data)
@@ -471,6 +472,7 @@ def _render_literal(obj: Literal) -> None:
         XSD.dateTime: _render_date_literal,
         RDF.JSON: _render_json_literal,
         NT.SecretToken: _render_secret_token_literal,
+        XSD.anyURI: _render_any_uri_literal,
     }
 
     if obj.datatype:
@@ -537,9 +539,9 @@ def render_other_string(obj):
     "whitespace-nowrap",
     "before:content-['«'] after:content-['»']",
 )
-def render_linkish_string(obj):
-    attr("href", obj.value)
-    text(obj.value)
+def render_linkish_string(obj: Literal) -> None:
+    attr("href", str(obj.toPython()))
+    text(str(obj.toPython()))
 
 
 @html.span("text-yellow-600 dark:text-yellow-400 font-bold")
@@ -593,6 +595,14 @@ def _render_language_literal(obj: Literal) -> None:
             text(f"{obj.value}")
     else:
         text(obj.value)
+
+
+@html.a(
+    "text-blue-600 dark:text-blue-400 font-mono max-w-60",
+    hx_swap="outerHTML",
+)
+def _render_any_uri_literal(obj: Literal) -> None:
+    render_linkish_string(obj)
 
 
 @html.span("text-orange-600 dark:text-orange-400")
