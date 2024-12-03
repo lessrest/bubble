@@ -10,7 +10,7 @@ import rich
 import structlog
 import trio
 
-from bubble.base_html import base_html
+from bubble.page import base_html
 from bubble.html import (
     ErrorMiddleware,
     HypermediaResponse,

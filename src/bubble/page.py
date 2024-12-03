@@ -44,3 +44,34 @@ def base_html(title: str):
                 type="module",
                 src="/static/voice-recorder-writer.js",
             )
+
+
+def action_button(label: str, **attrs):
+    """Create a styled action button with consistent Tailwind classes"""
+    default_classes = [
+        "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
+        "px-2 py-1",
+        "border border-gray-300 text-center",
+        "shadow-md shadow-slate-300 dark:shadow-slate-800/50",
+        "hover:border-gray-400 hover:bg-gray-50",
+        "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:border-indigo-500",
+        "active:bg-gray-100 active:border-gray-500",
+        "transition-colors duration-150 ease-in-out",
+        "dark:border-slate-900 dark:bg-slate-900/50",
+        "dark:hover:bg-slate-900 dark:hover:border-slate-800",
+        "dark:focus:ring-indigo-600 dark:focus:border-indigo-600",
+        "dark:active:bg-slate-800 dark:text-slate-200",
+    ]
+
+    # Merge provided classes with default classes if any
+    if "classes" in attrs:
+        if isinstance(attrs["classes"], list):
+            attrs["classes"].extend(default_classes)
+        else:
+            attrs["classes"] = [attrs["classes"]] + default_classes
+    else:
+        attrs["classes"] = default_classes
+
+    with tag("button", **attrs):
+        with tag("span", classes="font-medium"):
+            text(label)

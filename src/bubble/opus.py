@@ -1,25 +1,23 @@
 import os
-import sqlite3
-
-from typing import Generator
 from datetime import UTC, datetime
+from typing import Generator
 
 from starlette.datastructures import URL
 from rdflib import XSD, Literal
 from fastapi import APIRouter, Request, WebSocket
 
-from bubble.OggWriter import OggWriter
-from bubble.html import HypermediaResponse, tag, text
+from bubble.oggw import OggWriter
+from bubble.html import HypermediaResponse, tag
 from bubble.mint import fresh_id
 from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
 from bubble.repo import using_bubble
 from bubble.util import S, new, select_one_row
-from bubble.base_html import base_html
+from bubble.page import action_button, base_html
+from bubble.blob import BlobStore
 
 from trio_websocket import open_websocket_url
 import trio
-
 
 import structlog
 
@@ -28,20 +26,7 @@ logger = structlog.get_logger()
 
 class AudioPacketDatabase:
     def __init__(self, db_path: str = "audio_packets.db"):
-        self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        """Initialize the SQLite database with minimal schema"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS packets (
-                    src TEXT NOT NULL,    -- Stream source ID
-                    seq INTEGER NOT NULL, -- Sequence number
-                    dat BLOB NOT NULL,    -- Raw packet data
-                    PRIMARY KEY (src, seq)
-                )
-            """)
+        self.blob_store = BlobStore(db_path)
 
     def create_stream(
         self, socket_url: URL, sample_rate: int = 48000, channels: int = 1
@@ -69,27 +54,16 @@ class AudioPacketDatabase:
 
     def append_packet(self, src: str, seq: int, dat: bytes):
         """Add a frame to the stream"""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT INTO packets (src, seq, dat) VALUES (?, ?, ?)",
-                (src, seq, dat),
-            )
+        self.blob_store.append_blob(src, seq, dat)
 
     def get_frames(
         self, stream_id: str, start_seq: int, end_seq: int
     ) -> Generator[bytes, None, None]:
         """Retrieve frames for a stream starting from sequence number"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT dat FROM packets WHERE src = ? AND seq >= ? AND seq <= ? ORDER BY seq",
-                (stream_id, start_seq, end_seq),
-            )
-            for (frame_data,) in cursor:
-                yield frame_data
+        return self.blob_store.get_blobs(stream_id, start_seq, end_seq)
 
     def close_stream(self, stream_id: str):
         """Mark a stream as closed"""
-        # Update RDF to mark stream as ended
         new(
             NT.AudioPacketStream,
             {
@@ -142,31 +116,7 @@ async def get_index():
             hx_swap="outerHTML",
             classes="flex flex-col gap-2 min-h-screen items-start mt-4 mx-2",
         ):
-            with tag(
-                "button",
-                type="submit",
-                classes=[
-                    "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
-                    "px-2 py-1",
-                    "border border-gray-300 text-center",
-                    "shadow-md shadow-slate-300 dark:shadow-slate-800/50",
-                    "hover:border-gray-400 hover:bg-gray-50",
-                    "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:border-indigo-500",
-                    "active:bg-gray-100 active:border-gray-500",
-                    "transition-colors duration-150 ease-in-out",
-                    "dark:border-slate-900 dark:bg-slate-900/50",
-                    "dark:hover:bg-slate-900 dark:hover:border-slate-800",
-                    "dark:focus:ring-indigo-600 dark:focus:border-indigo-600",
-                    "dark:active:bg-slate-800 dark:text-slate-200",
-                ],
-            ):
-                # with tag("voice-recorder-writer"):
-                #     pass
-                with tag(
-                    "span",
-                    classes="font-medium",
-                ):
-                    text("New Voice Memo")
+            action_button("New Voice Memo", type="submit")
 
 
 audiodb = AudioPacketDatabase()
