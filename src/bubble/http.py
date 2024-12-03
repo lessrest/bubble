@@ -23,7 +23,7 @@ from bubble.repo import BubbleRepo, using_bubble
 
 import bubble.rdfa
 import bubble.opus
-
+import bubble.html
 from bubble.vars import Parameter
 
 logger = structlog.get_logger()
@@ -98,6 +98,7 @@ def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
 
 app.include_router(bubble.rdfa.router)
 app.include_router(bubble.opus.router)
+app.include_router(bubble.html.router)
 
 
 @app.middleware("http")

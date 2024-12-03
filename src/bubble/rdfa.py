@@ -235,9 +235,9 @@ def render_audio_packet_stream_resource(subject: S, data: Dict):
         ):
             render_properties(data)
     endpoint_row = select_one_row(
-        """SELECT ?endpoint WHERE { 
-            ?stream nt:hasPacketIngress ?ingress . 
-            ?ingress nt:hasWebSocketURI ?endpoint 
+        """SELECT ?endpoint WHERE {
+            ?stream nt:hasPacketIngress ?ingress .
+            ?ingress nt:hasWebSocketURI ?endpoint
         }""",
         {"stream": subject},
     )
