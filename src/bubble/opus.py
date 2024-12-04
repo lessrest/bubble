@@ -12,7 +12,7 @@ from trio_websocket import open_websocket_url
 from starlette.datastructures import URL
 
 from bubble.blob import BlobStore
-from bubble.html import HypermediaResponse, tag, text
+from bubble.html import HypermediaResponse, tag
 from bubble.mint import fresh_id
 from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
@@ -150,8 +150,6 @@ async def get_index():
                 )
 
                 with tag("div", classes="w-full"):
-                    with tag("h2", classes="text-xl font-bold mb-2"):
-                        text("Existing Recordings")
                     with tag("ul", classes="space-y-2"):
                         for stream_id, created_str in stream_info:
                             if stream_id not in streams_with_packets:

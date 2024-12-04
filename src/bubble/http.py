@@ -135,22 +135,6 @@ def voice_writer():
     )
 
 
-@app.get("/voice", response_class=HypermediaResponse)
-def get_voice_page():
-    with base_html("Voice Writer"):
-        with tag(
-            "div",
-            classes="flex font-serif max-w-prose mx-auto py-4",
-        ):
-            tag(
-                "voice-writer",
-                language="en-US",
-                server="wss://swa.sh",
-                debug=True,
-                classes="w-full",
-            )
-
-
 @app.get("/{bubble_id}/sparql")
 async def get_sparql(
     request: Request,
