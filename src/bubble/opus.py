@@ -1,11 +1,11 @@
 import os
-from typing import Generator
+
 from datetime import UTC, datetime
 
 import trio
 import structlog
 
-from rdflib import XSD, Literal
+from rdflib import XSD, URIRef, Literal
 from fastapi import Request, APIRouter, WebSocket
 from trio_websocket import open_websocket_url
 from starlette.datastructures import URL
@@ -16,8 +16,8 @@ from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
 from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
-from bubble.repo import current_bubble
-from bubble.util import S, new, select_rows, select_one_row
+from bubble.repo import current_bubble, using_bubble
+from bubble.util import new, select_rows, select_one_row
 
 logger = structlog.get_logger()
 
@@ -124,43 +124,44 @@ async def stream_audio(browser_socket: WebSocket, ingress_id: str):
     """WebSocket endpoint for streaming OPUS frames"""
     await browser_socket.accept()
 
-    bubble = current_bubble.get()
-    src = retrieve_websocket_stream(browser_socket)
-    logger.info("Stream created", stream=src)
+    with using_bubble(browser_socket.app.state.bubble) as bubble:
+        src = URIRef(retrieve_websocket_stream(browser_socket))
+        logger.info("Stream created", stream=src)
 
-    try:
-        async with create_deepgram_websocket() as deepgram_socket:
-            async with trio.open_nursery() as nursery:
+        try:
+            async with create_deepgram_websocket() as deepgram_socket:
+                async with trio.open_nursery() as nursery:
 
-                async def forward_audio_packets():
-                    seq = 0
-                    while True:
-                        dat = await browser_socket.receive_bytes()
-                        await deepgram_socket.send_message(dat)
-                        bubble.append_blob(src, seq, dat)
+                    async def forward_audio_packets():
+                        seq = 0
+                        stream = bubble.blob(src)
+                        while True:
+                            dat = await browser_socket.receive_bytes()
+                            await deepgram_socket.send_message(dat)
+                            stream.append_part(seq, dat)
 
-                        seq += 1
-                        if seq % 100 == 0:
-                            logger.info("Added 100 frames", stream=src)
+                            seq += 1
+                            if seq % 100 == 0:
+                                logger.info("Added 100 parts", stream=src)
 
-                async def read_transcription_events():
-                    while True:
-                        frame_data = await deepgram_socket.get_message()
-                        logger.info(
-                            "Deepgram message", frame_data=frame_data
-                        )
-                        await browser_socket.send_text(frame_data)
+                    async def read_transcription_events():
+                        while True:
+                            frame_data = await deepgram_socket.get_message()
+                            logger.info(
+                                "Deepgram message", frame_data=frame_data
+                            )
+                            await browser_socket.send_text(frame_data)
 
-                nursery.start_soon(forward_audio_packets)
-                nursery.start_soon(read_transcription_events)
-    finally:
-        new(
-            NT.AudioPacketStream,
-            {
-                NT.wasClosedAt: Literal(datetime.now(UTC)),
-            },
-            subject=src,
-        )
+                    nursery.start_soon(forward_audio_packets)
+                    nursery.start_soon(read_transcription_events)
+        finally:
+            new(
+                NT.AudioPacketStream,
+                {
+                    NT.wasClosedAt: Literal(datetime.now(UTC)),
+                },
+                subject=src,
+            )
 
 
 def create_deepgram_websocket():
@@ -204,13 +205,8 @@ async def get_audio_segment(path: str, t0: float, t1: float):
     from_seq = int(t0 / 0.02)
     to_seq = int(t1 / 0.02)
 
-    frames = [
-        frame
-        for frame in current_bubble.get().get_blobs(path, from_seq, to_seq)
-    ]
-
-    if not frames:
-        return Response(content=b"", media_type="audio/ogg")
+    stream = current_bubble.get().blob(URIRef(path))
+    frames = stream[from_seq:to_seq]
 
     # Create in-memory buffer for OGG file
     buffer = BytesIO()

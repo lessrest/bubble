@@ -9,6 +9,7 @@
 
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
+from typing import Generator
 
 import structlog
 import trio
@@ -27,7 +28,7 @@ from bubble.mind import reason
 from bubble.prfx import NT
 from bubble.util import get_single_subject, print_n3
 from bubble import vars
-from bubble.blob import BlobStore
+from bubble.blob import BlobStore, BlobStream
 
 logger = structlog.get_logger()
 
@@ -55,7 +56,7 @@ class BubbleRepo:
     vocab: Graph
 
     # The blob store for binary data
-    blob_store: BlobStore
+    blobs: BlobStore
 
     def __init__(self, path: Path, dataset: Dataset, base: _SubjectType):
         self.workdir = path
@@ -65,27 +66,15 @@ class BubbleRepo:
         self.dataset = dataset
         self.graph = self.dataset.graph(NT.bubble)
         self.vocab = self.dataset.graph(NT.vocabulary)
-        self.blob_store = BlobStore(str(path / "blobs.db"))
+        self.blobs = BlobStore(str(path / "blobs.db"))
 
-    def append_blob(self, stream_id: str, seq: int, data: bytes):
-        """Add a blob to a stream"""
-        self.blob_store.append_blob(stream_id, seq, data)
-
-    def get_blobs(self, stream_id: str, start_seq: int, end_seq: int):
-        """Get blobs from a stream within a sequence range"""
-        return self.blob_store.get_blobs(stream_id, start_seq, end_seq)
-
-    def get_last_sequence(self, stream_id: str) -> int:
-        """Get the last sequence number for a stream"""
-        return self.blob_store.get_last_sequence(stream_id)
+    def blob(self, stream_id: URIRef) -> BlobStream:
+        """Get a blob stream by ID"""
+        return self.blobs.stream(stream_id)
 
     def get_streams_with_blobs(self) -> list[URIRef]:
         """Get list of stream IDs that have blobs stored"""
-        return self.blob_store.get_streams_with_blobs()
-
-    def delete_stream(self, stream_id: str):
-        """Delete all blobs for a given stream"""
-        self.blob_store.delete_stream(stream_id)
+        return self.blobs.get_streams_with_blobs()
 
     async def load_many(
         self,

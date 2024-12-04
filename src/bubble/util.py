@@ -88,7 +88,15 @@ class QueryError(Exception):
 
 
 class NoResultsFoundError(QueryError):
-    pass
+    def __init__(
+        self, query: str, bindings: dict, count: Optional[int] = None
+    ):
+        super().__init__(
+            f"No results found for query: {query}\n\nBindings:\n{bindings}"
+        )
+        self.query = query
+        self.bindings = bindings
+        self.count = count
 
 
 class MultipleResultsError(QueryError):
@@ -100,9 +108,9 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
     rows = select_rows(query, bindings)
     if len(rows) == 0:
         print(bindings)
-        raise NoResultsFoundError(query)
+        raise NoResultsFoundError(query, bindings)
     elif len(rows) != 1:
-        raise MultipleResultsError(query, len(rows))
+        raise MultipleResultsError(query, bindings, len(rows))
     return rows[0]
 
 

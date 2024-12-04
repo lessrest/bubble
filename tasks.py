@@ -68,7 +68,7 @@ def server(c: Context, watch=True, debug=True, bind="0.0.0.0:2024"):
             {"--bind": bind},
             "bubble.http:app",
         ),
-        pty=True,
+        pty=False,
         echo=True,
     )
 
