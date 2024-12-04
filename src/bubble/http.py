@@ -156,7 +156,10 @@ async def websocket_stream_upload(
                         frame_data
                     )
                     if message.is_final:
-                        if len(message.channel.alternatives) > 0:
+                        if (
+                            len(message.channel.alternatives) > 0
+                            and message.channel.alternatives[0].transcript
+                        ):
                             logger.info(
                                 "Final transcription", message=message
                             )

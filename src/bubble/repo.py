@@ -204,7 +204,7 @@ class BubbleRepo:
 
         # Add all files to the index
         await trio.run_process(
-            ["git", "-C", str(self.workdir), "add", "."],
+            ["git", "-C", str(self.workdir), "add", "root.n3"],
         )
 
         await trio.run_process(
