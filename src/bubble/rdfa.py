@@ -217,7 +217,22 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
 
 @html.div("flex flex-col items-start gap-1")
 def render_packet_ingress_resource(subject: S, data: Dict):
-    render_resource_header(subject, data)
+    ingress = next(
+        (
+            obj
+            for pred, obj in data["predicates"]
+            if pred == NT.hasWebSocketURI
+        ),
+        None,
+    )
+    with tag(
+        "voice-recorder-writer",
+        classes=[
+            "text-lg font-serif py-1",
+        ],
+        endpoint=str(ingress),
+    ):
+        render_resource_header(subject, data)
     render_properties(data)
 
 

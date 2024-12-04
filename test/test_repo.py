@@ -271,3 +271,82 @@ async def test_repo_blob_sequence_order(temp_repo):
     # Verify retrieval order
     retrieved = list(stream[0 : len(test_data)])
     assert retrieved == test_data
+
+
+async def test_typed_blob_stream(temp_repo):
+    """Test creating and using a typed blob stream"""
+    # Create a test stream with type
+    stream_id = URIRef("test_stream")
+    stream_type = URIRef("http://example.org/TestType")
+
+    # Add stream metadata
+    new(
+        NT.BlobStream,
+        {
+            NT.wasCreatedAt: Literal(datetime.now(UTC)),
+            NT.hasPacketType: stream_type,
+        },
+        subject=stream_id,
+    )
+
+    # Add some test data
+    stream = temp_repo.blob(stream_id)
+    test_data = b"test packet data"
+    stream.append_part(0, test_data)
+
+    # Verify stream type
+    stream_type_result = select_one_row(
+        """
+        SELECT ?type WHERE {
+            ?stream nt:hasPacketType ?type .
+        }
+        """,
+        bindings={"stream": stream_id},
+    )[0]
+
+    assert stream_type_result == stream_type
+    assert stream[0] == test_data
+
+
+async def test_opus_stream_creation(temp_repo):
+    """Test creating an Opus audio stream"""
+    # Create a test stream with Opus type
+    stream_id = URIRef("test_opus_stream")
+
+    # Add stream metadata
+    new(
+        NT.BlobStream,
+        {
+            NT.wasCreatedAt: Literal(datetime.now(UTC)),
+            NT.hasPacketType: NT.OpusPacket20ms,
+        },
+        subject=stream_id,
+    )
+
+    # Add audio-specific metadata
+    new(
+        NT.AudioPacketStream,
+        {
+            NT.hasSampleRate: Literal(48000),
+            NT.hasChannelCount: Literal(1),
+        },
+        subject=stream_id,
+    )
+
+    # Verify stream type and audio metadata
+    results = select_rows(
+        """
+        SELECT ?type ?rate ?channels WHERE {
+            ?stream nt:hasPacketType ?type ;
+                    nt:hasSampleRate ?rate ;
+                    nt:hasChannelCount ?channels .
+        }
+        """,
+        bindings={"stream": stream_id},
+    )
+
+    assert len(results) == 1
+    stream_type, sample_rate, channels = results[0]
+    assert stream_type == NT.OpusPacket20ms
+    assert sample_rate == 48000
+    assert channels == 1

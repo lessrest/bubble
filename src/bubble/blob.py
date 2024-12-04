@@ -1,10 +1,71 @@
 import sqlite3
+
 from typing import Generator, overload
+from datetime import UTC, datetime
 from dataclasses import dataclass
-from rdflib import URIRef
+
 import structlog
 
+from rdflib import XSD, URIRef, Literal
+from fastapi import Request
+from starlette.datastructures import URL
+
+from bubble.mint import fresh_id
+from bubble.prfx import NT
+from bubble.util import new, select_one_row
+
 logger = structlog.get_logger()
+
+
+async def create_stream(
+    request: Request,
+    type: URIRef,
+) -> URIRef:
+    """Create a new blob stream with specified type"""
+    socket_url = generate_socket_url(request)
+    timestamp = datetime.now(UTC)
+
+    stream = new(
+        NT.BlobStream,
+        {
+            NT.wasCreatedAt: Literal(timestamp),
+            NT.hasPacketType: type,
+            NT.hasPacketIngress: new(
+                NT.PacketIngress,
+                {
+                    NT.hasWebSocketURI: Literal(
+                        socket_url, datatype=XSD.anyURI
+                    ),
+                },
+            ),
+        },
+    )
+
+    return stream
+
+
+def generate_socket_url(request: Request) -> URL:
+    socket_url = URL(
+        scope={
+            "scheme": "ws" if request.url.scheme == "http" else "wss",
+            "path": f"/blob/{fresh_id()}",
+            "server": (request.url.hostname, request.url.port),
+            "headers": {},
+        },
+    )
+    return socket_url
+
+
+def retrieve_websocket_stream(websocket):
+    return select_one_row(
+        """
+          SELECT ?stream WHERE {
+              ?stream nt:hasPacketIngress ?ingress .
+              ?ingress nt:hasWebSocketURI ?endpoint .
+          }
+          """,
+        bindings={"endpoint": Literal(websocket.url, datatype=XSD.anyURI)},
+    )[0]
 
 
 @dataclass

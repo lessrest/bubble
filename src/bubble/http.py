@@ -1,29 +1,38 @@
-from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 import pathlib
 
-from fastapi import FastAPI, Form, Path, Query, Request, Response
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.websockets import WebSocket
-import hypercorn.trio
-import rich
-import structlog
-import trio
+from contextlib import asynccontextmanager
+from typing import Annotated
 
-from bubble.page import base_html
+from rdflib import Literal, URIRef
+import rich
+import trio
+import structlog
+import hypercorn.trio
+
+from fastapi import Form, Path, Query, FastAPI, Request, Response, WebSocket
+from fastapi.responses import JSONResponse
+from fastapi.websockets import WebSocket
+from fastapi.staticfiles import StaticFiles
+
+import bubble.blob
+from bubble.blob import logger, retrieve_websocket_stream
+import bubble.html
+import bubble.opus
+from bubble.prfx import NT
+import bubble.rdfa
+
 from bubble.html import (
     ErrorMiddleware,
     HypermediaResponse,
-    classes,
-    log_middleware,
-    document,
     tag,
+    classes,
+    document,
+    log_middleware,
 )
+from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble
-
-import bubble.rdfa
-import bubble.opus
-import bubble.html
+from bubble.util import new
 from bubble.vars import Parameter
 
 logger = structlog.get_logger()
@@ -94,6 +103,43 @@ def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
     Mount a static files directory to the FastAPI application.
     """
     app.mount(mount_path, StaticFiles(directory=directory), name="static")
+
+
+@app.post("/blob")
+async def create_blob_stream(
+    request: Request, type: Annotated[str, Form()]
+):
+    stream = await bubble.blob.create_stream(request, URIRef(type))
+    bubble.rdfa.rdf_resource(stream)
+    return HypermediaResponse()
+
+
+@app.websocket("/blob/{path:path}")
+async def stream_blobs(websocket: WebSocket):
+    """WebSocket endpoint for streaming binary packets"""
+    await websocket.accept()
+    bubble = websocket.app.state.bubble
+    with using_bubble(bubble):
+        src = URIRef(retrieve_websocket_stream(websocket))
+        logger.info("Stream created", stream=src)
+
+        try:
+            seq = 0
+            stream = bubble.blob(src)
+            while True:
+                dat = await websocket.receive_bytes()
+                stream.append_part(seq, dat)
+                seq += 1
+                if seq % 100 == 0:
+                    logger.info("Added 100 parts", stream=src)
+        finally:
+            new(
+                NT.BlobStream,
+                {
+                    NT.wasClosedAt: Literal(datetime.now(UTC)),
+                },
+                subject=src,
+            )
 
 
 app.include_router(bubble.rdfa.router)

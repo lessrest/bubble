@@ -1,10 +1,10 @@
 """Utility functions for N3 processing."""
 
 import sys
-from typing import Any, Optional
+from typing import Any, Optional, overload
 
 
-from rdflib import RDF, Graph, IdentifiedNode, Literal
+from rdflib import RDF, BNode, Graph, IdentifiedNode, Literal, URIRef
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
@@ -16,37 +16,6 @@ from bubble.prfx import NT, SWA, JSON, AI
 S = _SubjectType
 P = _PredicateType
 O = _ObjectType  # noqa: E741
-
-
-class New:
-    """Create new nodes in a graph, inspired by Turtle syntax"""
-
-    def __init__(self, graph: Graph):
-        self.graph = graph
-
-    def __call__(
-        self,
-        type: Optional[S] = None,
-        properties: dict[P, Any] = {},
-        subject: Optional[S] = None,
-    ) -> S:
-        if subject is None:
-            subject = fresh_uri(SWA)
-
-        if type is not None:
-            self.graph.add((subject, RDF.type, type))
-
-        if properties is not None:
-            for predicate, object in properties.items():
-                if isinstance(object, list):
-                    for item in object:
-                        o = item if isinstance(item, O) else Literal(item)
-                        self.graph.add((subject, predicate, o))
-                else:
-                    o = object if isinstance(object, O) else Literal(object)
-                    self.graph.add((subject, predicate, o))
-
-        return subject
 
 
 def print_n3(graph: Optional[Graph] = None) -> None:
@@ -132,8 +101,38 @@ def turtle(src: str) -> Graph:
         return graph
 
 
-def new(*args, **kwargs):
-    return New(vars.graph.get())(*args, **kwargs)
+@overload
+def new(type: S, properties: dict[P, Any]) -> URIRef: ...
+@overload
+def new(type: S, properties: dict[P, Any], subject: URIRef) -> URIRef: ...
+@overload
+def new(type: S, properties: dict[P, Any], subject: BNode) -> BNode: ...
+
+
+def new(
+    type: S,
+    properties: dict[P, Any],
+    subject: Optional[URIRef | BNode] = None,
+) -> URIRef | BNode:
+    if subject is None:
+        subject = fresh_uri(SWA)
+
+    graph = vars.graph.get()
+
+    if type is not None:
+        graph.add((subject, RDF.type, type))
+
+    if properties is not None:
+        for predicate, object in properties.items():
+            if isinstance(object, list):
+                for item in object:
+                    o = item if isinstance(item, O) else Literal(item)
+                    graph.add((subject, predicate, o))
+            else:
+                o = object if isinstance(object, O) else Literal(object)
+                graph.add((subject, predicate, o))
+
+    return subject
 
 
 def is_a(subject: S, type: S) -> bool:
