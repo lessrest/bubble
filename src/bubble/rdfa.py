@@ -209,8 +209,6 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_voice_recording_resource(subject, data)
     elif data["type"] == NT.UploadCapability:
         render_upload_capability_resource(subject, data)
-    elif data["type"] == NT.AudioPacketStream:
-        render_audio_packet_stream_resource(subject, data)
     else:
         render_default_resource(subject, data)
 
@@ -227,41 +225,6 @@ def render_upload_capability_resource(subject: S, data: Dict):
     ):
         pass
     render_properties(data)
-
-
-@html.div("flex flex-col pb-2 gap-2")
-def render_audio_packet_stream_resource(subject: S, data: Dict):
-    with tag("div", classes="flex flex-col items-stretch"):
-        render_resource_header(subject, data)
-        with tag(
-            "div",
-            classes=[
-                "flex flex-col items-stretch gap-1 py-1",
-                "border-t-0",
-                "text-sm opacity-70",
-            ],
-        ):
-            render_properties(data)
-
-        # with tag("audio", controls=True):
-        #     attr("src", f"/opus/{subject}?t0=0&t1=1000")
-
-    endpoint_row = select_one_row(
-        """SELECT ?endpoint WHERE {
-            ?stream nt:hasPacketIngress ?ingress .
-            ?ingress nt:hasWebSocketURI ?endpoint
-        }""",
-        {"stream": subject},
-    )
-    endpoint = endpoint_row[0]
-    with tag(
-        "voice-recorder-writer",
-        classes=[
-            "px-8 text-lg font-serif py-1",
-        ],
-        endpoint=str(endpoint),
-    ):
-        pass
 
 
 @html.div(
@@ -370,7 +333,7 @@ def render_property_with_multiple_literals(predicate, literals):
         sorted_literals = sorted(
             literals,
             key=lambda x: [
-                prefs.index(x.language or ""),
+                prefs.index(x.language) if x.language else 0,
                 x.language or "",
                 x.value,
             ],
@@ -403,7 +366,7 @@ def render_property_label(predicate):
 def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
-        with tag("span", classes="small-caps"):
+        with tag("span"):
             dataset = current_bubble.get().dataset
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):

@@ -55,8 +55,7 @@ async def get_index():
                 stream_info = select_rows(
                     """
                     SELECT ?stream ?created WHERE {
-                        ?stream a nt:BlobStream ;
-                               nt:hasPacketType nt:OpusPacket20ms ;
+                        ?stream a nt:DataStream ;
                                nt:wasCreatedAt ?created .
                     }
                     ORDER BY DESC(?created)

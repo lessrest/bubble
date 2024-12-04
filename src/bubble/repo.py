@@ -81,6 +81,7 @@ class BubbleRepo:
         directory: Path,
         pattern: str,
         kind: str,
+        graph: Graph,
     ) -> None:
         """Load files into the graph
 
@@ -98,9 +99,9 @@ class BubbleRepo:
                 "Loading triples",
                 kind=kind,
                 source=path.as_uri(),
-                graph=self.graph.identifier,
+                graph=graph.identifier,
             )
-            self.graph.parse(str(path))
+            graph.parse(str(path))
 
     async def load_ontology(self) -> None:
         """Load the ontology into the vocab graph"""
@@ -126,14 +127,13 @@ class BubbleRepo:
 
     async def load_surfaces(self) -> None:
         """Load all surfaces from the bubble into the graph"""
-        await self.load_many(self.workdir, "*.n3", "surface")
-        await self.load_many(self.workdir, "*.ttl", "surface")
+        await self.load_many(self.workdir, "root.n3", "surface", self.graph)
 
     async def load_rules(self) -> None:
         """Load all rules from the system rules directory"""
         rules_dir = Path(__file__).parent / "rule"
         # TODO: test this
-        await self.load_many(rules_dir, "*.n3", "rule")
+        await self.load_many(rules_dir, "*.n3", "rule", self.vocab)
 
     async def reason(self) -> Graph:
         """Reason over the graphs"""
@@ -218,6 +218,11 @@ class BubbleRepo:
             ]
         )
 
+    async def save_graph(self) -> None:
+        """Save the graph to the root file"""
+        self.graph.serialize(destination=self.rootpath, format="n3")
+        await self.commit()
+
     @classmethod
     async def load(cls, path: Path) -> "BubbleRepo":
         """Open and fully initialize a BubbleRepo with all required data loaded."""
@@ -251,3 +256,7 @@ async def loading_bubble_from(path: Path):
     repo = await BubbleRepo.load(path)
     with using_bubble(repo):
         yield repo
+
+
+async def save_bubble():
+    await current_bubble.get().save_graph()

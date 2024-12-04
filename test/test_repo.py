@@ -1,10 +1,18 @@
+from datetime import UTC, datetime
+
 import pytest
 import structlog
 import trio
-from rdflib import Graph, URIRef, RDF
+from rdflib import Graph, Literal, URIRef, RDF
 from bubble.repo import using_bubble_at
 from bubble.prfx import NT
-from bubble.util import get_single_subject, print_n3
+from bubble.util import (
+    get_single_subject,
+    new,
+    print_n3,
+    select_one_row,
+    select_rows,
+)
 
 from bubble import vars
 
@@ -286,7 +294,7 @@ async def test_typed_blob_stream(temp_repo):
             NT.wasCreatedAt: Literal(datetime.now(UTC)),
             NT.hasPacketType: stream_type,
         },
-        subject=stream_id,
+        stream_id,
     )
 
     # Add some test data
