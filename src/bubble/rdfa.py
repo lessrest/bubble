@@ -207,8 +207,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_video_resource(subject, data)
     elif data["type"] == NT.VoiceRecording:
         render_voice_recording_resource(subject, data)
-    elif data["type"] == NT.PacketIngress:
-        render_packet_ingress_resource(subject, data)
+    elif data["type"] == NT.UploadCapability:
+        render_upload_capability_resource(subject, data)
     elif data["type"] == NT.AudioPacketStream:
         render_audio_packet_stream_resource(subject, data)
     else:
@@ -216,23 +216,16 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
 
 
 @html.div("flex flex-col items-start gap-1")
-def render_packet_ingress_resource(subject: S, data: Dict):
-    ingress = next(
-        (
-            obj
-            for pred, obj in data["predicates"]
-            if pred == NT.hasWebSocketURI
-        ),
-        None,
-    )
+def render_upload_capability_resource(subject: S, data: Dict):
+    render_resource_header(subject, data)
     with tag(
         "voice-recorder-writer",
         classes=[
             "text-lg font-serif py-1",
         ],
-        endpoint=str(ingress),
+        endpoint=str(subject),
     ):
-        render_resource_header(subject, data)
+        pass
     render_properties(data)
 
 

@@ -2,7 +2,7 @@ import os
 
 import structlog
 
-from rdflib import URIRef, Literal
+from rdflib import URIRef
 from fastapi import Request, APIRouter
 from trio_websocket import open_websocket_url
 
@@ -13,24 +13,11 @@ from bubble.page import base_html, action_button
 from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
 from bubble.repo import current_bubble
-from bubble.util import new, select_rows, select_one_row
+from bubble.util import select_rows
 
 logger = structlog.get_logger()
 
 router = APIRouter()
-
-
-@router.post("/opus")
-async def create_stream(request: Request):
-    """Create a new audio stream"""
-    # Create a blob stream with Opus packet type
-    response = await blob.create_stream(
-        request=request,
-        type=NT.OpusPacket20ms,
-    )
-
-    rdf_resource(response)
-    return HypermediaResponse(response)
 
 
 @router.get("/opus")

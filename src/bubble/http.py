@@ -4,7 +4,7 @@ import pathlib
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from rdflib import Literal, URIRef
+from rdflib import RDF, XSD, Literal, URIRef
 import rich
 import trio
 import structlog
@@ -16,7 +16,7 @@ from fastapi.websockets import WebSocket
 from fastapi.staticfiles import StaticFiles
 
 import bubble.blob
-from bubble.blob import logger, retrieve_websocket_stream
+from bubble.blob import logger
 import bubble.html
 import bubble.opus
 from bubble.prfx import NT
@@ -32,7 +32,7 @@ from bubble.html import (
 )
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble
-from bubble.util import new
+from bubble.util import is_a, new, select_one_row
 from bubble.vars import Parameter
 
 logger = structlog.get_logger()
@@ -114,32 +114,32 @@ async def create_blob_stream(
     return HypermediaResponse()
 
 
-@app.websocket("/blob/{path:path}")
-async def stream_blobs(websocket: WebSocket):
-    """WebSocket endpoint for streaming binary packets"""
+@app.websocket("/{id:path}")
+async def websocket_endpoint(websocket: WebSocket, id: str):
     await websocket.accept()
-    bubble = websocket.app.state.bubble
+    bubble: BubbleRepo = websocket.app.state.bubble
+    entity = URIRef(str(websocket.url))
     with using_bubble(bubble):
-        src = URIRef(retrieve_websocket_stream(websocket))
-        logger.info("Stream created", stream=src)
+        if is_a(entity, NT.UploadCapability):
+            await websocket_stream_upload(websocket, entity, bubble)
+        else:
+            await websocket.close(code=1008, reason="No capability")
 
-        try:
-            seq = 0
-            stream = bubble.blob(src)
-            while True:
-                dat = await websocket.receive_bytes()
-                stream.append_part(seq, dat)
-                seq += 1
-                if seq % 100 == 0:
-                    logger.info("Added 100 parts", stream=src)
-        finally:
-            new(
-                NT.BlobStream,
-                {
-                    NT.wasClosedAt: Literal(datetime.now(UTC)),
-                },
-                subject=src,
-            )
+
+async def websocket_stream_upload(websocket, cap: URIRef, bubble):
+    logger.info("Stream created", stream=cap)
+
+    try:
+        seq = 0
+        handle = bubble.blob(cap)
+        while True:
+            dat = await websocket.receive_bytes()
+            handle.append_part(seq, dat)
+            seq += 1
+            if seq % 100 == 0:
+                logger.info("Added 100 parts", stream=cap)
+    finally:
+        bubble.graph.add((cap, NT.wasClosedAt, Literal(datetime.now(UTC))))
 
 
 app.include_router(bubble.rdfa.router)

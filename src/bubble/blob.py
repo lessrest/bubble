@@ -21,22 +21,20 @@ async def create_stream(
     request: Request,
     type: URIRef,
 ) -> URIRef:
-    """Create a new blob stream with specified type"""
+    """Create a new data stream with specified type and upload capability"""
     socket_url = generate_socket_url(request)
     timestamp = datetime.now(UTC)
 
     stream = new(
-        NT.BlobStream,
+        NT.DataStream,
         {
             NT.wasCreatedAt: Literal(timestamp),
-            NT.hasPacketType: type,
-            NT.hasPacketIngress: new(
-                NT.PacketIngress,
+            NT.hasPart: new(
+                NT.UploadCapability,
                 {
-                    NT.hasWebSocketURI: Literal(
-                        socket_url, datatype=XSD.anyURI
-                    ),
+                    NT.hasPacketType: type,
                 },
+                subject=socket_url,
             ),
         },
     )
@@ -44,28 +42,16 @@ async def create_stream(
     return stream
 
 
-def generate_socket_url(request: Request) -> URL:
+def generate_socket_url(request: Request) -> URIRef:
     socket_url = URL(
         scope={
             "scheme": "ws" if request.url.scheme == "http" else "wss",
-            "path": f"/blob/{fresh_id()}",
+            "path": f"/{fresh_id()}",
             "server": (request.url.hostname, request.url.port),
             "headers": {},
         },
     )
-    return socket_url
-
-
-def retrieve_websocket_stream(websocket):
-    return select_one_row(
-        """
-          SELECT ?stream WHERE {
-              ?stream nt:hasPacketIngress ?ingress .
-              ?ingress nt:hasWebSocketURI ?endpoint .
-          }
-          """,
-        bindings={"endpoint": Literal(websocket.url, datatype=XSD.anyURI)},
-    )[0]
+    return URIRef(str(socket_url))
 
 
 @dataclass
