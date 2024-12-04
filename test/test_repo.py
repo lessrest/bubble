@@ -181,3 +181,88 @@ def test_get_single_subject():
     g = vars.graph.get()
     g.add((URIRef("s"), URIRef("p"), URIRef("o")))
     assert get_single_subject(URIRef("p"), URIRef("o")) == URIRef("s")
+
+
+async def test_repo_blob_storage(temp_repo):
+    """Test blob storage operations in the repository"""
+    # Test data
+    stream_id = "test_stream"
+    test_data = [b"test data 1", b"test data 2", b"test data 3"]
+
+    # Test appending blobs
+    for seq, data in enumerate(test_data):
+        temp_repo.append_blob(stream_id, seq, data)
+
+    # Test getting last sequence
+    assert temp_repo.get_last_sequence(stream_id) == len(test_data) - 1
+
+    # Test getting blobs
+    retrieved_blobs = list(
+        temp_repo.get_blobs(stream_id, 0, len(test_data))
+    )
+    assert retrieved_blobs == test_data
+
+    # Test getting streams with blobs
+    streams = temp_repo.get_streams_with_blobs()
+    assert len(streams) == 1
+    assert str(streams[0]) == stream_id
+
+    # Test getting partial range
+    partial_blobs = list(temp_repo.get_blobs(stream_id, 1, 2))
+    assert partial_blobs == test_data[1:3]
+
+    # Test deleting stream
+    temp_repo.delete_stream(stream_id)
+    assert temp_repo.get_last_sequence(stream_id) == -1
+    assert list(temp_repo.get_blobs(stream_id, 0, len(test_data))) == []
+    assert temp_repo.get_streams_with_blobs() == []
+
+
+async def test_repo_blob_persistence(temp_repo):
+    """Test that blobs persist across repository instances"""
+    # Add test data
+    stream_id = "test_stream"
+    test_data = b"persistent data"
+    temp_repo.append_blob(stream_id, 0, test_data)
+
+    # Create new repo instance with same path
+    async with using_bubble_at(temp_repo.workdir) as new_repo:
+        # Verify data persists
+        retrieved_data = list(new_repo.get_blobs(stream_id, 0, 0))[0]
+        assert retrieved_data == test_data
+        assert new_repo.get_last_sequence(stream_id) == 0
+        assert str(new_repo.get_streams_with_blobs()[0]) == stream_id
+
+
+async def test_repo_multiple_streams(temp_repo):
+    """Test handling multiple blob streams"""
+    streams = ["stream1", "stream2", "stream3"]
+    test_data = b"test data"
+
+    # Add data to multiple streams
+    for stream_id in streams:
+        temp_repo.append_blob(stream_id, 0, test_data)
+
+    # Verify all streams are present
+    stored_streams = temp_repo.get_streams_with_blobs()
+    assert len(stored_streams) == len(streams)
+    assert all(str(s) in streams for s in stored_streams)
+
+    # Verify data in each stream
+    for stream_id in streams:
+        assert list(temp_repo.get_blobs(stream_id, 0, 0))[0] == test_data
+        assert temp_repo.get_last_sequence(stream_id) == 0
+
+
+async def test_repo_blob_sequence_order(temp_repo):
+    """Test that blob sequences are maintained in order"""
+    stream_id = "test_stream"
+    test_data = [b"data1", b"data2", b"data3"]
+
+    # Add data in reverse order
+    for seq in reversed(range(len(test_data))):
+        temp_repo.append_blob(stream_id, seq, test_data[seq])
+
+    # Verify retrieval order
+    retrieved = list(temp_repo.get_blobs(stream_id, 0, len(test_data)))
+    assert retrieved == test_data

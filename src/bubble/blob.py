@@ -7,8 +7,8 @@ logger = structlog.get_logger()
 
 
 class BlobStore:
-    def __init__(self, db_path: str = "blobs.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str | None = None):
+        self.db_path = db_path or "blobs.db"
         self._init_db()
 
     def _init_db(self):

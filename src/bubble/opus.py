@@ -1,5 +1,4 @@
 import os
-
 from typing import Generator
 from datetime import UTC, datetime
 
@@ -11,69 +10,17 @@ from fastapi import Request, APIRouter, WebSocket
 from trio_websocket import open_websocket_url
 from starlette.datastructures import URL
 
-from bubble.blob import BlobStore
 from bubble.html import HypermediaResponse, tag
 from bubble.mint import fresh_id
 from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
 from bubble.prfx import NT
 from bubble.rdfa import rdf_resource
-from bubble.repo import using_bubble
+from bubble.repo import current_bubble
 from bubble.util import S, new, select_rows, select_one_row
 
 logger = structlog.get_logger()
 
-
-class AudioPacketDatabase:
-    def __init__(self, db_path: str = "audio_packets.db"):
-        self.blob_store = BlobStore(db_path)
-
-    def create_stream(
-        self, socket_url: URL, sample_rate: int = 48000, channels: int = 1
-    ) -> S:
-        """Create a new audio stream and return its ID"""
-        timestamp = datetime.now(UTC)
-
-        return new(
-            NT.AudioPacketStream,
-            {
-                NT.wasCreatedAt: Literal(timestamp),
-                NT.hasSampleRate: Literal(sample_rate),
-                NT.hasChannelCount: Literal(channels),
-                NT.hasPacketIngress: new(
-                    NT.PacketIngress,
-                    {
-                        NT.hasWebSocketURI: Literal(
-                            socket_url, datatype=XSD.anyURI
-                        ),
-                        NT.hasPacketType: NT.OpusPacket20ms,
-                    },
-                ),
-            },
-        )
-
-    def append_packet(self, src: str, seq: int, dat: bytes):
-        """Add a frame to the stream"""
-        self.blob_store.append_blob(src, seq, dat)
-
-    def get_frames(
-        self, stream_id: str, start_seq: int, end_seq: int
-    ) -> Generator[bytes, None, None]:
-        """Retrieve frames for a stream starting from sequence number"""
-        return self.blob_store.get_blobs(stream_id, start_seq, end_seq)
-
-    def close_stream(self, stream_id: str):
-        """Mark a stream as closed"""
-        new(
-            NT.AudioPacketStream,
-            {
-                NT.wasClosedAt: Literal(datetime.now(UTC)),
-            },
-            subject=stream_id,
-        )
-
-
-# FastAPI Router setup
 router = APIRouter()
 
 
@@ -84,9 +31,26 @@ async def create_stream(
     channels: int = 1,
 ):
     """Create a new audio stream"""
-    audio = AudioPacketDatabase()
     socket_url = generate_socket_url(request)
-    stream = audio.create_stream(socket_url, sample_rate, channels)
+    timestamp = datetime.now(UTC)
+
+    stream = new(
+        NT.AudioPacketStream,
+        {
+            NT.wasCreatedAt: Literal(timestamp),
+            NT.hasSampleRate: Literal(sample_rate),
+            NT.hasChannelCount: Literal(channels),
+            NT.hasPacketIngress: new(
+                NT.PacketIngress,
+                {
+                    NT.hasWebSocketURI: Literal(
+                        socket_url, datatype=XSD.anyURI
+                    ),
+                    NT.hasPacketType: NT.OpusPacket20ms,
+                },
+            ),
+        },
+    )
 
     rdf_resource(stream)
     return HypermediaResponse()
@@ -103,9 +67,6 @@ def generate_socket_url(request: Request) -> URL:
     )
 
     return socket_url
-
-
-audiodb = AudioPacketDatabase()
 
 
 @router.get("/opus")
@@ -128,7 +89,7 @@ async def get_index():
 
             # Get streams with audio packets
             streams_with_packets = (
-                audiodb.blob_store.get_streams_with_blobs()
+                current_bubble.get().get_streams_with_blobs()
             )
 
             if streams_with_packets:
@@ -163,10 +124,11 @@ async def stream_audio(browser_socket: WebSocket, ingress_id: str):
     """WebSocket endpoint for streaming OPUS frames"""
     await browser_socket.accept()
 
-    with using_bubble(browser_socket.app.state.bubble):
-        src = retrieve_websocket_stream(browser_socket)
-        logger.info("Stream created", stream=src)
+    bubble = current_bubble.get()
+    src = retrieve_websocket_stream(browser_socket)
+    logger.info("Stream created", stream=src)
 
+    try:
         async with create_deepgram_websocket() as deepgram_socket:
             async with trio.open_nursery() as nursery:
 
@@ -175,7 +137,7 @@ async def stream_audio(browser_socket: WebSocket, ingress_id: str):
                     while True:
                         dat = await browser_socket.receive_bytes()
                         await deepgram_socket.send_message(dat)
-                        audiodb.append_packet(src=src, seq=seq, dat=dat)
+                        bubble.append_blob(src, seq, dat)
 
                         seq += 1
                         if seq % 100 == 0:
@@ -191,8 +153,14 @@ async def stream_audio(browser_socket: WebSocket, ingress_id: str):
 
                 nursery.start_soon(forward_audio_packets)
                 nursery.start_soon(read_transcription_events)
-
-        audiodb.close_stream(src)
+    finally:
+        new(
+            NT.AudioPacketStream,
+            {
+                NT.wasClosedAt: Literal(datetime.now(UTC)),
+            },
+            subject=src,
+        )
 
 
 def create_deepgram_websocket():
@@ -236,7 +204,10 @@ async def get_audio_segment(path: str, t0: float, t1: float):
     from_seq = int(t0 / 0.02)
     to_seq = int(t1 / 0.02)
 
-    frames = [frame for frame in audiodb.get_frames(path, from_seq, to_seq)]
+    frames = [
+        frame
+        for frame in current_bubble.get().get_blobs(path, from_seq, to_seq)
+    ]
 
     if not frames:
         return Response(content=b"", media_type="audio/ogg")
