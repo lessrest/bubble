@@ -68,9 +68,9 @@ class BubbleRepo:
         self.vocab = self.dataset.graph(NT.vocabulary)
         self.blobs = BlobStore(str(path / "blobs.db"))
 
-    def blob(self, stream_id: URIRef) -> BlobStream:
+    def blob(self, stream_id: URIRef, seq: int = 0) -> BlobStream:
         """Get a blob stream by ID"""
-        return self.blobs.stream(stream_id)
+        return self.blobs.stream(stream_id, seq)
 
     def get_streams_with_blobs(self) -> list[URIRef]:
         """Get list of stream IDs that have blobs stored"""

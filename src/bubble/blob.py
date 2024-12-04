@@ -60,10 +60,12 @@ class BlobStream:
 
     blob_store: "BlobStore"
     stream_id: URIRef
+    seq: int
 
-    def append_part(self, seq: int, data: bytes):
+    def append_part(self, data: bytes):
         """Add a part to the stream"""
-        self.blob_store.append_blob(str(self.stream_id), seq, data)
+        self.blob_store.append_blob(str(self.stream_id), self.seq, data)
+        self.seq += 1
 
     def get_parts(self, start_seq: int, end_seq: int):
         """Get parts from the stream within a sequence range"""
@@ -120,9 +122,9 @@ class BlobStore:
                 )
             """)
 
-    def stream(self, stream_id: URIRef) -> BlobStream:
+    def stream(self, stream_id: URIRef, seq: int = 0) -> BlobStream:
         """Get a stream by ID"""
-        return BlobStream(self, stream_id)
+        return BlobStream(self, stream_id, seq)
 
     def append_blob(self, stream_id: str, seq: int, data: bytes):
         """Add a blob to a stream/collection"""

@@ -32,6 +32,7 @@ from bubble.html import (
 )
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble
+from bubble.transcribe import create_deepgram_websocket
 from bubble.util import is_a, new, select_one_row
 from bubble.vars import Parameter
 
@@ -126,18 +127,32 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
             await websocket.close(code=1008, reason="No capability")
 
 
-async def websocket_stream_upload(websocket, cap: URIRef, bubble):
+async def websocket_stream_upload(
+    websocket, cap: URIRef, bubble: BubbleRepo
+):
     logger.info("Stream created", stream=cap)
 
     try:
-        seq = 0
-        handle = bubble.blob(cap)
-        while True:
-            dat = await websocket.receive_bytes()
-            handle.append_part(seq, dat)
-            seq += 1
-            if seq % 100 == 0:
-                logger.info("Added 100 parts", stream=cap)
+        handle = bubble.blob(cap, seq=0)
+
+        async with create_deepgram_websocket() as deepgram_socket:
+
+            async def forward_audio_packets():
+                while True:
+                    dat = await websocket.receive_bytes()
+                    handle.append_part(dat)
+                    await deepgram_socket.send_message(dat)
+
+            async def read_transcription_events():
+                while True:
+                    frame_data = await deepgram_socket.get_message()
+                    logger.info("Deepgram message", frame_data=frame_data)
+                    await websocket.send_text(frame_data)
+
+            async with trio.open_nursery() as nursery:
+                nursery.start_soon(forward_audio_packets)
+                nursery.start_soon(read_transcription_events)
+
     finally:
         bubble.graph.add((cap, NT.wasClosedAt, Literal(datetime.now(UTC))))
 
