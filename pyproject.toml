@@ -77,12 +77,18 @@ dependencies = [
     "trio-websocket>=0.11.1",
     "backend>=0.2.4.1",
     "pycapnp>=2.0.0",
-    "capnp-stub-generator @ git+https://gitlab.com/mic_public/tools/python-helpers/capnp-stub-generator.git#egg=capnp-stub-generator&pycapnp==2.0.0",
+    "capnp-stub-generator",
+    "ipykernel>=6.29.5",
+    "pip>=24.3.1",
 ]
 
 [tool.uv.sources]
 # stay current with rdflib
 rdflib = { git = "https://github.com/RDFLib/rdflib" }
+capnp-stub-generator = { workspace = true }
+
+[tool.uv.workspace]
+members = ["vendor/*"]
 
 [project.scripts]
 bubble = "bubble.main:app"
@@ -142,3 +148,6 @@ markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
 
 # Run tests in parallel
 addopts = "-n 4"
+
+[tool.hatch.metadata]
+allow-direct-references = true

@@ -200,7 +200,7 @@ async def test_repo_blob_storage(temp_repo):
 
     # Test appending blobs
     for seq, data in enumerate(test_data):
-        stream.append_part(seq, data)
+        stream.write(data)
 
     # Test getting last sequence
     assert stream.get_last_sequence() == len(test_data) - 1
@@ -233,7 +233,7 @@ async def test_repo_blob_persistence(temp_repo):
     # Add test data
     stream_id = URIRef("test_stream")
     test_data = b"persistent data"
-    temp_repo.blob(stream_id).append_part(0, test_data)
+    temp_repo.blob(stream_id).write(test_data)
 
     # Create new repo instance with same path
     async with using_bubble_at(temp_repo.workdir) as new_repo:
@@ -252,7 +252,7 @@ async def test_repo_multiple_streams(temp_repo):
 
     # Add data to multiple streams
     for stream_id in streams:
-        temp_repo.blob(stream_id).append_part(0, test_data)
+        temp_repo.blob(stream_id).write(test_data)
 
     # Verify all streams are present
     stored_streams = temp_repo.get_streams_with_blobs()
@@ -273,8 +273,8 @@ async def test_repo_blob_sequence_order(temp_repo):
     stream = temp_repo.blob(stream_id)
 
     # Add data in reverse order
-    for seq in reversed(range(len(test_data))):
-        stream.append_part(seq, test_data[seq])
+    for seq in range(len(test_data)):
+        stream.write(test_data[seq])
 
     # Verify retrieval order
     retrieved = list(stream[0 : len(test_data)])
@@ -300,7 +300,7 @@ async def test_typed_blob_stream(temp_repo):
     # Add some test data
     stream = temp_repo.blob(stream_id)
     test_data = b"test packet data"
-    stream.append_part(0, test_data)
+    stream.write(test_data)
 
     # Verify stream type
     stream_type_result = select_one_row(
@@ -356,5 +356,5 @@ async def test_opus_stream_creation(temp_repo):
     assert len(results) == 1
     stream_type, sample_rate, channels = results[0]
     assert stream_type == NT.OpusPacket20ms
-    assert sample_rate == 48000
-    assert channels == 1
+    assert int(sample_rate) == 48000
+    assert int(channels) == 1

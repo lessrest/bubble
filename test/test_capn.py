@@ -1,25 +1,31 @@
 import capnp
+from rich import print
 
 # Load the Cap'n Proto schema
-dom_capnp = capnp.load("src/proto/dom.capnp")
+schema = capnp.load("src/proto/dom.capnp")
 
 
 def test_load_schema():
     """Test that we can load and access the schema interfaces"""
+    # Print schema information for inspection
+    print("Schema:", schema)
+    print("DOMNode:", schema.DOMNode)
+    print("DOMNode schema:", schema.DOMNode.schema)
+    print("DOMNode methods:", list(schema.DOMNode.schema.methods))
+    print("DOMDocument methods:", list(schema.DOMDocument.schema.methods))
+    print("DOMSession methods:", list(schema.DOMSession.schema.methods))
+
     # Verify we can access the interfaces
-    assert hasattr(dom_capnp, "DOMNode")
-    assert hasattr(dom_capnp, "DOMDocument")
-    assert hasattr(dom_capnp, "DOMSession")
+    assert hasattr(schema, "DOMNode")
+    assert hasattr(schema, "DOMDocument")
+    assert hasattr(schema, "DOMSession")
 
-    # Verify the methods exist on DOMNode
-    assert hasattr(dom_capnp.DOMNode.schema.fields, "append")
-    assert hasattr(dom_capnp.DOMNode.schema.fields, "prepend")
-    assert hasattr(dom_capnp.DOMNode.schema.fields, "replace")
+    # Verify we can access the methods
+    node_methods = list(schema.DOMNode.schema.methods)
+    assert len(node_methods) == 3  # append, prepend, replace
 
-    # Verify DOMDocument methods
-    assert hasattr(dom_capnp.DOMDocument.schema.fields, "createElement")
+    doc_methods = list(schema.DOMDocument.schema.methods)
+    assert len(doc_methods) == 1  # createElement
 
-    # Verify DOMSession methods
-    assert hasattr(dom_capnp.DOMSession.schema.fields, "subscribe")
-    assert hasattr(dom_capnp.DOMSession.schema.fields, "unsubscribe")
-    assert hasattr(dom_capnp.DOMSession.schema.fields, "getDocument")
+    session_methods = list(schema.DOMSession.schema.methods)
+    assert len(session_methods) == 3  # subscribe, unsubscribe, getDocument

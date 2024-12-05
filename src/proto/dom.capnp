@@ -1,27 +1,41 @@
-@0xd4e19674c5d5f0c9;
+@0x96e09069c4cb9a01;
 
-using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("bubble::dom");
+enum InsertPosition {
+  beforeBegin @0;  # Before the element itself
+  afterBegin @1;   # Just inside the element, before its first child
+  beforeEnd @2;    # Just inside the element, after its last child
+  afterEnd @3;     # After the element itself
+}
 
 interface DOMNode {
-  # A capability provided by the client (browser) to the server
-  # for manipulating a specific DOM node
+  # Base interface for all DOM nodes
   
-  append @0 (html: Text) -> ();
-  # Appends HTML content to this node
-  
-  prepend @1 (html: Text) -> ();
-  # Prepends HTML content to this node
-  
-  replace @2 (html: Text) -> ();
-  # Replaces this node's content with new HTML
+  insertAdjacent @0 (position: InsertPosition, node: DOMNode) -> ();
+  # Inserts a node in a specified position relative to this node
+}
+
+interface DOMElement extends(DOMNode) {
+  # Interface for element nodes
+
+  setAttribute @0 (name: Text, value: Text) -> ();
+  # Sets the value of an attribute on this element
+}
+
+interface DOMText extends(DOMNode) {
+  # Interface for text nodes
+
+  setText @0 (text: Text) -> ();
+  # Sets the text content of this node
 }
 
 interface DOMDocument {
   # Represents the browser's document
   
-  createElement @0 (tag: Text) -> (node: DOMNode);
+  createElement @0 (tag: Text) -> (node: DOMElement);
   # Creates a new DOM element with the given tag name
+
+  createTextNode @1 (data: Text) -> (node: DOMText);
+  # Creates a new text node with the given text content
 }
 
 interface DOMSession {
