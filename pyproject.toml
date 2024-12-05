@@ -80,6 +80,7 @@ dependencies = [
     "capnp-stub-generator",
     "ipykernel>=6.29.5",
     "pip>=24.3.1",
+    "cbor2>=5.6.5",
 ]
 
 [tool.uv.sources]

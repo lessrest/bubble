@@ -3,11 +3,10 @@ import os
 import structlog
 
 from rdflib import URIRef
-from fastapi import Request, APIRouter
+from fastapi import APIRouter
 from trio_websocket import open_websocket_url
 
-from bubble import blob
-from bubble.html import HypermediaResponse, tag
+from bubble.html import tag
 from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
 from bubble.prfx import NT
