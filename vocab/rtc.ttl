@@ -1,0 +1,375 @@
+@prefix bfo: <https://node.town/bfo#> .
+@prefix iao: <https://node.town/iao#> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ro: <https://node.town/ro#> .
+@prefix rtc: <https://node.town/rtc#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+## Basic Formal Ontology (BFO)
+
+obo:BFO_0000001 a owl:Class ;
+   owl:equivalentClass bfo:Entity ;
+   owl:equivalentClass bfo:Entity ;
+   rdfs:label "entity"@en ;
+   skos:definition "Anything that exists, has existed, or will exist"@en .
+
+## Continuant branch
+obo:BFO_0000002 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000001 ;
+   owl:equivalentClass bfo:Continuant ;
+   rdfs:label "continuant"@en ;
+   skos:definition "An entity that maintains its identity through time"@en .
+
+## Independent Continuant branch
+obo:BFO_0000004 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000002 ;
+   owl:equivalentClass bfo:IndependentContinuant ;
+   rdfs:label "independent continuant"@en ;
+   skos:definition "A continuant that does not depend on other entities for its existence"@en .
+
+### Material Entity and subclasses
+obo:BFO_0000040 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000004 ;
+   owl:equivalentClass bfo:MaterialEntity ;
+   rdfs:label "material entity"@en ;
+   skos:definition "An independent continuant that has matter as parts"@en .
+obo:BFO_0000030 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000040 ;
+   owl:equivalentClass bfo:Object ;
+   rdfs:label "object"@en ;
+   skos:definition "A material entity that exhibits causal unity and maintains its identity through changes in parts"@en .
+obo:BFO_0000024 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000040 ;
+   owl:equivalentClass bfo:FiatObjectPart ;
+   rdfs:label "fiat object part"@en ;
+   skos:definition "A material entity that is part of an object and demarcated by fiat boundaries"@en .
+obo:BFO_0000027 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000040 ;
+   owl:equivalentClass bfo:ObjectAggregate ;
+   rdfs:label "object aggregate"@en ;
+   skos:definition "A material entity consisting of multiple objects functioning as a unit"@en .
+
+### Immaterial Entity and subclasses
+obo:BFO_0000141 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000004 ;
+   owl:equivalentClass bfo:ImmaterialEntity ;
+   rdfs:label "immaterial entity"@en ;
+   skos:definition "An independent continuant that never has material parts"@en .
+obo:BFO_0000006 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000141 ;
+   owl:equivalentClass bfo:SpatialRegion ;
+   rdfs:label "spatial region"@en ;
+   skos:definition "A continuant region of space"@en .
+obo:BFO_0000028 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000006 ;
+   owl:equivalentClass bfo:ThreeDimensionalSpatialRegion ;
+   rdfs:label "three-dimensional spatial region"@en ;
+   skos:definition "A spatial region extending in three dimensions"@en .
+obo:BFO_0000009 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000006 ;
+   owl:equivalentClass bfo:TwoDimensionalSpatialRegion ;
+   rdfs:label "two-dimensional spatial region"@en ;
+   skos:definition "A spatial region extending in two dimensions"@en .
+obo:BFO_0000026 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000006 ;
+   owl:equivalentClass bfo:OneDimensionalSpatialRegion ;
+   rdfs:label "one-dimensional spatial region"@en ;
+   skos:definition "A spatial region extending in one dimension"@en .
+obo:BFO_0000018 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000006 ;
+   owl:equivalentClass bfo:ZeroDimensionalSpatialRegion ;
+   rdfs:label "zero-dimensional spatial region"@en ;
+   skos:definition "A spatial region consisting of one or more points"@en .
+obo:BFO_0000029 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000141 ;
+   owl:equivalentClass bfo:Site ;
+   rdfs:label "site"@en ;
+   skos:definition "An immaterial entity bounded by material entities"@en .
+obo:BFO_0000140 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000141 ;
+   owl:equivalentClass bfo:ContinuantFiatBoundary ;
+   rdfs:label "continuant fiat boundary"@en ;
+   skos:definition "An immaterial boundary defined by convention or fiat"@en .
+obo:BFO_0000142 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000140 ;
+   owl:equivalentClass bfo:FiatLine ;
+   rdfs:label "fiat line"@en ;
+   skos:definition "A one-dimensional fiat boundary"@en .
+obo:BFO_0000146 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000140 ;
+   owl:equivalentClass bfo:FiatSurface ;
+   rdfs:label "fiat surface"@en ;
+   skos:definition "A two-dimensional fiat boundary"@en .
+obo:BFO_0000147 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000140 ;
+   owl:equivalentClass bfo:FiatPoint ;
+   rdfs:label "fiat point"@en ;
+   skos:definition "A zero-dimensional fiat boundary"@en .
+
+## Dependent Continuant branch
+
+### Specifically Dependent Continuant branch
+obo:BFO_0000020 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000002 ;
+   owl:equivalentClass bfo:SpecificallyDependentContinuant ;
+   rdfs:label "specifically dependent continuant"@en ;
+   skos:definition "A continuant that depends on a specific independent continuant"@en .
+obo:BFO_0000019 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000020 ;
+   owl:equivalentClass bfo:Quality ;
+   rdfs:label "quality"@en ;
+   skos:definition "A dependent entity that is fully exhibited at any time it exists"@en .
+obo:BFO_0000145 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000019 ;
+   owl:equivalentClass bfo:RelationalQuality ;
+   rdfs:label "relational quality"@en ;
+   skos:definition "A quality that inheres in multiple bearers"@en .
+obo:BFO_0000017 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000020 ;
+   owl:equivalentClass bfo:RealizableEntity ;
+   rdfs:label "realizable entity"@en ;
+   skos:definition "A dependent entity requiring processes for its realization"@en .
+obo:BFO_0000016 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000017 ;
+   owl:equivalentClass bfo:Disposition ;
+   rdfs:label "disposition"@en ;
+   skos:definition "A realizable entity requiring specific physical conditions for realization"@en .
+obo:BFO_0000034 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000016 ;
+   owl:equivalentClass bfo:Function ;
+   rdfs:label "function"@en ;
+   skos:definition "A disposition that exists due to physical makeup selected for its type"@en .
+obo:BFO_0000023 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000017 ;
+   owl:equivalentClass bfo:Role ;
+   rdfs:label "role"@en ;
+   skos:definition "A realizable entity that exists due to external circumstances"@en .
+
+### Generically Dependent Continuant
+obo:BFO_0000031 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000002 ;
+   owl:equivalentClass bfo:GenericallyDependentContinuant ;
+   rdfs:label "generically dependent continuant"@en ;
+   skos:definition "A continuant that depends on some bearer but can migrate between bearers"@en .
+
+## Occurrent branch
+obo:BFO_0000003 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000001 ;
+   owl:equivalentClass bfo:Occurrent ;
+   rdfs:label "occurrent"@en ;
+   skos:definition "An entity that unfolds in time"@en .
+obo:BFO_0000015 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000003 ;
+   owl:equivalentClass bfo:Process ;
+   rdfs:label "process"@en ;
+   skos:definition "An occurrent that has temporal parts and material participants"@en .
+obo:BFO_0000182 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000015 ;
+   owl:equivalentClass bfo:History ;
+   rdfs:label "history"@en ;
+   skos:definition "The complete process of changes undergone by a material entity"@en .
+obo:BFO_0000035 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000003 ;
+   owl:equivalentClass bfo:ProcessBoundary ;
+   rdfs:label "process boundary"@en ;
+   skos:definition "An occurrent marking the instant of beginning or ending of a process"@en .
+obo:BFO_0000008 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000003 ;
+   owl:equivalentClass bfo:TemporalRegion ;
+   rdfs:label "temporal region"@en ;
+   skos:definition "A region of time"@en .
+obo:BFO_0000038 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000008 ;
+   owl:equivalentClass bfo:OneDimensionalTemporalRegion ;
+   rdfs:label "one-dimensional temporal region"@en ;
+   skos:definition "A temporal region with duration"@en .
+obo:BFO_0000148 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000008 ;
+   owl:equivalentClass bfo:ZeroDimensionalTemporalRegion ;
+   rdfs:label "zero-dimensional temporal region"@en ;
+   skos:definition "A temporal region without duration"@en .
+obo:BFO_0000202 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000038 ;
+   owl:equivalentClass bfo:TemporalInterval ;
+   rdfs:label "temporal interval"@en ;
+   skos:definition "A continuous one-dimensional temporal region"@en .
+obo:BFO_0000203 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000148 ;
+   owl:equivalentClass bfo:TemporalInstant ;
+   rdfs:label "temporal instant"@en ;
+   skos:definition "A temporal region occupying a single moment"@en .
+obo:BFO_0000011 a owl:Class ;
+   rdfs:subClassOf obo:BFO_0000003 ;
+   owl:equivalentClass bfo:SpatiotemporalRegion ;
+   rdfs:label "spatiotemporal region"@en ;
+   skos:definition "A region of spacetime"@en .
+
+## Core Relations
+obo:BFO_0000050 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:PartOf ;
+   rdfs:label "part of"@en ;
+   skos:definition "A fundamental relation of parthood between entities"@en .
+obo:BFO_0000051 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:HasPart ;
+   rdfs:label "has part"@en ;
+   skos:definition "Inverse of part of relation"@en .
+obo:BFO_0000178 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:HasContinuantPart ;
+   rdfs:label "has continuant part"@en ;
+   skos:definition "Parthood relation between continuants"@en .
+obo:BFO_0000176 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:ContinuantPartOf ;
+   rdfs:label "continuant part of"@en ;
+   skos:definition "Inverse of has continuant part"@en .
+obo:BFO_0000132 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:OccurrentPartOf ;
+   rdfs:label "occurrent part of"@en ;
+   skos:definition "Parthood relation between occurrents"@en .
+obo:BFO_0000117 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:HasOccurrentPart ;
+   rdfs:label "has occurrent part"@en ;
+   skos:definition "Inverse of occurrent part of"@en .
+obo:BFO_0000195 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:SpecificallyDependsOn ;
+   rdfs:label "specifically depends on"@en ;
+   skos:definition "Dependency relation from specifically dependent continuant to bearer"@en .
+obo:BFO_0000194 a owl:ObjectProperty ;
+   owl:equivalentClass bfo:SpecificallyDependedOnBy ;
+   rdfs:label "specifically depended on by"@en ;
+   skos:definition "Inverse of specifically depends on"@en .
+
+## Disjointness axioms
+bfo:Continuant owl:disjointWith bfo:Occurrent .
+bfo:IndependentContinuant owl:disjointWith bfo:SpecificallyDependentContinuant , bfo:GenericallyDependentContinuant .
+bfo:SpecificallyDependentContinuant owl:disjointWith bfo:GenericallyDependentContinuant .
+bfo:MaterialEntity owl:disjointWith bfo:ImmaterialEntity .
+bfo:Disposition owl:disjointWith bfo:Role .
+bfo:RealizableEntity owl:disjointWith bfo:Quality .
+bfo:IndependentContinuant owl:disjointWith bfo:SpatiotemporalRegion , bfo:Process , bfo:ProcessBoundary .
+bfo:OneDimensionalTemporalRegion owl:disjointWith bfo:ZeroDimensionalTemporalRegion .
+
+
+## Information Artifact Ontology (IAO)
+obo:IAO_0000030 rdf:type owl:Class ;
+   owl:equivalentClass iao:InformationContentEntity ;
+   rdfs:label "information content entity"@en ;
+   rdfs:subClassOf obo:BFO_0000031 ;  # generically dependent continuant
+   skos:definition "A generically dependent continuant that is about some thing."@en .
+obo:IAO_0000033 rdf:type owl:Class ;
+   owl:equivalentClass iao:DirectiveInformationEntity ;
+   rdfs:label "directive information entity"@en ;
+   rdfs:subClassOf obo:IAO_0000030 ;
+   skos:definition "An information content entity whose concretizations indicate to their bearer how to realize them in a process."@en .
+obo:IAO_0000104 rdf:type owl:Class ;
+   owl:equivalentClass iao:PlanSpecification ;
+   rdfs:label "plan specification"@en ;
+   rdfs:subClassOf obo:IAO_0000033 ;
+   skos:definition "A directive information entity with action specifications and objective specifications as parts that may be concretized as a realizable entity that, if realized, is realized in a process in which the bearer tries to achieve the objectives by taking the actions specified."@en .
+obo:IAO_0000007 rdf:type owl:Class ;
+   owl:equivalentClass iao:ActionSpecification ;
+   rdfs:label "action specification"@en ;
+   rdfs:subClassOf obo:IAO_0000033 ;
+   skos:definition "A directive information entity that describes an action the bearer will take."@en .
+obo:IAO_0000005 rdf:type owl:Class ;
+   owl:equivalentClass iao:ObjectiveSpecification ;
+   rdfs:label "objective specification"@en ;
+   rdfs:subClassOf obo:IAO_0000033 ;
+   skos:definition "A directive information entity that describes an intended process endpoint."@en .
+obo:IAO_0000010 rdf:type owl:Class ;
+   owl:equivalentClass iao:Software ;
+   rdfs:label "software"@en ;
+   rdfs:subClassOf obo:IAO_0000104 ;
+   skos:definition "A plan specification composed of a series of instructions that can be interpreted by or directly executed by a processing unit."@en .
+obo:IAO_0000591 rdf:type owl:Class ;
+   owl:equivalentClass iao:SoftwareMethod ;
+   rdfs:label "software method"@en ;
+   rdfs:subClassOf obo:IAO_0000010 ;
+   skos:definition "A software method (also called subroutine, subprogram, procedure, method, function, or routine) is software designed to execute a specific task."@en .
+obo:IAO_0000027 rdf:type owl:Class ;
+   owl:equivalentClass iao:DataItem ;
+   rdfs:label "data item"@en ;
+   rdfs:subClassOf obo:IAO_0000030 ;
+   skos:definition "An information content entity that is intended to be a truthful statement about something and is constructed/acquired by a method which reliably tends to produce truthful statements."@en .
+obo:IAO_0000088 rdf:type owl:Class ;
+   owl:equivalentClass iao:Report ;
+   rdfs:label "report"@en ;
+   rdfs:subClassOf obo:IAO_0000310 ;
+   skos:definition "A document assembled by an author for the purpose of providing information for the audience. A report is the output of a documenting process and has the objective to be consumed by a specific audience."@en .
+obo:IAO_0000572 rdf:type owl:Class ;
+   owl:equivalentClass iao:Documenting ;
+   rdfs:label "documenting"@en ;
+   rdfs:subClassOf obo:OBI_0000011 ;  # planned process
+   skos:definition "A planned process in which a document is created or added to by including the specified input in it."@en .
+obo:IAO_0000650 rdf:type owl:Class ;
+   owl:equivalentClass iao:DatabaseExtractTransformAndLoadProcess ;
+   rdfs:label "database extract, transform, and load process"@en ;
+   rdfs:subClassOf obo:OBI_0000011 ;
+   skos:definition "A planned process which takes as input a database and fills another database by extracting concretizations of information entities from the first, transforming them, and loading the transformed concretizations into the second."@en .
+
+## WebRTC
+
+### CONTINUANTS: INFORMATION ENTITIES ###
+rtc:PeerConnection a iao:InformationEntity ;
+   rdfs:label "WebRTC peer connection"@en ;
+   rdfs:comment "Represents a WebRTC connection between two peers."@en ;
+   skos:definition "An information artifact that encapsulates the state and configuration of a WebRTC connection."@en ;
+   skos:note "Establish, maintain, and manage peer-to-peer WebRTC connections."@en .
+rtc:SessionDescription a iao:InformationEntity ;
+   rdfs:label "WebRTC session description"@en ;
+   rdfs:comment "Describes connection parameters during WebRTC signaling."@en ;
+   skos:definition "An information entity that represents SDP configuration used in WebRTC signaling for offer/answer exchange."@en ;
+   ro:realizedIn rtc:SignalingProcess .
+rtc:IceCandidate a iao:InformationEntity ;
+   rdfs:label "WebRTC ICE candidate"@en ;
+   rdfs:comment "A potential network route used in WebRTC ICE negotiation."@en ;
+   skos:definition "An information entity representing a candidate network path discovered by the ICE agent."@en ;
+   ro:participatesIn rtc:ICENegotiationProcess .
+rtc:MediaStreamTrack a iao:InformationEntity ;
+   rdfs:label "MediaStreamTrack"@en ;
+   rdfs:comment "A single media track (audio or video) within a WebRTC session."@en ;
+   skos:definition "An information entity representing a stream of audio or video data."@en ;
+   skos:note "Transmit media data to or from a peer."@en .
+rtc:MediaPlayer a iao:InformationEntity ;
+   rdfs:label "MediaPlayer"@en ;
+   rdfs:comment "Reads media from files, webcams, or streams for use in WebRTC."@en ;
+   skos:definition "An engineered artifact that sources media for transmission."@en ;
+   ro:realizedIn rtc:MediaSourceProcess .
+
+### OCCURRENTS: PROCESSES ###
+
+# ICE Negotiation
+rtc:ICENegotiationProcess a iao:PlannedProcess ;
+   rdfs:label "ICE Negotiation Process"@en ;
+   rdfs:comment "A process for determining the optimal network route between peers."@en ;
+   skos:definition "A planned process involving the discovery and evaluation of ICE candidates for connectivity establishment."@en ;
+   ro:participatesIn rtc:IceCandidate .
+
+# Signaling
+rtc:SignalingProcess a iao:PlannedProcess ;
+   rdfs:label "Signaling Process"@en ;
+   rdfs:comment "Exchanges configuration information between peers to establish a WebRTC connection."@en ;
+   skos:definition "A planned process in which SDP offers and answers are exchanged to establish connection parameters."@en ;
+   ro:participatesIn rtc:SessionDescription .
+
+# Media Source Process
+rtc:MediaSourceProcess a iao:PlannedProcess ;
+   rdfs:label "Media Source Process"@en ;
+   rdfs:comment "The process of reading media from a source for transmission."@en ;
+   skos:definition "A planned process where media is read from files, devices, or streams for WebRTC use."@en ;
+   ro:participatesIn rtc:MediaPlayer ;
+   ro:realizes rtc:MediaStreamTrack .
+
+# Media Relay Process
+rtc:MediaRelayProcess a iao:PlannedProcess ;
+   rdfs:label "Media Relay Process"@en ;
+   rdfs:comment "Relays media from a source track to one or more consumers."@en ;
+   skos:definition "A planned process that creates proxies of media tracks for multiple simultaneous consumers."@en ;
+   ro:participatesIn rtc:MediaStreamTrack .
+
+### RELATIONS ###
+rtc:PeerConnection ro:participatesIn rtc:SignalingProcess , rtc:MediaSourceProcess .
+rtc:SessionDescription ro:participatesIn rtc:SignalingProcess .
+rtc:MediaStreamTrack ro:participatesIn rtc:MediaSourceProcess , rtc:MediaRelayProcess .
