@@ -8,7 +8,7 @@ authors = ["Adrian Figueroa <adrian.figueroa@metirionic.com>"]
 python = "^3.8"
 black = "^22.6.0"
 isort = "^5.10.1"
-pycapnp = "^1.1.1"
+pycapnp = "^2.0.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.1.3"
