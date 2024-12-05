@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 import structlog
 
-from rdflib import XSD, URIRef, Literal
+from rdflib import URIRef, Literal
 from fastapi import Request
 from starlette.datastructures import URL
 
 from bubble.mint import fresh_id
 from bubble.prfx import NT
-from bubble.util import new, select_one_row
+from bubble.util import new
 
 logger = structlog.get_logger()
 
@@ -62,7 +62,7 @@ class BlobStream:
     stream_id: URIRef
     seq: int
 
-    def append_part(self, data: bytes):
+    def write(self, data: bytes):
         """Add a part to the stream"""
         self.blob_store.append_blob(str(self.stream_id), self.seq, data)
         self.seq += 1

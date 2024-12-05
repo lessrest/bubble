@@ -64,46 +64,7 @@ nt:Surface rdfs:label "surface"@en .
 nt:WebService rdfs:label "web service"@en .
 ai:ImageModel rdfs:label "image model"@en .
 recraft:RecraftV3Style rdfs:label "Recraft v3 style"@en .
-nt:OpusPacket20ms a owl:Class ;
-   rdfs:label "20ms Opus packet"@en ;
-   rdfs:comment "a 20ms raw Opus packet"@en ;
-   rdfs:subClassOf nt:Packet .
-nt:PacketIngress a owl:Class ;
-   rdfs:label "packet ingress"@en ;
-   rdfs:comment "an ingress point for packets"@en .
-nt:hasWebSocketURI a owl:DatatypeProperty ;
-   rdfs:label "has WebSocket URI"@en ;
-   rdfs:comment "the WebSocket URI of a packet ingress"@en ;
-   rdfs:domain nt:PacketIngress ;
-   rdfs:range xsd:anyURI .
-nt:hasPacketType a owl:ObjectProperty ;
-   rdfs:label "has packet type"@en ;
-   rdfs:comment "the type of packet of a packet ingress"@en ;
-   rdfs:domain nt:PacketIngress ;
-   rdfs:range owl:Class .
-nt:AudioPacketStream a owl:Class ;
-   rdfs:label "audio packet stream"@en ;
-   rdfs:comment "an audio packet stream"@en .
-nt:wasCreatedAt a owl:DatatypeProperty ;
-   rdfs:label "was created at"@en ;
-   rdfs:comment "the timestamp something was created"@en ;
-   rdfs:domain owl:Thing ;
-   rdfs:range xsd:dateTime .
-nt:hasSampleRate a owl:DatatypeProperty ;
-   rdfs:label "has sample rate"@en ;
-   rdfs:comment "the sample rate of an audio packet stream"@en ;
-   rdfs:domain nt:AudioPacketStream ;
-   rdfs:range xsd:integer .
-nt:hasChannelCount a owl:DatatypeProperty ;
-   rdfs:label "has channel count"@en ;
-   rdfs:comment "the number of channels in an audio packet stream"@en ;
-   rdfs:domain nt:AudioPacketStream ;
-   rdfs:range xsd:integer .
-nt:hasPacketIngress a owl:ObjectProperty ;
-   rdfs:label "has packet ingress"@en ;
-   rdfs:comment "the packet ingress of an audio packet stream"@en ;
-   rdfs:domain nt:AudioPacketStream ;
-   rdfs:range nt:PacketIngress .
+
 protege:defaultLanguage rdfs:label "has default language"@en .
 obo:IAO_0000113 rdfs:label "has branch"@en .
 obo:IAO_0000114 rdfs:label "has curation status"@en .

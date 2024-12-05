@@ -1,0 +1,73 @@
+@prefix : <https://node.town/2024/> .
+@prefix ai: <https://node.town/2024/ai/#> .
+@prefix as: <http://www.w3.org/ns/activitystreams#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix iao: <http://purl.obolibrary.org/obo/iao/dev/> .
+@prefix nt: <https://node.town/2024/> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov-o#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@base <https://node.town/2024/> .
+
+nt:Continuant a owl:Class ;
+    rdfs:label "a continuant"@en ;
+    rdfs:subClassOf prov:Entity .
+
+nt:IndependentContinuant a owl:Class ;
+    rdfs:label "an independent continuant"@en ;
+    rdfs:subClassOf nt:Continuant .
+
+nt:DependentContinuant a owl:Class ;
+    rdfs:label "a dependent continuant"@en ;
+    rdfs:subClassOf nt:Continuant .
+
+nt:GenericallyDependentContinuant a owl:Class ;
+    rdfs:label "a generically dependent continuant"@en ;
+    rdfs:subClassOf nt:DependentContinuant .
+
+nt:SpecificallyDependentContinuant a owl:Class ;
+    rdfs:label "a specifically dependent continuant"@en ;
+    rdfs:subClassOf nt:DependentContinuant .
+
+nt:InformationContentEntity a owl:Class ;
+    rdfs:label "an information content entity"@en ;
+    rdfs:subClassOf nt:GenericallyDependentContinuant .
+
+nt:MaterialEntity a owl:Class ;
+    rdfs:label "a material entity"@en ;
+    rdfs:subClassOf nt:IndependentContinuant .
+
+nt:Object a owl:Class ;
+    rdfs:label "an object"@en ;
+    rdfs:subClassOf nt:MaterialEntity .
+
+nt:EngineeredObject a owl:Class ;
+    rdfs:label "an engineered object"@en ;
+    rdfs:subClassOf nt:Object .
+
+nt:Device a owl:Class ;
+    rdfs:label "a device"@en ;
+    rdfs:subClassOf nt:EngineeredObject .
+
+nt:Sensor a owl:Class ;
+    rdfs:label "a sensor"@en ;
+    rdfs:subClassOf prov:Entity .
+
+nt:Microphone a owl:Class ;
+    rdfs:label "a microphone"@en ;
+    rdfs:subClassOf nt:Sensor .
+
+nt:RecordingActivity a owl:Class ;
+    rdfs:label "an activity of recording"@en ;
+    rdfs:subClassOf prov:Activity .
+
+nt:AudioStream a owl:Class ;
+    rdfs:label "an audio stream"@en ;
+    rdfs:subClassOf prov:Entity .
+

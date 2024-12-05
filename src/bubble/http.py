@@ -1,10 +1,9 @@
-from datetime import UTC, datetime
 import pathlib
 
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from rdflib import RDF, XSD, Literal, URIRef
+from rdflib import URIRef
 import rich
 import trio
 import structlog
@@ -32,8 +31,8 @@ from bubble.html import (
 )
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, save_bubble, using_bubble
-from bubble.talk import DeepgramMessage, create_deepgram_websocket
-from bubble.util import S, get_single_subject, is_a, new, select_one_row
+from bubble.talk import handle_websocket_voice_ingress
+from bubble.util import get_single_subject, is_a
 from bubble.vars import Parameter
 
 logger = structlog.get_logger()
@@ -125,72 +124,9 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
         if is_a(entity, NT.UploadCapability):
             stream = get_single_subject(NT.hasPart, entity)
             assert isinstance(stream, URIRef)
-            await websocket_stream_upload(websocket, stream, bubble)
+            await handle_websocket_voice_ingress(websocket, stream, bubble)
         else:
             await websocket.close(code=1008, reason="No capability")
-
-
-async def websocket_stream_upload(
-    websocket, stream: URIRef, bubble: BubbleRepo
-):
-    logger.info("Stream created", stream=stream)
-
-    try:
-        handle = bubble.blob(stream, seq=0)
-
-        async with create_deepgram_websocket() as deepgram_socket:
-
-            async def forward_audio_packets():
-                while True:
-                    dat = await websocket.receive_bytes()
-                    handle.append_part(dat)
-                    await deepgram_socket.send_message(dat)
-
-            async def read_transcription_events():
-                while True:
-                    frame_data = await deepgram_socket.get_message()
-                    logger.info("Deepgram message", frame_data=frame_data)
-                    await websocket.send_text(frame_data)
-
-                    message = DeepgramMessage.model_validate_json(
-                        frame_data
-                    )
-                    if message.is_final:
-                        if (
-                            len(message.channel.alternatives) > 0
-                            and message.channel.alternatives[0].transcript
-                        ):
-                            logger.info(
-                                "Final transcription", message=message
-                            )
-                            transcription = new(
-                                NT.Transcription,
-                                {
-                                    NT.hasOffset: Literal(message.start),
-                                    NT.hasDuration: Literal(
-                                        message.duration
-                                    ),
-                                    NT.hasText: Literal(
-                                        message.channel.alternatives[
-                                            0
-                                        ].transcript
-                                    ),
-                                },
-                            )
-                            bubble.graph.add(
-                                (stream, NT.hasPart, transcription)
-                            )
-                            await save_bubble()
-
-            async with trio.open_nursery() as nursery:
-                nursery.start_soon(forward_audio_packets)
-                nursery.start_soon(read_transcription_events)
-
-    finally:
-        bubble.graph.add(
-            (stream, NT.wasClosedAt, Literal(datetime.now(UTC)))
-        )
-        await save_bubble()
 
 
 app.include_router(bubble.rdfa.router)
