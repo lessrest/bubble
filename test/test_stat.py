@@ -1,7 +1,7 @@
 import pytest
 
 from bubble.stat import gather_system_info
-from bubble.prfx import NT
+from swash.prfx import NT
 
 
 @pytest.mark.darwin

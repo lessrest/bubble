@@ -1,6 +1,6 @@
 from rdflib import Graph, URIRef
 from rdflib.graph import QuotedGraph
-from bubble import vars
+from swash import vars
 
 
 def test_graph_context():

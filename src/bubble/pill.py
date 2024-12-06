@@ -1,6 +1,6 @@
 from typing import Optional
-from bubble.html import attr, tag, html
-from bubble.html import classes as klasses
+from swash.html import attr, tag, html
+from swash.html import classes as klasses
 
 
 @html("audio-player", "w-5")

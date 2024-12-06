@@ -16,8 +16,8 @@ from rdflib.query import ResultRow
 from bubble.bash import get_shell_tool_spec, handle_shell_tool
 from bubble.repo import current_bubble
 from bubble.slop import Claude
-from bubble.util import select_rows
-from bubble.vars import graph
+from swash.util import select_rows
+from swash.vars import graph
 
 
 def join_sentences(*sentences) -> str:

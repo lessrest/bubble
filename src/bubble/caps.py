@@ -13,9 +13,9 @@ from rdflib.graph import _SubjectType
 from rdflib.query import ResultRow
 from rich.console import Console
 
-from bubble.prfx import NT
+from swash.prfx import NT
 from bubble.json import json_from_rdf
-from bubble.util import new, select_one_row
+from swash.util import add, new, select_one_row
 
 console = Console()
 
@@ -66,7 +66,7 @@ async def create_result_node(
         },
     )
     if invocation is not None:
-        new(None, {NT.result: node}, subject=invocation)
+        add(subject=invocation, properties={NT.result: node})
     return node
 
 

@@ -1,16 +1,13 @@
 # hmm
 
+from swash import prfx, mind, mint, vars
 from . import (
     boot,
     cred,
     chat,
-    mind,
-    mint,
-    prfx,
     repo,
     slop,
     util,
-    vars,
     wiki,
     stat,
     caps,

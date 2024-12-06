@@ -10,9 +10,9 @@ from rdflib import URIRef, Literal
 from fastapi import Request
 from starlette.datastructures import URL
 
-from bubble.mint import fresh_id
-from bubble.prfx import NT
-from bubble.util import new
+from swash.mint import fresh_id
+from swash.prfx import NT
+from swash.util import new
 
 logger = structlog.get_logger()
 

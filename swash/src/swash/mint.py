@@ -5,7 +5,7 @@ import secrets
 from xid import XID
 from rdflib import URIRef, Namespace
 
-from bubble.prfx import SWA
+from swash.prfx import SWA
 
 
 class Mint:

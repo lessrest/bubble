@@ -2,15 +2,15 @@ from pydantic import SecretStr
 import pytest
 from rdflib import Graph, URIRef
 
-from bubble import vars
-from bubble.prfx import NT, AI
+from swash import vars
+from swash.prfx import NT, AI
 from bubble.cred import (
     InsecureCredentialError,
     get_service_credential,
 )
 
 
-from bubble.util import NoResultsFoundError, MultipleResultsError
+from swash.util import NoResultsFoundError, MultipleResultsError
 
 
 @pytest.fixture

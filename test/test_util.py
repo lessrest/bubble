@@ -2,8 +2,8 @@ import pytest
 from rdflib import URIRef, Literal
 from rdflib.namespace import RDF
 
-from bubble.util import get_single_subject, print_n3, turtle
-from bubble import vars
+from swash.util import get_single_subject, print_n3, turtle
+from swash import vars
 
 
 @pytest.fixture

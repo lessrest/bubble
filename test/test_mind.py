@@ -10,8 +10,8 @@ import pytest
 from rdflib import URIRef
 from rdflib.namespace import RDF
 
-from bubble.mind import reason
-from bubble.util import turtle
+from swash.mind import reason
+from swash.util import turtle
 
 
 @pytest.fixture

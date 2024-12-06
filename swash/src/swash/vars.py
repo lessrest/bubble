@@ -1,19 +1,15 @@
 # A global context variable for dependency injection of the current RDF graph.
 # This enables a form of dynamic scoping where code can access the "current graph"
 # without explicitly passing it through all function calls.
+from typing import Any, Generic, TypeVar, Optional, Sequence, Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional, Sequence, Generic, TypeVar
-from rdflib import Graph, Literal
-
-
 from contextvars import ContextVar
 
-from bubble.mint import fresh_iri
+from rdflib import Graph, Literal
+from rdflib.graph import QuotedGraph, _TripleType
 
-from rdflib.graph import _TripleType, QuotedGraph
-
-from bubble.prfx import AS, NT, SWA
-
+from swash.mint import fresh_iri
+from swash.prfx import AS, NT, SWA
 
 T = TypeVar("T")
 

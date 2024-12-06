@@ -1,39 +1,34 @@
 import pathlib
 
-from contextlib import asynccontextmanager
 from typing import Annotated
+from contextlib import asynccontextmanager
 
-from rdflib import URIRef
 import rich
 import trio
 import structlog
 import hypercorn.trio
 
+from rdflib import URIRef
 from fastapi import Form, Path, Query, FastAPI, Request, Response, WebSocket
 from fastapi.responses import JSONResponse
-from fastapi.websockets import WebSocket
 from fastapi.staticfiles import StaticFiles
 
 import bubble.blob
-from bubble.blob import logger
-import bubble.html
 import bubble.opus
-from bubble.prfx import NT
 import bubble.rdfa
 
-from bubble.html import (
-    ErrorMiddleware,
+from swash.html import (
     HypermediaResponse,
     tag,
     classes,
     document,
-    log_middleware,
 )
+from swash.prfx import NT
+from swash.util import is_a, get_single_subject
+from swash.vars import Parameter
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, save_bubble, using_bubble
 from bubble.talk import handle_websocket_voice_ingress
-from bubble.util import get_single_subject, is_a
-from bubble.vars import Parameter
 
 logger = structlog.get_logger()
 
@@ -131,20 +126,12 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
 
 app.include_router(bubble.rdfa.router)
 app.include_router(bubble.opus.router)
-app.include_router(bubble.html.router)
 
 
 @app.middleware("http")
 async def context_middleware(request, call_next):
     with document():
         return await call_next(request)
-
-
-# Add error handling middleware
-app.add_middleware(ErrorMiddleware)
-
-# Add request logging
-app.middleware("http")(log_middleware)
 
 
 @app.get("/", response_class=HypermediaResponse)

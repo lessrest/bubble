@@ -1,0 +1,17 @@
+[project]
+name = "swash"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi>=0.115.5",
+    "rdflib>=8.0.0a0",
+    "structlog>=24.4.0",
+    "trio>=0.27.0",
+    "xid>=1.0.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

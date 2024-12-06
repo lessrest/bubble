@@ -7,7 +7,7 @@ import psutil
 from rdflib import XSD, Literal
 import uuid
 
-from bubble.prfx import NT
+from swash.prfx import NT
 from bubble.disk import DiskInfo, get_disk_info
 
 from typing import TypedDict

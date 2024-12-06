@@ -1,6 +1,6 @@
 import pytest
 
-from bubble.html import (
+from swash.html import (
     document,
     tag,
     text,

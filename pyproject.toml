@@ -11,9 +11,7 @@ Repository = "https://github.com/lessrest/bubble"
 name = "bubble"
 version = "0.2.0"
 description = "a Node.Town bubble server"
-authors = [
-    { name = "Mikael Brockman", email = "mikael@brockman.se" }
-]
+authors = [{ name = "Mikael Brockman", email = "mikael@brockman.se" }]
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = "==3.12.*"
 license = { file = "LICENSE.md" }
@@ -26,15 +24,7 @@ classifiers = [
     "Framework :: Trio",
     "Programming Language :: Python :: 3.12",
 ]
-keywords = [
-    "bubble",
-    "rdf",
-    "logic",
-    "llm",
-    "git",
-    "async",
-    "trio",
-]
+keywords = ["bubble", "rdf", "logic", "llm", "git", "async", "trio"]
 
 dependencies = [
     # Structured concurrency library for managing async code
@@ -76,20 +66,25 @@ dependencies = [
     "deepgram-sdk>=3.7.7",
     "trio-websocket>=0.11.1",
     "backend>=0.2.4.1",
-    "pycapnp>=2.0.0",
-    "capnp-stub-generator",
     "ipykernel>=6.29.5",
     "pip>=24.3.1",
     "cbor2>=5.6.5",
+    "swash>=0.1.0",
+    "invoke>=2.2.0",
+    "pytest>=8.3.3",
+    "pytest-httpx>=0.34.0",
+    "hypothesis>=6.119.4",
+    "pytest-xdist>=3.6.1",
+    "pytest-trio>=0.8.0",
 ]
 
 [tool.uv.sources]
 # stay current with rdflib
 rdflib = { git = "https://github.com/RDFLib/rdflib" }
-capnp-stub-generator = { workspace = true }
+swash = { workspace = true }
 
 [tool.uv.workspace]
-members = ["vendor/*"]
+members = ["swash"]
 
 [project.scripts]
 bubble = "bubble.main:app"
@@ -126,7 +121,7 @@ dev-dependencies = [
     # Code coverage measurement tool
     "coverage==7.*",
     # Used only for comment wrapping functionality
-    "autopep8==2.*",    
+    "autopep8==2.*",
 ]
 
 [tool.ruff]

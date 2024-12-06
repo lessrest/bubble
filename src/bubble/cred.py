@@ -1,9 +1,9 @@
 from pydantic import SecretStr
-from bubble.util import (
+from swash.util import (
     select_one_row,
 )
 from rdflib import Literal, URIRef
-from bubble.prfx import AI
+from swash.prfx import AI
 
 
 class CredentialError(Exception):

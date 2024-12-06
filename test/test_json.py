@@ -11,9 +11,9 @@ from bubble.json import (
     json_from_rdf,
     rdf_from_json,
 )
-from bubble.prfx import JSON
-from bubble.util import is_a, new, select_rows
-from bubble import vars
+from swash.prfx import JSON
+from swash.util import is_a, new, select_rows
+from swash import vars
 
 
 @pytest.fixture

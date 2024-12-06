@@ -6,13 +6,13 @@ from rdflib import URIRef
 from fastapi import APIRouter
 from trio_websocket import open_websocket_url
 
-from bubble.html import tag
+from swash.html import tag
 from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
-from bubble.prfx import NT
+from swash.prfx import NT
 from bubble.rdfa import rdf_resource
 from bubble.repo import current_bubble
-from bubble.util import select_rows
+from swash.util import select_rows
 
 logger = structlog.get_logger()
 

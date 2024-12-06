@@ -9,7 +9,6 @@
 
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
-from typing import Generator
 
 import structlog
 import trio
@@ -24,10 +23,10 @@ from rdflib import (
 from rdflib.graph import _SubjectType
 
 from bubble.boot import describe_new_bubble
-from bubble.mind import reason
-from bubble.prfx import NT
-from bubble.util import get_single_subject, print_n3
-from bubble import vars
+from swash.mind import reason
+from swash.prfx import NT
+from swash.util import get_single_subject, print_n3
+from swash import vars
 from bubble.blob import BlobStore, BlobStream
 
 logger = structlog.get_logger()

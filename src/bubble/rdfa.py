@@ -21,11 +21,11 @@ from rdflib import (
 import rich
 import structlog
 
-from bubble.util import P, S, select_one_row
+from swash.util import P, S
 from bubble.repo import current_bubble
 
-from bubble.prfx import NT
-from bubble.html import (
+from swash.prfx import NT
+from swash.html import (
     HypermediaResponse,
     html,
     tag,
@@ -33,7 +33,7 @@ from bubble.html import (
     text,
     classes,
 )
-from bubble import vars
+from swash import vars
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 

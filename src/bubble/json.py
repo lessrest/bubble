@@ -1,10 +1,10 @@
-from rdflib import IdentifiedNode, Literal
+from rdflib import IdentifiedNode, Literal, URIRef
 from rdflib.collection import Collection
 import structlog
-from bubble.mint import fresh_uri
-from bubble.prfx import JSON, SWA
-from bubble.util import O, S, is_a, new, select_rows
-from bubble import vars
+from swash.mint import fresh_uri
+from swash.prfx import JSON, SWA
+from swash.util import O, S, is_a, new, select_rows
+from swash import vars
 
 
 def json_from_rdf(
@@ -69,7 +69,8 @@ def rdf_from_json(
             items.append(rdf_from_json(item))
 
         collection = Collection(vars.graph.get(), fresh_uri(SWA), items)
+        assert isinstance(collection.uri, URIRef)
 
-        return new(JSON.Array, {}, collection.uri)
+        return new(JSON.Array, {}, subject=collection.uri)
     else:
         return Literal(value)

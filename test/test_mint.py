@@ -4,7 +4,7 @@ import pytest
 
 from rdflib import Namespace
 
-from bubble.mint import Mint
+from swash.mint import Mint
 
 
 @pytest.fixture

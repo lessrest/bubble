@@ -11,9 +11,9 @@ import trio
 from trio_websocket import open_websocket_url
 
 
-from bubble.prfx import NT
+from swash.prfx import NT
 from bubble.repo import BubbleRepo, save_bubble
-from bubble.util import new
+from swash.util import new
 
 logger = structlog.get_logger()
 

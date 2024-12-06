@@ -6,7 +6,9 @@ import trio
 from pydantic import SecretStr
 from rdflib import URIRef
 from bubble.cred import get_service_credential
-from bubble.prfx import AI  # You'll need to add TG namespace to prfx.py
+from swash.prfx import (
+    AI,
+)  # You'll need to add TG namespace to prfx.py
 from bubble.repo import loading_bubble_from
 import pathlib
 

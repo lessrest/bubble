@@ -1,4 +1,4 @@
-from bubble.html import tag, text
+from swash.html import tag, text
 
 import json
 from contextlib import contextmanager

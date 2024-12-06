@@ -12,10 +12,10 @@ and basic bubble metadata. The created bubble includes:
 The module uses RDF and the Notation3 format to represent all data.
 """
 
-from bubble.mint import fresh_iri
-from bubble import vars
-from bubble.prfx import AS, NT, SWA, UUID
-from bubble.util import new
+from swash.mint import fresh_iri
+from swash import vars
+from swash.prfx import AS, NT, SWA, UUID
+from swash.util import new
 from bubble.stat import gather_system_info
 
 
