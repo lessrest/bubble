@@ -3,7 +3,7 @@
 import pytest
 import uuid
 
-from bubble.disk import get_disk_info
+from bubble.stat.disk import get_disk_info
 
 
 async def test_get_disk_info_basic():

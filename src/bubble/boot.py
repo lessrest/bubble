@@ -16,7 +16,7 @@ from swash.mint import fresh_iri
 from swash import vars
 from swash.prfx import AS, NT, SWA, UUID
 from swash.util import new
-from bubble.stat import gather_system_info
+from bubble.stat.stat import gather_system_info
 
 
 from rdflib import OWL, RDFS, Graph, Literal

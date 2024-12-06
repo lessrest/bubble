@@ -5,7 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src/bubble" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/vendor/capnp-stub-generator" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/swash/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/bubble.egg-info" />
       <excludeFolder url="file://$MODULE_DIR$/htmlcov" />
       <excludeFolder url="file://$MODULE_DIR$/node_modules" />

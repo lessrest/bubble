@@ -1,20 +1,17 @@
 # hmm
 
 from swash import prfx, mind, mint, vars
+
 from . import (
     boot,
     cred,
     chat,
     repo,
     slop,
-    util,
     wiki,
-    stat,
-    caps,
-    json,
-    macs,
     main,
     http,
+    stat,
 )
 
 import rdflib.term
@@ -37,13 +34,10 @@ __all__ = [
     "prfx",
     "repo",
     "slop",
-    "util",
     "vars",
     "wiki",
     "stat",
-    "caps",
-    "json",
-    "macs",
+    "stat",
     "main",
     "http",
 ]

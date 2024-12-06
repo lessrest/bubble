@@ -8,7 +8,7 @@ from rdflib import XSD, Literal
 import uuid
 
 from swash.prfx import NT
-from bubble.disk import DiskInfo, get_disk_info
+from bubble.stat.disk import DiskInfo, get_disk_info
 
 from typing import TypedDict
 from pwd import struct_passwd
@@ -35,7 +35,7 @@ async def get_computer_serial() -> str:
     """Get computer serial number in a platform-independent way"""
     try:
         if platform.system() == "Darwin":
-            from bubble.macs import computer_serial_number
+            from bubble.stat.macs import computer_serial_number
 
             return await computer_serial_number()
         else:
@@ -62,7 +62,7 @@ async def get_machine_id() -> str:
 
         # Try reading Hardware UUID on macOS
         if platform.system() == "Darwin":
-            from bubble.macs import get_hardware_uuid
+            from bubble.stat.macs import get_hardware_uuid
 
             try:
                 return await get_hardware_uuid()

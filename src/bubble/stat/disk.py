@@ -38,7 +38,7 @@ async def get_disk_info(
     try:
         if platform.system() == "Darwin":
             # Use macOS diskutil to get proper disk info
-            from bubble.macs import get_disk_info as get_mac_disk_info
+            from bubble.stat.macs import get_disk_info as get_mac_disk_info
 
             # Find the device for this mount point
             partition = next(

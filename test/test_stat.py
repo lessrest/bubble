@@ -1,6 +1,6 @@
 import pytest
 
-from bubble.stat import gather_system_info
+from bubble.stat.stat import gather_system_info
 from swash.prfx import NT
 
 

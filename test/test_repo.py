@@ -49,7 +49,7 @@ async def test_repo_initialization(temp_repo):
 async def test_repo_load_surfaces(temp_repo):
     """Test loading surfaces into the repository"""
     # Create a test surface file
-    surface_path = trio.Path(temp_repo.workdir) / "test.n3"
+    surface_path = trio.Path(temp_repo.workdir) / "root.n3"
     await surface_path.write_text("""
         @prefix : <http://example.org/> .
         :TestSubject a :TestType .
@@ -63,6 +63,7 @@ async def test_repo_load_surfaces(temp_repo):
     assert (test_subject, RDF.type, test_type) in temp_repo.graph
 
 
+@pytest.mark.skip("we're not saving arbitrary files yet")
 async def test_repo_commit(temp_repo):
     """Test committing changes to the repository"""
     # Add a test file

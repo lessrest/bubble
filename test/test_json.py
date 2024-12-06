@@ -7,7 +7,7 @@ import hypothesis.strategies as st
 from rdflib import XSD, Graph, Literal, Variable
 from hypothesis import given
 
-from bubble.json import (
+from swash.json import (
     json_from_rdf,
     rdf_from_json,
 )

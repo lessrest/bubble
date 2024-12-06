@@ -7,8 +7,8 @@ from rdflib import RDF, BNode, Graph, IdentifiedNode, Literal, URIRef
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
+import swash.vars as vars
 from swash.mint import fresh_uri
-from swash import vars
 from swash.prfx import NT, SWA, JSON, AI
 
 S = _SubjectType

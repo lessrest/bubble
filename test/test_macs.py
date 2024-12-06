@@ -1,7 +1,7 @@
 import platform
 import pytest
 
-from bubble.macs import (
+from bubble.stat.macs import (
     disk_list,
     get_disk_info,
     computer_serial_number,

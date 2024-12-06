@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 import bubble.blob
 import bubble.opus
-import bubble.rdfa
+import swash.rdfa
 
 from swash.html import (
     HypermediaResponse,
@@ -105,7 +105,7 @@ async def create_blob_stream(
     request: Request, type: Annotated[str, Form()]
 ):
     stream = await bubble.blob.create_stream(request, URIRef(type))
-    bubble.rdfa.rdf_resource(stream)
+    swash.src.swash.rdfa.rdf_resource(stream)
     await save_bubble()
     return HypermediaResponse()
 
@@ -124,7 +124,7 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
             await websocket.close(code=1008, reason="No capability")
 
 
-app.include_router(bubble.rdfa.router)
+app.include_router(swash.rdfa.router)
 app.include_router(bubble.opus.router)
 
 

@@ -7,12 +7,12 @@ from fastapi import APIRouter
 from trio_websocket import open_websocket_url
 
 from swash.html import tag
+from swash.prfx import NT
+from swash.rdfa import rdf_resource
+from swash.util import select_rows
 from bubble.oggw import OggWriter, TimedAudioPacket
 from bubble.page import base_html, action_button
-from swash.prfx import NT
-from bubble.rdfa import rdf_resource
 from bubble.repo import current_bubble
-from swash.util import select_rows
 
 logger = structlog.get_logger()
 
