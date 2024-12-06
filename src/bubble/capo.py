@@ -1,4 +1,5 @@
 import inspect
+import uuid
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Union, Protocol
 from contextlib import asynccontextmanager
@@ -68,7 +69,8 @@ class RemoteCapability[T](CapRef[T]):
 
     async def _call_remote(self, method_name: str, params: Any):
         self.log.debug(
-            "Calling remote method",
+            "Invoking remote method",
+            connection_id=self._connection.connection_id,
             remote_method_name=method_name,
             params=params,
         )
@@ -95,7 +97,6 @@ class LocalCapability[T](CapRef[T]):
         return getattr(self._instance, name)
 
 
-# Example capability implementation:
 class ChatRoom(Protocol):
     INTERFACE_ID = 0x1234
 
@@ -107,15 +108,36 @@ class ChatRoom(Protocol):
 
 
 class ChatRoomImpl(ChatRoom):
-    def __init__(self):
+    def __init__(self, room_name: str):
         self.history = []
+        self.name = room_name
+        self.log = logger.bind(room=self.name)
 
     async def send_message(self, content: str) -> None:
-        print(f"Message received: {content}")
+        self.log.info("Message received in chat room", content=content)
         self.history.append(content)
 
     async def get_history(self):
-        return {"messages": self.history}
+        self.log.debug("Returning chat history")
+        return {"messages": self.history, "room": self.name}
+
+
+class RoomFactory(Protocol):
+    INTERFACE_ID = 0x2345
+
+    @method(INTERFACE_ID, 0)
+    async def create_room(self, name: str) -> ChatRoom: ...
+
+
+class RoomFactoryImpl(RoomFactory):
+    def __init__(self, vat: "Vat"):
+        self.vat = vat
+        self.log = logger.bind(factory="RoomFactory")
+
+    async def create_room(self, name: str) -> LocalCapability[ChatRoom]:
+        self.log.info("Creating new chat room", room_name=name)
+        chat_impl = ChatRoomImpl(name)
+        return LocalCapability(self.vat, ChatRoom, chat_impl)
 
 
 class Side(Enum):
@@ -177,12 +199,39 @@ class Vat:
     """A vat is a collection of objects and their capabilities, independent of connections."""
 
     def __init__(self):
-        self.log = logger.bind(side="server_vat")
+        self.log = logger.bind(component="vat")
         self.log.info("Creating shared vat")
         self.bootstrap_interface = None
+        self.protocol_registry: Dict[int, type] = {}
 
     def set_bootstrap_interface(self, interface: LocalCapability):
+        self.log.info(
+            "Setting bootstrap interface",
+            interface=interface._protocol.__name__,
+        )
         self.bootstrap_interface = interface
+
+    def register_protocol(self, interface_id: int, protocol: type):
+        self.log.debug(
+            "Registering protocol",
+            interface_id=hex(interface_id),
+            protocol=protocol.__name__,
+        )
+        self.protocol_registry[interface_id] = protocol
+
+    def lookup_protocol(self, interface_id: int) -> Optional[type]:
+        proto = self.protocol_registry.get(interface_id)
+        if proto:
+            self.log.debug(
+                "Protocol found",
+                interface_id=hex(interface_id),
+                protocol=proto.__name__,
+            )
+        else:
+            self.log.warning(
+                "Protocol not found", interface_id=hex(interface_id)
+            )
+        return proto
 
 
 class VatConnection:
@@ -193,7 +242,11 @@ class VatConnection:
         side: Side,
     ):
         self._vat = vat
-        self.log = logger.bind(side=side)
+        self.connection_id = str(uuid.uuid4())[:8]
+        self.side = side
+        self.log = logger.bind(
+            side=side.value, connection_id=self.connection_id
+        )
         self.log.info("Creating vat connection")
 
         self._closing = False
@@ -211,8 +264,6 @@ class VatConnection:
         self._next_question_id = 0
         self._next_export_id = 0
 
-        self.side = side
-
     async def run(self):
         self.log.info("Starting vat connection message loop")
         try:
@@ -221,48 +272,55 @@ class VatConnection:
                     message = await self.receive_message()
                 except WebSocketClosed:
                     if self._closing:
+                        self.log.info("WebSocket closed intentionally")
                         break
                     else:
-                        if self.side == Side.SERVER:
-                            if len(self.questions) == 0:
-                                self.log.info(
-                                    "client disconnected with no pending questions"
-                                )
-                                break
-                            else:
-                                raise
-                        else:
-                            raise
+                        if (
+                            self.side == Side.SERVER
+                            and len(self.questions) == 0
+                        ):
+                            self.log.info(
+                                "Client disconnected with no pending questions"
+                            )
+                            break
+                        raise
+
                 if message is None:
+                    self.log.debug("No more messages; ending loop")
                     break
+
                 msg_type = message.get("type")
-                self.log.debug("Received message", message_type=msg_type)
+                self.log.debug("Message received", message_type=msg_type)
                 await self.handle_message(message)
         except Exception as e:
-            self.log.exception("Error in message loop", error=str(e))
+            self.log.exception(
+                "Error encountered during message loop", error=str(e)
+            )
             abort = {"type": "abort", "reason": str(e)}
             await self.send_message(abort)
             raise
 
     async def close(self):
+        self.log.info("Closing vat connection")
         self._closing = True
         await self.websocket.aclose()
 
     async def bootstrap(self):
         qid = self._next_question()
         message = {"type": "bootstrap", "questionId": qid}
+        self.log.debug("Sending bootstrap request", question_id=qid)
         return await self.ask_question(message)
 
     async def call_method(self, target_id, interface_id, method_id, params):
         self.log.debug(
             "Calling remote method",
             target_id=target_id,
-            interface_id=interface_id,
+            interface_id=hex(interface_id),
             method_id=method_id,
+            params=params,
         )
         qid = self._next_question()
 
-        # Encode params including capabilities
         cap_table = []
         encoded_params = self.encode_value(params, cap_table)
 
@@ -284,20 +342,31 @@ class VatConnection:
         send_channel, receive_channel = trio.open_memory_channel(1)
         self.questions[qid] = (send_channel, receive_channel)
         await self.send_message(message)
-        self.log.debug("Waiting for call response")
+        self.log.debug("Waiting for response", question_id=qid)
         result = await receive_channel.receive()
-        self.log.debug("Call response received")
+        self.log.debug("Response received", question_id=qid)
         if isinstance(result, Exception):
+            self.log.warning(
+                "Remote returned exception",
+                question_id=qid,
+                error=str(result),
+            )
             raise result
         return result
 
     async def send_message(self, message):
-        self.log.debug("Sending message", message_type=message.get("type"))
+        msg_type = message.get("type")
+        self.log.debug("Sending message", message_type=msg_type)
         message_bytes = cbor2.dumps(message)
         await self.websocket.send_message(message_bytes)
 
     async def receive_message(self):
-        message_bytes = await self.websocket.get_message()
+        try:
+            message_bytes = await self.websocket.get_message()
+        except WebSocketClosed:
+            self.log.info("WebSocket closed during receive")
+            return None
+
         message = cbor2.loads(message_bytes)
         return message
 
@@ -305,10 +374,12 @@ class VatConnection:
         msg_type = message.get("type")
 
         if msg_type == "unimplemented":
-            pass
+            self.log.warning("Received 'unimplemented' message from remote")
+            # Not much to do here
 
         elif msg_type == "abort":
             reason = message.get("reason", "Unknown")
+            self.log.error("Remote aborted connection", reason=reason)
             raise Exception(f"Remote aborted: {reason}")
 
         elif msg_type == "bootstrap":
@@ -324,14 +395,19 @@ class VatConnection:
             await self._handle_finish(message)
 
         else:
+            self.log.warning(
+                "Received unknown message type", message_type=msg_type
+            )
             await self._send_unimplemented(message)
 
     async def _send_unimplemented(self, message):
+        self.log.debug("Sending unimplemented response")
         unimplemented = {"type": "unimplemented", "original": message}
         await self.send_message(unimplemented)
 
     async def _handle_bootstrap(self, message):
         qid = message["questionId"]
+        self.log.debug("Handling bootstrap request", question_id=qid)
         if self._vat.bootstrap_interface is None:
             self.log.warning("No bootstrap interface available")
             return_msg = {
@@ -344,19 +420,31 @@ class VatConnection:
 
         export_id = self._next_export()
         self.exports[export_id] = self._vat.bootstrap_interface
+        self.log.info("Providing bootstrap capability", export_id=export_id)
         return_msg = {
             "type": "return",
             "answerId": qid,
-            "capTable": [{"senderHosted": export_id}],
-            "results": {
-                "capRef": 0
-            },  # The bootstrap capability is the first in capTable
+            "capTable": [
+                {
+                    "senderHosted": export_id,
+                    "interfaceId": self._vat.bootstrap_interface._protocol.INTERFACE_ID,
+                }
+            ],
+            "results": {"capRef": 0},
         }
         await self.send_message(return_msg)
 
     async def _handle_call(self, message):
         qid = message["questionId"]
+        interface_id = message.get("interfaceId")
+        method_id = message.get("methodId")
         self.answers[qid] = None
+        self.log.debug(
+            "Handling call",
+            question_id=qid,
+            interface_id=hex(interface_id) if interface_id else None,
+            method_id=method_id,
+        )
         try:
             target_info = message["target"]
             if "importedCap" in target_info:
@@ -365,12 +453,8 @@ class VatConnection:
                 if target is None:
                     raise Exception("Invalid capability")
 
-                interface_id = message["interfaceId"]
-                method_id = message["methodId"]
                 cap_table = message.get("capTable", [])
                 encoded_params = message.get("params", {})
-
-                # Decode params (replace capRefs)
                 params = self.decode_value(encoded_params, cap_table)
 
                 assert isinstance(params, dict)
@@ -390,9 +474,15 @@ class VatConnection:
 
                 args = params.get("args", [])
                 kwargs = params.get("kwargs", {})
+                self.log.debug(
+                    "Invoking local method",
+                    question_id=qid,
+                    local_method_name=m.__name__,
+                    args=args,
+                    kwargs=kwargs,
+                )
                 result = await m(*args, **kwargs)
 
-                # Encode result (including capabilities)
                 result_cap_table = []
                 encoded_result = self.encode_value(result, result_cap_table)
 
@@ -408,6 +498,9 @@ class VatConnection:
                 raise Exception("Unsupported target type")
 
         except Exception as e:
+            self.log.exception(
+                "Error handling call", question_id=qid, error=str(e)
+            )
             return_msg = {
                 "type": "return",
                 "answerId": qid,
@@ -420,8 +513,12 @@ class VatConnection:
     async def _handle_return(self, message):
         answer_id = message["answerId"]
         cap_table = message.get("capTable", [])
+        self.log.debug("Handling return", answer_id=answer_id)
         channel = self.questions.get(answer_id)
         if channel is None:
+            self.log.warning(
+                "No pending question for answer", answer_id=answer_id
+            )
             return
 
         send_channel, receive_channel = channel
@@ -440,6 +537,7 @@ class VatConnection:
 
     async def _handle_finish(self, message):
         qid = message["questionId"]
+        self.log.debug("Handling finish", question_id=qid)
         if qid in self.answers:
             del self.answers[qid]
 
@@ -454,25 +552,31 @@ class VatConnection:
         return eid
 
     def export_capability(self, capability: LocalCapability) -> int:
-        export_id = self._next_export()
-        self.exports[export_id] = capability
-        return export_id
+        eid = self._next_export()
+        self.exports[eid] = capability
+        self.log.debug(
+            "Exporting capability",
+            export_id=eid,
+            protocol=capability._protocol.__name__,
+        )
+        return eid
 
-    def import_capability(
-        self, import_id: int, protocol: Optional[type] = None
-    ) -> Any:
-        # Here we assume protocol known or a default
-        # In a real system, you'd have a registry mapping interface IDs to protocol classes
+    def import_capability(self, import_id: int, interface_id: int) -> Any:
+        protocol = self._vat.lookup_protocol(interface_id)
         if protocol is None:
-            # Use a default protocol or handle differently
-            protocol = ChatRoom
+            raise Exception(
+                f"No known protocol for interface_id: {interface_id}"
+            )
         cap = RemoteCapability(self, protocol, import_id)
         self.imports[import_id] = cap
+        self.log.debug(
+            "Importing capability",
+            import_id=import_id,
+            protocol=protocol.__name__,
+        )
         return cap
 
     def encode_value(self, value, cap_table):
-        """Recursively encode values.
-        If a capability is found, export/import it and replace with {"capRef": index}."""
         if isinstance(value, dict):
             return {
                 k: self.encode_value(v, cap_table) for k, v in value.items()
@@ -482,43 +586,42 @@ class VatConnection:
         elif isinstance(value, tuple):
             return [self.encode_value(v, cap_table) for v in value]
         elif isinstance(value, LocalCapability):
-            # Export this capability
             eid = self.export_capability(value)
             index = len(cap_table)
-            cap_table.append({"senderHosted": eid})
+            cap_table.append(
+                {
+                    "senderHosted": eid,
+                    "interfaceId": value._protocol.INTERFACE_ID,
+                }
+            )
             return {"capRef": index}
         elif isinstance(value, RemoteCapability):
-            # This capability was imported from the other side; reference its import_id
             index = len(cap_table)
-            cap_table.append({"importedCap": value._import_id})
+            cap_table.append(
+                {
+                    "importedCap": value._import_id,
+                    "interfaceId": value._protocol.INTERFACE_ID,
+                }
+            )
             return {"capRef": index}
         else:
             return value
 
     def decode_value(self, value, cap_table):
-        """Recursively decode values. If {"capRef": n} is found, replace with a capability."""
         if isinstance(value, dict):
             if "capRef" in value:
                 ref_index = value["capRef"]
                 cap_entry = cap_table[ref_index]
-                # Determine if this is senderHosted or importedCap
+                interface_id = cap_entry["interfaceId"]
                 if "senderHosted" in cap_entry:
-                    # The remote side hosts this capability; we must import it
                     eid = cap_entry["senderHosted"]
-                    # Import as a remote capability
-                    return self.import_capability(eid)
+                    return self.import_capability(eid, interface_id)
                 elif "importedCap" in cap_entry:
-                    # This references a capability we previously exported and now is being sent back?
-                    # Actually, if "importedCap" is seen on decoding, that means the remote references
-                    # a capability that we originally exported or they imported from us.
-                    # For simplicity, treat it the same as senderHosted but reversed.
-                    # In a real system, you'd handle differently. Here we just import again:
                     iid = cap_entry["importedCap"]
-                    return self.import_capability(iid)
+                    return self.import_capability(iid, interface_id)
                 else:
                     raise Exception("Unknown capRef type")
             else:
-                # decode recursively
                 return {
                     k: self.decode_value(v, cap_table)
                     for k, v in value.items()
@@ -534,11 +637,16 @@ async def connect_vat(url: str):
     logger.info("Connecting to remote vat", url=url)
     async with open_websocket_url(url) as websocket:
         vat = Vat()
+        vat.register_protocol(ChatRoom.INTERFACE_ID, ChatRoom)
+        vat.register_protocol(RoomFactory.INTERFACE_ID, RoomFactory)
         connection = VatConnection(vat, websocket, Side.CLIENT)
         try:
             yield connection
         finally:
-            logger.info("Closing vat connection")
+            logger.info(
+                "Closing vat connection to remote",
+                connection_id=connection.connection_id,
+            )
             await connection.close()
 
 
@@ -546,19 +654,23 @@ async def client_example():
     async with trio.open_nursery() as nursery:
         async with connect_vat("ws://localhost:8000/ws") as connection:
             nursery.start_soon(connection.run)
-            remote_chat = await connection.bootstrap()
+            remote_factory = await connection.bootstrap()
+            if isinstance(remote_factory, RemoteCapability):
+                new_room = await remote_factory.create_room("TestRoom1")
+                await new_room.send_message("Hello from client!")
+                history = await new_room.get_history()
+                logger.info("Received chat history", history=history)
 
-            # remote_chat might contain a capRef referring to a capability in the capTable
-            # decode_value is already called for results in _handle_return
-            # so we have the real object now
-            # Assuming remote_chat is a capability
-            if isinstance(remote_chat, RemoteCapability):
-                await remote_chat.send_message("Hello from client!")
-                history = await remote_chat.get_history()
-                print(f"Chat history: {history}")
+                await trio.sleep(1)
+                another_room = await remote_factory.create_room("TestRoom2")
+                await another_room.send_message("Hello second room!")
+                history2 = await another_room.get_history()
+                logger.info(
+                    "Received second room history", history=history2
+                )
                 await trio.sleep(3)
             else:
-                print("No bootstrap capability returned.")
+                logger.warning("No bootstrap capability returned.")
 
 
 async def main():
@@ -573,8 +685,13 @@ async def main():
     app = FastAPI()
 
     vat = Vat()
-    chat_impl = ChatRoomImpl()
-    vat.set_bootstrap_interface(LocalCapability(vat, ChatRoom, chat_impl))
+    vat.register_protocol(ChatRoom.INTERFACE_ID, ChatRoom)
+    vat.register_protocol(RoomFactory.INTERFACE_ID, RoomFactory)
+
+    factory_impl = RoomFactoryImpl(vat)
+    vat.set_bootstrap_interface(
+        LocalCapability(vat, RoomFactory, factory_impl)
+    )
 
     @app.websocket("/ws")
     async def ws_endpoint(websocket: WebSocket):
