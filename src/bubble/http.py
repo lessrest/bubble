@@ -74,23 +74,20 @@ async def websocket_middleware(websocket: WebSocket, call_next):
 
 
 @app.middleware("http")
-async def bubble_graph(request: Request, call_next):
+async def bubble_context_middleware(request: Request, call_next):
     with using_bubble(request.app.state.bubble):
-        logger.info(
-            f"Using graph with {len(request.app.state.bubble.graph)} triples"
-        )
         try:
             return await call_next(request)
         finally:
             logger.info("Leaving graph context")
 
 
-@app.middleware("http")
-async def reload_ontology(request: Request, call_next):
-    repo: BubbleRepo = request.app.state.bubble
-    logger.info("Reloading ontology")
-    await repo.load_ontology()
-    return await call_next(request)
+# @app.middleware("http")
+# async def reload_ontology(request: Request, call_next):
+#     repo: BubbleRepo = request.app.state.bubble
+#     logger.info("Reloading ontology")
+#     await repo.load_ontology()
+#     return await call_next(request)
 
 
 def mount_static(app: FastAPI, directory: str, mount_path: str = "/static"):
@@ -105,7 +102,7 @@ async def create_blob_stream(
     request: Request, type: Annotated[str, Form()]
 ):
     stream = await bubble.blob.create_stream(request, URIRef(type))
-    swash.src.swash.rdfa.rdf_resource(stream)
+    swash.rdfa.rdf_resource(stream)
     await save_bubble()
     return HypermediaResponse()
 
