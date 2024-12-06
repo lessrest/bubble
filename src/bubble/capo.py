@@ -1,7 +1,6 @@
 import inspect
-
 from enum import Enum
-from typing import Any, Callable, Dict, Union, Protocol
+from typing import Any, Callable, Dict, Optional, Union, Protocol
 from contextlib import asynccontextmanager
 
 import trio
@@ -13,9 +12,7 @@ from trio_websocket import (
     WebSocketConnection as TrioWebSocket,
     ConnectionClosed as TrioConnectionClosed,
 )
-from trio_websocket import (
-    open_websocket_url,
-)
+from trio_websocket import open_websocket_url
 from starlette.websockets import (
     WebSocket as StarletteWebSocket,
     WebSocketDisconnect as StarletteConnectionClosed,
@@ -53,15 +50,16 @@ def method(interface_id: int, method_id: int) -> Callable[..., Any]:
 
 
 class RemoteCapability[T](CapRef[T]):
-    """Represents a capability hosted by another vat"""
+    """Represents a capability hosted by another vat connection"""
 
-    def __init__(self, vat: "Vat", protocol: type[T], import_id: int):
-        super().__init__(vat=vat, protocol=protocol)
+    def __init__(
+        self, connection: "VatConnection", protocol: type[T], import_id: int
+    ):
+        super().__init__(vat=connection._vat, protocol=protocol)
+        self._connection = connection
         self._import_id = import_id
 
     def __getattr__(self, name):
-        """Handle method calls by forwarding them to the remote vat"""
-
         async def call_method(*args, **kwargs):
             params = {"args": args, "kwargs": kwargs}
             return await self._call_remote(name, params)
@@ -69,18 +67,16 @@ class RemoteCapability[T](CapRef[T]):
         return call_method
 
     async def _call_remote(self, method_name: str, params: Any):
-        """Call a method on a remote capability"""
         self.log.debug(
             "Calling remote method",
             remote_method_name=method_name,
             params=params,
         )
-
         m = self._methods.get(method_name)
         if m is None:
             raise Exception(f"Unknown method: {method_name}")
 
-        return await self._vat.call_method(
+        return await self._connection.call_method(
             self._import_id,
             m._interface_id,
             m._method_id,
@@ -101,7 +97,7 @@ class LocalCapability[T](CapRef[T]):
 
 # Example capability implementation:
 class ChatRoom(Protocol):
-    INTERFACE_ID = 0x1234  # Unique ID for this interface
+    INTERFACE_ID = 0x1234
 
     @method(INTERFACE_ID, 0)
     async def send_message(self, content: str) -> None: ...
@@ -115,15 +111,11 @@ class ChatRoomImpl(ChatRoom):
         self.history = []
 
     async def send_message(self, content: str) -> None:
-        """Send a message to the chat room"""
-        # Implementation for local calls
         print(f"Message received: {content}")
         self.history.append(content)
 
     async def get_history(self):
-        """Get chat history"""
-        # Implementation for local calls
-        return {"messages": ["msg1", "msg2"]}
+        return {"messages": self.history}
 
 
 class Side(Enum):
@@ -132,20 +124,16 @@ class Side(Enum):
 
 
 class WebSocketAdapter(Protocol):
-    """Protocol for WebSocket connections"""
-
     async def send_message(self, message: bytes) -> None: ...
     async def get_message(self) -> bytes: ...
     async def aclose(self) -> None: ...
 
 
 class WebSocketClosed(Exception):
-    """Exception raised when the WebSocket is closed"""
+    pass
 
 
 class StarletteWebSocketWrapper:
-    """Wrapper for Starlette WebSocket to match our protocol"""
-
     def __init__(self, websocket: StarletteWebSocket):
         self.websocket = websocket
 
@@ -166,8 +154,6 @@ class StarletteWebSocketWrapper:
 
 
 class TrioWebSocketWrapper:
-    """Wrapper for Trio WebSocket to match our protocol"""
-
     def __init__(self, websocket: TrioWebSocket):
         self.websocket = websocket
 
@@ -188,44 +174,47 @@ class TrioWebSocketWrapper:
 
 
 class Vat:
-    """A vat is a collection of objects and their capabilities"""
+    """A vat is a collection of objects and their capabilities, independent of connections."""
 
+    def __init__(self):
+        self.log = logger.bind(side="server_vat")
+        self.log.info("Creating shared vat")
+        self.bootstrap_interface = None
+
+    def set_bootstrap_interface(self, interface: LocalCapability):
+        self.bootstrap_interface = interface
+
+
+class VatConnection:
     def __init__(
         self,
+        vat: Vat,
         websocket: Union[StarletteWebSocket, TrioWebSocket],
         side: Side,
     ):
+        self._vat = vat
         self.log = logger.bind(side=side)
-        self.log.info("Creating vat")
+        self.log.info("Creating vat connection")
 
         self._closing = False
 
-        # Wrap the websocket in appropriate adapter
         if isinstance(websocket, StarletteWebSocket):
             self.websocket = StarletteWebSocketWrapper(websocket)
-            self.log.debug("Using Starlette WebSocket")
         else:
             self.websocket = TrioWebSocketWrapper(websocket)
-            self.log.debug("Using Trio WebSocket")
 
-        # The four tables from the RPC protocol
-        self.questions = {}  # QuestionId -> (SendChannel, ReceiveChannel)
-        self.answers = {}  # AnswerId -> Interface
-        self.exports = {}  # ExportId -> Interface
-        self.imports = {}  # ImportId -> Interface
+        self.questions = {}
+        self.answers = {}
+        self.exports = {}  # export_id -> LocalCapability
+        self.imports = {}  # import_id -> RemoteCapability
 
-        # Counter for generating new IDs
         self._next_question_id = 0
         self._next_export_id = 0
 
         self.side = side
 
-        # Bootstrap interface for this vat
-        self.bootstrap_interface = None
-
     async def run(self):
-        """Main message loop"""
-        self.log.info("Starting vat message loop")
+        self.log.info("Starting vat connection message loop")
         try:
             while True:
                 try:
@@ -243,8 +232,6 @@ class Vat:
                             else:
                                 raise
                         else:
-                            # we're the client, so the server
-                            # closing the connection is an error
                             raise
                 if message is None:
                     break
@@ -258,20 +245,15 @@ class Vat:
             raise
 
     async def close(self):
-        """Clean up the vat"""
         self._closing = True
-
-        # Close websocket
         await self.websocket.aclose()
 
     async def bootstrap(self):
-        """Get the bootstrap interface from the remote vat"""
         qid = self._next_question()
         message = {"type": "bootstrap", "questionId": qid}
         return await self.ask_question(message)
 
     async def call_method(self, target_id, interface_id, method_id, params):
-        """Make an outgoing method call"""
         self.log.debug(
             "Calling remote method",
             target_id=target_id,
@@ -279,14 +261,21 @@ class Vat:
             method_id=method_id,
         )
         qid = self._next_question()
+
+        # Encode params including capabilities
+        cap_table = []
+        encoded_params = self.encode_value(params, cap_table)
+
         message = {
             "type": "call",
             "questionId": qid,
             "target": {"importedCap": target_id},
             "interfaceId": interface_id,
             "methodId": method_id,
-            "params": params,
+            "params": encoded_params,
         }
+        if cap_table:
+            message["capTable"] = cap_table
 
         return await self.ask_question(message)
 
@@ -303,24 +292,16 @@ class Vat:
         return result
 
     async def send_message(self, message):
-        """Send a message over the websocket"""
         self.log.debug("Sending message", message_type=message.get("type"))
         message_bytes = cbor2.dumps(message)
         await self.websocket.send_message(message_bytes)
 
     async def receive_message(self):
-        """Receive a message from the websocket"""
         message_bytes = await self.websocket.get_message()
         message = cbor2.loads(message_bytes)
         return message
 
-    def set_bootstrap_interface(self, interface):
-        """Set the bootstrap interface for this vat"""
-        self.bootstrap_interface = interface
-
     async def handle_message(self, message):
-        """Handle an incoming RPC message"""
-
         msg_type = message.get("type")
 
         if msg_type == "unimplemented":
@@ -343,21 +324,15 @@ class Vat:
             await self._handle_finish(message)
 
         else:
-            # Send unimplemented in response
             await self._send_unimplemented(message)
 
     async def _send_unimplemented(self, message):
-        """Send an unimplemented message in response to an unsupported message"""
         unimplemented = {"type": "unimplemented", "original": message}
         await self.send_message(unimplemented)
 
     async def _handle_bootstrap(self, message):
-        """Handle a bootstrap message"""
         qid = message["questionId"]
-        self.log.debug(
-            "Handling bootstrap request", question_id=qid, msg=message
-        )
-        if self.bootstrap_interface is None:
+        if self._vat.bootstrap_interface is None:
             self.log.warning("No bootstrap interface available")
             return_msg = {
                 "type": "return",
@@ -367,21 +342,19 @@ class Vat:
             await self.send_message(return_msg)
             return
 
-        # Export the bootstrap interface
         export_id = self._next_export()
-        self.exports[export_id] = self.bootstrap_interface
-
-        # Return the capability
+        self.exports[export_id] = self._vat.bootstrap_interface
         return_msg = {
             "type": "return",
             "answerId": qid,
-            "results": {"capTable": [{"senderHosted": export_id}]},
+            "capTable": [{"senderHosted": export_id}],
+            "results": {
+                "capRef": 0
+            },  # The bootstrap capability is the first in capTable
         }
         await self.send_message(return_msg)
 
     async def _handle_call(self, message):
-        """Handle a method call"""
-        self.log.debug("Handling call", msg=message)
         qid = message["questionId"]
         self.answers[qid] = None
         try:
@@ -394,14 +367,20 @@ class Vat:
 
                 interface_id = message["interfaceId"]
                 method_id = message["methodId"]
-                params = message.get("params", {})
+                cap_table = message.get("capTable", [])
+                encoded_params = message.get("params", {})
+
+                # Decode params (replace capRefs)
+                params = self.decode_value(encoded_params, cap_table)
+
+                assert isinstance(params, dict)
 
                 # Find the method
                 m = None
-                for name, m in target._methods.items():
+                for name, meth in target._methods.items():
                     if (
-                        m._method_id == method_id
-                        and m._interface_id == interface_id
+                        meth._method_id == method_id
+                        and meth._interface_id == interface_id
                     ):
                         m = getattr(target, name)
                         break
@@ -409,24 +388,26 @@ class Vat:
                 if m is None:
                     raise Exception(f"Method {method_id} not found")
 
-                # Call the method (unpack params from dict)
-                # We assumed params as {"args": [...], "kwargs": {...}}
                 args = params.get("args", [])
                 kwargs = params.get("kwargs", {})
                 result = await m(*args, **kwargs)
 
-                # Send successful return
+                # Encode result (including capabilities)
+                result_cap_table = []
+                encoded_result = self.encode_value(result, result_cap_table)
+
                 return_msg = {
                     "type": "return",
                     "answerId": qid,
-                    "results": result,
+                    "results": encoded_result,
                 }
+                if result_cap_table:
+                    return_msg["capTable"] = result_cap_table
                 await self.send_message(return_msg)
             else:
                 raise Exception("Unsupported target type")
 
         except Exception as e:
-            # Send error return
             return_msg = {
                 "type": "return",
                 "answerId": qid,
@@ -437,18 +418,19 @@ class Vat:
             del self.answers[qid]
 
     async def _handle_return(self, message):
-        """Handle a return message"""
         answer_id = message["answerId"]
-        self.log.debug("Handling return", answer_id=answer_id)
+        cap_table = message.get("capTable", [])
         channel = self.questions.get(answer_id)
         if channel is None:
             return
 
         send_channel, receive_channel = channel
 
-        # Send result or exception through channel
         if "results" in message:
-            await send_channel.send(message["results"])
+            decoded_results = self.decode_value(
+                message["results"], cap_table
+            )
+            await send_channel.send(decoded_results)
         elif "exception" in message:
             await send_channel.send(
                 Exception(message["exception"]["reason"])
@@ -457,79 +439,122 @@ class Vat:
         del self.questions[answer_id]
 
     async def _handle_finish(self, message):
-        """Handle a finish message"""
         qid = message["questionId"]
         if qid in self.answers:
             del self.answers[qid]
 
     def _next_question(self):
-        """Get the next available question ID"""
         qid = self._next_question_id
         self._next_question_id += 1
         return qid
 
     def _next_export(self):
-        """Get the next available export ID"""
         eid = self._next_export_id
         self._next_export_id += 1
         return eid
 
     def export_capability(self, capability: LocalCapability) -> int:
-        """Export a capability to be used by other vats"""
         export_id = self._next_export()
-        self.log.debug(
-            "Exporting capability",
-            export_id=export_id,
-            capability_type=type(capability).__name__,
-        )
-        capability._vat = self
         self.exports[export_id] = capability
         return export_id
 
-    def import_capability[T](self, import_id: int, protocol: type[T]) -> Any:
-        """Import a capability from another vat"""
-        self.log.debug(
-            "Importing capability",
-            import_id=import_id,
-            interface_class=protocol.__name__,
-        )
+    def import_capability(
+        self, import_id: int, protocol: Optional[type] = None
+    ) -> Any:
+        # Here we assume protocol known or a default
+        # In a real system, you'd have a registry mapping interface IDs to protocol classes
+        if protocol is None:
+            # Use a default protocol or handle differently
+            protocol = ChatRoom
         cap = RemoteCapability(self, protocol, import_id)
         self.imports[import_id] = cap
         return cap
 
+    def encode_value(self, value, cap_table):
+        """Recursively encode values.
+        If a capability is found, export/import it and replace with {"capRef": index}."""
+        if isinstance(value, dict):
+            return {
+                k: self.encode_value(v, cap_table) for k, v in value.items()
+            }
+        elif isinstance(value, list):
+            return [self.encode_value(v, cap_table) for v in value]
+        elif isinstance(value, tuple):
+            return [self.encode_value(v, cap_table) for v in value]
+        elif isinstance(value, LocalCapability):
+            # Export this capability
+            eid = self.export_capability(value)
+            index = len(cap_table)
+            cap_table.append({"senderHosted": eid})
+            return {"capRef": index}
+        elif isinstance(value, RemoteCapability):
+            # This capability was imported from the other side; reference its import_id
+            index = len(cap_table)
+            cap_table.append({"importedCap": value._import_id})
+            return {"capRef": index}
+        else:
+            return value
+
+    def decode_value(self, value, cap_table):
+        """Recursively decode values. If {"capRef": n} is found, replace with a capability."""
+        if isinstance(value, dict):
+            if "capRef" in value:
+                ref_index = value["capRef"]
+                cap_entry = cap_table[ref_index]
+                # Determine if this is senderHosted or importedCap
+                if "senderHosted" in cap_entry:
+                    # The remote side hosts this capability; we must import it
+                    eid = cap_entry["senderHosted"]
+                    # Import as a remote capability
+                    return self.import_capability(eid)
+                elif "importedCap" in cap_entry:
+                    # This references a capability we previously exported and now is being sent back?
+                    # Actually, if "importedCap" is seen on decoding, that means the remote references
+                    # a capability that we originally exported or they imported from us.
+                    # For simplicity, treat it the same as senderHosted but reversed.
+                    # In a real system, you'd handle differently. Here we just import again:
+                    iid = cap_entry["importedCap"]
+                    return self.import_capability(iid)
+                else:
+                    raise Exception("Unknown capRef type")
+            else:
+                # decode recursively
+                return {
+                    k: self.decode_value(v, cap_table)
+                    for k, v in value.items()
+                }
+        elif isinstance(value, list):
+            return [self.decode_value(v, cap_table) for v in value]
+        else:
+            return value
+
 
 @asynccontextmanager
 async def connect_vat(url: str):
-    """Connect to a remote vat as a client"""
     logger.info("Connecting to remote vat", url=url)
     async with open_websocket_url(url) as websocket:
-        vat = Vat(websocket, Side.CLIENT)
+        vat = Vat()
+        connection = VatConnection(vat, websocket, Side.CLIENT)
         try:
-            yield vat
+            yield connection
         finally:
             logger.info("Closing vat connection")
-            await vat.close()
+            await connection.close()
 
 
 async def client_example():
-    """Example of using a vat as a client"""
     async with trio.open_nursery() as nursery:
-        async with connect_vat("ws://localhost:8000/ws") as vat:
-            nursery.start_soon(vat.run)
+        async with connect_vat("ws://localhost:8000/ws") as connection:
+            nursery.start_soon(connection.run)
+            remote_chat = await connection.bootstrap()
 
-            # Get the remote chat room capability
-            remote_chat = await vat.bootstrap()
-
-            # Assuming remote_chat is something like {"capTable": [{"senderHosted": <exportId>}]}
-            # We would then import that capability using vat.import_capability:
-            if (
-                "capTable" in remote_chat
-                and len(remote_chat["capTable"]) > 0
-            ):
-                import_id = remote_chat["capTable"][0]["senderHosted"]
-                chat_cap = vat.import_capability(import_id, ChatRoom)
-                await chat_cap.send_message("Hello from client!")
-                history = await chat_cap.get_history()
+            # remote_chat might contain a capRef referring to a capability in the capTable
+            # decode_value is already called for results in _handle_return
+            # so we have the real object now
+            # Assuming remote_chat is a capability
+            if isinstance(remote_chat, RemoteCapability):
+                await remote_chat.send_message("Hello from client!")
+                history = await remote_chat.get_history()
                 print(f"Chat history: {history}")
                 await trio.sleep(3)
             else:
@@ -543,21 +568,21 @@ async def main():
         await client_example()
         return
 
-    # Server code
     from fastapi import FastAPI
 
     app = FastAPI()
 
+    vat = Vat()
+    chat_impl = ChatRoomImpl()
+    vat.set_bootstrap_interface(LocalCapability(vat, ChatRoom, chat_impl))
+
     @app.websocket("/ws")
-    async def ws(websocket: WebSocket):
-        await websocket.accept()  # Need to accept the connection first
-        vat = Vat(websocket, Side.SERVER)
-        chat = ChatRoomImpl()
-        vat.set_bootstrap_interface(LocalCapability(vat, ChatRoom, chat))
-        await vat.run()
+    async def ws_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        connection = VatConnection(vat, websocket, Side.SERVER)
+        await connection.run()
 
     import hypercorn
-
     from hypercorn.trio import serve
 
     config = hypercorn.Config()
