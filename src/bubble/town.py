@@ -19,10 +19,10 @@ from swash import mint
 
 import structlog
 from bubble.logs import configure_logging
+from bubble.cert import generate_self_signed_cert, create_ssl_context
 
 # At the start of your application:
 configure_logging(colors=sys.stderr.isatty())
-
 logger = structlog.get_logger()
 
 
@@ -32,7 +32,7 @@ class Town:
     def __init__(self, base_url: str):
         self.actors = {}
         self.base_url = base_url
-        logger.info("initialized town", base_url=base_url)
+        logger.info("initialized town", base=base_url)
 
     @asynccontextmanager
     async def spawn(
@@ -56,49 +56,64 @@ async def serve(app: Starlette, config: hypercorn.Config) -> None:
 
 
 async def new_town(base_url: str, bind: str):
-    # First create a bootstrap app to verify the base URL
-    async def did_document(request):
-        did = f"did:web:{base_url.removeprefix('https://')}"
-        logger.info("responding to DID document request", did=did)
-        return JSONResponse(
-            {
-                "@context": ["https://www.w3.org/ns/did/v1"],
-                "id": did,
-                "verificationMethod": [],
-                "service": [
-                    {
-                        "id": "#ws",
-                        "type": "WebSocketEndpoint",
-                        "serviceEndpoint": base_url.replace(
-                            "https://", "wss://"
-                        ),
-                    }
-                ],
-            }
+    # Enforce HTTPS
+    if not base_url.startswith("https://"):
+        logger.error(
+            "base URL must start with https:// to enable TLS",
+            base=base_url,
         )
+        raise ValueError("base_url must use HTTPS")
+
+    async def did_document(request):
+        did = (
+            f"did:web:{base_url.removeprefix('https://').removesuffix('/')}"
+        )
+        document = {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": did,
+            "verificationMethod": [],
+        }
+        logger.info("responding to DID document request", document=document)
+        return JSONResponse(document)
+
+    @asynccontextmanager
+    async def bootstrap_lifespan(self):
+        logger.info("starting base URL verification server")
+        try:
+            yield
+        finally:
+            logger.info("stopping base URL verification server")
 
     bootstrap_app = Starlette(
-        routes=[Route("/.well-known/did.json", did_document)]
+        routes=[Route("/.well-known/did.json", did_document)],
+        lifespan=bootstrap_lifespan,
     )
 
-    logger.info("starting base URL verification server", bind=bind)
+    # Generate a self-signed certificate if you do not have one
+    hostname = base_url.replace("https://", "").rstrip("/")
+    cert_path, key_path = generate_self_signed_cert(hostname)
+
     async with trio.open_nursery() as nursery:
         config = hypercorn.Config()
         config.bind = [bind]
-        config.log.error_logger = logger.bind()
+        config.log.error_logger = logger.bind(name="hypercorn.error")
+        config.certfile = cert_path
+        config.keyfile = key_path
 
+        # Verify we can serve HTTPS with self-signed certificate
         nursery.start_soon(serve, bootstrap_app, config)
 
         # Verify we can reach our own DID document
         try:
-            http_url = base_url.replace("wss://", "https://")
             logger.info(
                 "verifying control over base URL",
-                url=f"{http_url}/.well-known/did.json",
+                url=f"{base_url}/.well-known/did.json",
             )
-            async with httpx.AsyncClient() as client:
+            # We'll need to allow self-signed cert verification
+            ssl_context = create_ssl_context(cert_path, key_path)
+            async with httpx.AsyncClient(verify=ssl_context) as client:
                 response = await client.get(
-                    f"{http_url}/.well-known/did.json"
+                    f"{base_url}/.well-known/did.json"
                 )
                 response.raise_for_status()
             logger.info("successfully verified control over base URL")

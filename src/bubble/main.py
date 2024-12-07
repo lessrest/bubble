@@ -1,4 +1,5 @@
 import pathlib
+from urllib.parse import urlparse
 
 import hypercorn
 import hypercorn.trio
@@ -14,6 +15,7 @@ from bubble.cred import get_anthropic_credential
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.logs import configure_logging
+from bubble.cert import generate_self_signed_cert
 
 
 console = Console(width=80)
@@ -48,11 +50,21 @@ def chat(
 def server(
     bubble_path: str = BubblePath,
     bind: str = Option("127.0.0.1:2024", "--bind", help="Bind address"),
+    base_url: str = Option(
+        "https://localhost:2024", "--base-url", help="Public base URL"
+    ),
 ) -> None:
     """Serve the Bubble web interface."""
 
     config = hypercorn.Config()
     config.bind = [bind]
+
+    if base_url.startswith("https://"):
+        hostname = urlparse(base_url).hostname
+        if hostname:
+            cert_path, key_path = generate_self_signed_cert(hostname)
+            config.certfile = cert_path
+            config.keyfile = key_path
 
     async def run():
         with bubble.http.bubble_path.bind(bubble_path):
@@ -65,17 +77,23 @@ def server(
 def town(
     bind: str = Option("127.0.0.1:2025", "--bind", help="Bind address"),
     base_url: str = Option(
-        "http://localhost:2025", "--base-url", help="Public base URL"
+        "https://localhost:2025", "--base-url", help="Public base URL"
     ),
 ) -> None:
     """Serve the Town websocket interface."""
     from bubble.town import new_town
 
-    logger = configure_logging()
-    logger.info("starting", bind=bind, base_url=base_url)
-
     config = hypercorn.Config()
     config.bind = [bind]
+    logger = configure_logging()
+    config.log.error_logger = logger.bind(name="hypercorn.error")  # type: ignore
+
+    if base_url.startswith("https://"):
+        hostname = urlparse(base_url).hostname
+        if hostname:
+            cert_path, key_path = generate_self_signed_cert(hostname)
+            config.certfile = cert_path
+            config.keyfile = key_path
 
     async def run():
         app = await new_town(base_url, bind)
