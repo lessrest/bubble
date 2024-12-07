@@ -85,7 +85,7 @@ async def new_town(base_url: str, bind: str):
     async with trio.open_nursery() as nursery:
         config = hypercorn.Config()
         config.bind = [bind]
-        config.log.error_logger = logger.bind(name="http")
+        config.log.error_logger = logger.bind()
 
         nursery.start_soon(serve, bootstrap_app, config)
 
@@ -102,16 +102,28 @@ async def new_town(base_url: str, bind: str):
                 )
                 response.raise_for_status()
             logger.info("successfully verified control over base URL")
+
         except Exception as e:
             logger.error(
                 "failed to verify control over base URL", error=str(e)
             )
             raise RuntimeError(f"Failed to verify base URL {base_url}: {e}")
+        finally:
+            nursery.cancel_scope.cancel()
 
     # Now create the main town and websocket app
     town = Town(base_url)
 
     async def app(scope: Scope, receive: Receive, send: Send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+                elif message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+
         # Handle DID document requests
         if (
             scope["type"] == "http"

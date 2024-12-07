@@ -1,9 +1,14 @@
 import logging
 from typing import Any, Optional
 
-from rich.console import Console
+from rich.console import Console, RenderableType
 from rich.panel import Panel
+from rich.table import Table
 from rich.theme import Theme
+from rich.padding import Padding
+from rich.columns import Columns
+from rich.text import Text
+from rich.containers import Renderables
 
 import structlog
 
@@ -17,8 +22,11 @@ THEME = Theme(
         "debug": "cyan",
         "timestamp": "dim magenta",
         "actor": "green",
-        "event": "white",
+        "event": "white bold",
         "dim": "dim white",
+        "file": "cyan",
+        "module": "cyan",
+        "field_key": "dim blue",
     }
 )
 
@@ -33,14 +41,7 @@ class RichConsoleRenderer:
         level_styles: Optional[dict[str, str]] = None,
         show_timestamp: bool = True,
     ):
-        """Initialize the renderer.
-
-        Args:
-            console: Optional Rich console instance to use
-            colors: Whether to use colors
-            level_styles: Custom styles for different log levels
-            show_timestamp: Whether to show timestamps
-        """
+        """Initialize the renderer."""
         self._console = console or Console(
             theme=THEME, force_terminal=colors
         )
@@ -54,67 +55,102 @@ class RichConsoleRenderer:
         }
         self._show_timestamp = show_timestamp
 
-    def __call__(
-        self, logger: Any, name: str, event_dict: dict[str, Any]
-    ) -> str:
-        """Render the log entry using Rich.
+    def _create_header(
+        self, timestamp: str, name: str, file_location: Text, event: str
+    ) -> Columns:
+        """Create the main log header line with consistent spacing."""
+        parts: list[RenderableType] = []
 
-        Args:
-            logger: The logger instance
-            name: The name of the log method (e.g. 'info', 'error')
-            event_dict: The structured log entry
-
-        Returns:
-            The rendered string (though with Rich this is handled by the Console)
-        """
-        # Extract main components
-        timestamp = event_dict.pop("timestamp", "")
-        event = event_dict.pop("event", "")
-
-        # Create the main line components
-        components = []
+        # Timestamp and level in fixed-width format
         if self._show_timestamp and timestamp:
-            components.append(f"[timestamp]{timestamp}[/timestamp]")
+            parts.append(Text(timestamp, style="timestamp", justify="left"))
 
-        # Add log level with appropriate style
         level_style = self._level_styles.get(name, "info")
-        components.append(f" [{level_style}]{name}[/{level_style}]")
+        parts.append(Text(name, style=level_style, justify="left"))
 
-        # Add the event
-        components.append(f": [event]{event}[/event]")
+        # Add file location if present
+        if file_location:
+            parts.append(file_location)
 
-        # Create the main line
-        main_line = "".join(components)
+        # Add event
+        parts.append(Text(f": {event}", style="event", justify="left"))
 
-        # Format remaining fields
-        field_lines = []
+        return Columns(parts, equal=False, expand=False, padding=(0, 1))
+
+    def _create_fields_table(self, event_dict: dict[str, Any]) -> Table:
+        """Create a table for the additional fields."""
+        table = Table(
+            show_header=False,
+            show_lines=False,
+            pad_edge=False,
+            box=None,
+            padding=(0, 2, 0, 2),
+        )
+
+        table.add_column(
+            "Key", style="field_key", justify="right", min_width=12
+        )
+        table.add_column("Value", style="white", ratio=1)
+
         for key, value in sorted(event_dict.items()):
             if key == "level":
                 continue
             if key == "actor":
-                field_lines.append(f"  {key:>12} = [actor]{value}[/actor]")
+                table.add_row(key, Text(str(value), style="actor"))
             else:
-                # Indent other fields and style them
-                field_lines.append(f"  {key:>12} = [white]{value}[/white]")
+                table.add_row(key, str(value))
 
-        # Combine all lines
-        all_lines = (
-            [main_line] + field_lines if field_lines else [main_line]
-        )
-        content = "\n".join(all_lines)
+        return table
 
-        # For errors and warnings, wrap in a panel
+    def __call__(
+        self, logger: Any, name: str, event_dict: dict[str, Any]
+    ) -> str:
+        """Render the log entry using Rich."""
+        # Extract main components
+        timestamp = event_dict.pop("timestamp", "")
+        event = event_dict.pop("event", "")
+
+        # Extract and format filename/lineno/module
+        filename = event_dict.pop("filename", None)
+        lineno = event_dict.pop("lineno", None)
+        module = event_dict.pop("module", None)
+
+        # Create file location text
+        file_location = Text("")
+        if filename and lineno:
+            file_location.append(f"{filename}:{lineno}", style="file")
+        if module:
+            if file_location:
+                file_location.append(" ")
+            file_location.append(f"{module}", style="module")
+
+        # Create header
+        header = self._create_header(timestamp, name, file_location, event)
+
+        # Build the complete renderable
+        elements: list[RenderableType] = [header]
+
+        # Add fields table if we have additional fields
+        if event_dict:
+            fields_table = self._create_fields_table(event_dict)
+            elements.append(Padding(fields_table, (0, 0, 0, 4)))
+
+        # Combine all elements
+        content = Renderables(elements)
+
+        # For errors and warnings, wrap in a panel with appropriate styling
         if name in ("error", "critical", "warning"):
             panel = Panel(
                 content,
                 border_style=self._level_styles[name],
                 padding=(0, 1),
+                title=name.upper(),
+                title_align="left",
             )
             self._console.print(panel)
         else:
             self._console.print(content)
 
-        # Return empty string since we handled the printing
         return ""
 
 
@@ -126,6 +162,13 @@ def configure_logging(colors: bool = True) -> structlog.stdlib.BoundLogger:
     """
     processors = [
         structlog.processors.add_log_level,
+        structlog.processors.CallsiteParameterAdder(
+            [
+                structlog.processors.CallsiteParameter.FILENAME,
+                structlog.processors.CallsiteParameter.LINENO,
+                structlog.processors.CallsiteParameter.MODULE,
+            ]
+        ),
         structlog.processors.TimeStamper(fmt="%H:%M:%S"),
         RichConsoleRenderer(colors=colors),
     ]
