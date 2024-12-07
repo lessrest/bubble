@@ -1,6 +1,5 @@
 import sys
-import traceback
-from typing import AsyncGenerator, Tuple, Callable, Awaitable
+from typing import Callable, Awaitable
 from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl
 
@@ -66,35 +65,31 @@ class ActorContext:
     def __init__(
         self,
         actor: URIRef,
-        recv_chan: ReceiveChannel,
-        send_func: Callable[[URIRef, dict], Awaitable[None]],
+        receiver: ReceiveChannel,
+        send_message: Callable[[URIRef, dict], Awaitable[None]],
         nursery: trio.Nursery,
-        spawn_actor_func: Callable[
-            [trio.Nursery, Callable, ...], Awaitable[URIRef]
-        ],
+        spawn: Callable[[trio.Nursery, Callable, ...], Awaitable[URIRef]],
     ):
         self.actor = actor
-        self.recv_chan = recv_chan
-        self.send_func = send_func
+        self.receiver = receiver
+        self.send_message = send_message
         self.nursery = nursery
-        self._spawn_actor = spawn_actor_func
+        self.spawn = spawn
         self.logger = structlog.get_logger().bind(actor=actor)
 
     async def send(self, target: URIRef, message: dict):
         """Helper method to send a message to another actor"""
-        await self.send_func(target, message)
+        await self.send_message(target, message)
 
     async def receive(self):
         """Helper method to receive the next message"""
-        return await self.recv_chan.receive()
+        return await self.receiver.receive()
 
     async def spawn_child(
         self, actor_type: Callable, *args, **kwargs
     ) -> URIRef:
         """Spawn a child actor in this actor's nursery"""
-        return await self._spawn_actor(
-            self.nursery, actor_type, *args, **kwargs
-        )
+        return await self.spawn(self.nursery, actor_type, *args, **kwargs)
 
 
 class Town:
@@ -119,9 +114,9 @@ class Town:
         """Helper method to create a new actor with channels"""
         actor = mint.fresh_uri(Namespace(f"{self.base_url}/"))
         logger.info("spawning new actor", actor=actor)
-        send_chan, recv_chan = trio.open_memory_channel(10)
-        self.actors[actor] = send_chan
-        return actor, recv_chan, send_chan
+        sender, receiver = trio.open_memory_channel(10)
+        self.actors[actor] = sender
+        return actor, receiver, sender
 
     async def _send_message(self, target_actor: URIRef, message: dict):
         """Helper method to send messages between actors"""
@@ -136,11 +131,11 @@ class Town:
     async def spawn_actor(
         self, nursery: trio.Nursery, actor_type: Callable, *args, **kwargs
     ) -> URIRef:
-        actor, recv_chan, _ = self._create_actor()
+        actor, receiver, _ = self._create_actor()
 
         context = ActorContext(
             actor,
-            recv_chan,
+            receiver,
             self._send_message,
             nursery,
             self.spawn_actor,
@@ -149,6 +144,22 @@ class Town:
         nursery.start_soon(actor_type, context, *args, **kwargs)
 
         return actor
+
+    async def run_actor(self, actor_type: Callable, *args, **kwargs):
+        async with trio.open_nursery() as nursery:
+            actor, receiver, _ = self._create_actor()
+            context = ActorContext(
+                actor,
+                receiver,
+                self._send_message,
+                nursery,
+                self.spawn_actor,
+            )
+            try:
+                await actor_type(context, *args, **kwargs)
+            finally:
+                logger.info("actor completed", actor=actor)
+                del self.actors[actor]
 
 
 async def serve_app(app: Starlette, config: hypercorn.Config) -> None:
@@ -354,15 +365,8 @@ async def filesystem_actor(
 
     entries: dict[str, URIRef] = {}
 
-    # Pre-spawn actors for each entry in the directory
-    async def spawn_entry(entry: trio.Path) -> URIRef:
-        # We'll spawn either a file_actor or another filesystem_actor
-        child_actor = await this.spawn_child(file_actor, entry)
-        return child_actor
-
     for entry in await directory.iterdir():
-        # Spawn an actor for each entry
-        child_actor = await spawn_entry(entry)
+        child_actor = await this.spawn_child(file_actor, entry)
         entries[entry.name] = child_actor
 
     # Now run the main loop to handle requests
@@ -464,8 +468,10 @@ async def main_app(
     if scope["type"] == "lifespan":
         try:
             async with trio.open_nursery() as nursery:
-                root_ctx = await town.spawn_actor(nursery, root_actor)
-                directory = trio.Path(".")
+                await town.spawn_actor(nursery, root_actor)
+                await town.spawn_actor(
+                    nursery, filesystem_actor, trio.Path(".")
+                )
 
                 while True:
                     message = await receive()
@@ -502,54 +508,56 @@ async def main_app(
                 # Read the request body
                 body = await get_request_body(receive)
 
-                async with trio.open_nursery() as nursery:
-                    async with town.using_actor(nursery) as response_ctx:
-                        request_data = HttpRequestData(
-                            method=method,
-                            headers=headers,
-                            path=path,
-                            query_params=query_params,
-                            body=body,
-                        )
-                        request_model = HttpRequestWithResponseCapability(
-                            request=request_data,
-                            response=response_ctx.actor,
-                        )
+                async def response_actor(this: ActorContext):
+                    request_data = HttpRequestData(
+                        method=method,
+                        headers=headers,
+                        path=path,
+                        query_params=query_params,
+                        body=body,
+                    )
+                    request_model = HttpRequestWithResponseCapability(
+                        request=request_data,
+                        response=this.actor,
+                    )
 
-                        # Send the request structure to the target actor's mailbox
-                        await town.actors[actor].send(
-                            request_model.model_dump()
+                    # Send the request structure to the target actor's mailbox
+                    await town.actors[actor].send(
+                        request_model.model_dump()
+                    )
+
+                    # Wait for the response
+                    response_model = await this.receive()
+                    try:
+                        response_data = HttpResponseData.model_validate(
+                            response_model
                         )
-
-                        # Wait for the response
-                        response_model = await response_ctx.receive()
-                        try:
-                            response_data = HttpResponseData.model_validate(
-                                response_model
-                            )
-                            response_ctx.logger.info(
-                                "response received by actor",
-                                response=response_data,
-                            )
-                        except Exception:
-                            response_ctx.logger.warning(
-                                "invalid response received by actor",
-                                response=response_model,
-                            )
-                            response_data = HttpResponseData(
-                                status=500,
-                                headers={},
-                                body=b"Invalid response from actor",
-                            )
-
-                        response = starlette.responses.Response(
-                            content=response_data.body,
-                            status_code=response_data.status,
-                            headers=response_data.headers,
+                        this.logger.info(
+                            "response received by actor",
+                            response=response_data,
+                        )
+                    except Exception:
+                        this.logger.warning(
+                            "invalid response received by actor",
+                            response=response_model,
+                        )
+                        response_data = HttpResponseData(
+                            status=500,
+                            headers={},
+                            body=b"Invalid response from actor",
                         )
 
-                        await response(scope, receive, send)
-                        return
+                    response = starlette.responses.Response(
+                        content=response_data.body,
+                        status_code=response_data.status,
+                        headers=response_data.headers,
+                    )
+
+                    await response(scope, receive, send)
+                    return
+
+                await town.run_actor(response_actor)
+
             else:
                 # No such actor, return 404
                 logger.warning("no matching actor for request", path=path)
