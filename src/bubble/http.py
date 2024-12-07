@@ -192,7 +192,7 @@ async def post_sparql(
 
 
 async def serve(config: hypercorn.Config) -> None:
-    await hypercorn.trio.serve(app, config)  # type: ignore
+    await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
 
 
 if __name__ == "__main__":

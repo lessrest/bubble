@@ -17,13 +17,8 @@ from . import (
 import rdflib.term
 
 from pydantic import SecretStr
-import structlog
-
-logger = structlog.get_logger()
-
 
 rdflib.term.bind(prfx.NT.SecretToken, SecretStr)
-logger.info("Bound SecretStr to https://node.town/2024/SecretToken")
 
 __all__ = [
     "boot",

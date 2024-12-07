@@ -76,6 +76,7 @@ dependencies = [
     "hypothesis>=6.119.4",
     "pytest-xdist>=3.6.1",
     "pytest-trio>=0.8.0",
+    "colorama>=0.4.6",
 ]
 
 [tool.uv.sources]
