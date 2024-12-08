@@ -1,10 +1,8 @@
+from dataclasses import dataclass
 import sys
-from typing import Callable, Awaitable
 from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl
 
-import rich
-import rich.traceback
 import starlette
 import starlette.responses
 import trio
@@ -49,6 +47,17 @@ class HttpResponseData(BaseModel):
     headers: dict[str, str]
     body: bytes
 
+    def to_response(self) -> starlette.responses.Response:
+        return starlette.responses.Response(
+            content=self.body,
+            status_code=self.status,
+            headers=self.headers,
+        )
+
+    async def send(self, scope: Scope, receive: Receive, send: Send):
+        response = self.to_response()
+        await response(scope, receive, send)
+
 
 class HttpRequestWithResponseCapability(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
@@ -59,37 +68,117 @@ class HttpRequestWithResponseCapability(BaseModel):
 class ActorContext:
     """
     Encapsulates the context needed for an actor to operate, including its URI,
-    receive channel, send function, and nursery for spawning child actors.
+    receive channel, and nursery for spawning child actors.
     """
 
     def __init__(
         self,
         actor: URIRef,
         receiver: ReceiveChannel,
-        send_message: Callable[[URIRef, dict], Awaitable[None]],
+        town: "Town",
         nursery: trio.Nursery,
-        spawn: Callable[[trio.Nursery, Callable, ...], Awaitable[URIRef]],
     ):
         self.actor = actor
         self.receiver = receiver
-        self.send_message = send_message
+        self.town = town
         self.nursery = nursery
-        self.spawn = spawn
         self.logger = structlog.get_logger().bind(actor=actor)
 
     async def send(self, target: URIRef, message: dict):
         """Helper method to send a message to another actor"""
-        await self.send_message(target, message)
+        await self.town.send(target, message)
+
+
+class Actor[Param]:
+    """
+    Base class for all actors in the system.
+    Provides common functionality and a standard interface.
+    """
+
+    def __init__(self, context: ActorContext, param: Param):
+        """
+        Initialize the actor with its context.
+
+        :param context: The ActorContext providing access to actor capabilities
+        :param param: The parameter to pass to the actor's run method
+        """
+        self.context = context
+        self.param = param
+        self.logger = self.context.logger
+
+    async def run(self):
+        """
+        Main entry point for actor execution. All actors must implement this method.
+        """
+        raise NotImplementedError("Actors must implement run()")
+
+    async def spawn_child[Param2](
+        self, actor_type: type["Actor[Param2]"], param: Param2
+    ) -> URIRef:
+        """Spawn a child actor in this actor's nursery"""
+        actor_id, receiver, _ = self.context.town._create_actor()
+        self.context.nursery.start_soon(actor_type(self.context, param).run)
+        return actor_id
+
+    async def handle_message(self, message: dict) -> None:
+        """
+        Default message handler that processes HTTP requests.
+        Actors can override this to handle different message types.
+        """
+        try:
+            request = HttpRequestWithResponseCapability.model_validate(
+                message
+            )
+            self.logger.info("request received by actor", request=request)
+            await self.handle_http_request(request)
+        except Exception as e:
+            self.logger.warning(
+                "invalid or unrecognized message received by actor",
+                message=message,
+                error=str(e),
+            )
+
+    async def handle_http_request(
+        self,
+        request: HttpRequestWithResponseCapability,
+    ) -> None:
+        """
+        Handle HTTP requests. Actors should override this method to provide custom HTTP handling.
+        """
+        response = HttpResponseData(
+            status=501,
+            headers={"Content-Type": "text/plain"},
+            body=b"Not implemented",
+        )
+        await self.context.send(request.response, response.model_dump())
 
     async def receive(self):
         """Helper method to receive the next message"""
-        return await self.receiver.receive()
+        return await self.context.receiver.receive()
 
-    async def spawn_child(
-        self, actor_type: Callable, *args, **kwargs
-    ) -> URIRef:
-        """Spawn a child actor in this actor's nursery"""
-        return await self.spawn(self.nursery, actor_type, *args, **kwargs)
+    async def receive_model[T: BaseModel](self, model_class: type[T]) -> T:
+        """
+        Receive and validate a message against a Pydantic model.
+
+        :param model_class: The Pydantic model class to validate against
+        :return: An instance of the model class
+        :raises: ValidationError if the message doesn't match the model
+        """
+        message = await self.receive()
+        try:
+            return model_class.model_validate(message)
+        except Exception as e:
+            self.logger.warning(
+                "failed to validate received message",
+                model=model_class.__name__,
+                error=str(e),
+                message=message,
+            )
+            raise
+
+    async def send(self, target: URIRef, model: BaseModel):
+        """Send a message to another actor"""
+        await self.context.town.send(target, model.model_dump())
 
 
 class Town:
@@ -118,7 +207,7 @@ class Town:
         self.actors[actor] = sender
         return actor, receiver, sender
 
-    async def _send_message(self, target_actor: URIRef, message: dict):
+    async def send(self, target_actor: URIRef, message: dict):
         """Helper method to send messages between actors"""
         if target_actor in self.actors:
             await self.actors[target_actor].send(message)
@@ -128,35 +217,30 @@ class Town:
                 target=target_actor,
             )
 
-    async def spawn_actor(
-        self, nursery: trio.Nursery, actor_type: Callable, *args, **kwargs
-    ) -> URIRef:
-        actor, receiver, _ = self._create_actor()
+    async def run_actor[Param](
+        self,
+        actor_type: type["Actor[Param]"],
+        param: Param,
+    ):
+        async with self.using_actor(actor_type, param):
+            pass
 
-        context = ActorContext(
-            actor,
-            receiver,
-            self._send_message,
-            nursery,
-            self.spawn_actor,
-        )
-
-        nursery.start_soon(actor_type, context, *args, **kwargs)
-
-        return actor
-
-    async def run_actor(self, actor_type: Callable, *args, **kwargs):
+    @asynccontextmanager
+    async def using_actor[Param](
+        self, actor_type: type["Actor[Param]"], param: Param
+    ):
         async with trio.open_nursery() as nursery:
             actor, receiver, _ = self._create_actor()
             context = ActorContext(
                 actor,
                 receiver,
-                self._send_message,
+                self,
                 nursery,
-                self.spawn_actor,
             )
+            instance = actor_type(context, param)
             try:
-                await actor_type(context, *args, **kwargs)
+                nursery.start_soon(instance.run)
+                yield actor
             finally:
                 logger.info("actor completed", actor=actor)
                 del self.actors[actor]
@@ -225,31 +309,6 @@ def create_bootstrap_app() -> Starlette:
     )
 
 
-async def root_actor(this: ActorContext):
-    """
-    The root actor that handles messages from the websocket or HTTP requests.
-    """
-    while True:
-        this.logger.info("waiting for message")
-        message = await this.receive()
-        try:
-            request = HttpRequestWithResponseCapability.model_validate(
-                message
-            )
-            this.logger.info("request received by actor", request=request)
-            response = HttpResponseData(
-                status=200,
-                headers={"Content-Type": "text/plain"},
-                body=b"Hello from the root actor!",
-            )
-            await this.send(request.response, response.model_dump())
-        except Exception:
-            this.logger.warning(
-                "invalid or unrecognized message received by actor",
-                message=message,
-            )
-
-
 class FSRequest(BaseModel):
     """
     A general request format to the filesystem actors.
@@ -261,70 +320,65 @@ class FSRequest(BaseModel):
     # You could also include offset/length for partial reads, etc.
 
 
-async def file_actor(
-    this: ActorContext,
-    file_path: trio.Path,
-):
+class FileActor(Actor[trio.Path]):
     """
     A file actor that serves a single file in a read-only manner.
-    Supports "open" action to return its entire content.
     """
-    this.logger.info("file actor spawned", file=str(file_path))
 
-    while True:
-        message = await this.receive()
-        try:
-            request_with_response = (
-                HttpRequestWithResponseCapability.model_validate(message)
+    async def run(self):
+        self.logger.info("file actor spawned", file=str(self.param))
+
+        while True:
+            message = await self.receive()
+            await self.handle_message(message)
+
+    async def handle_http_request(
+        self,
+        request: HttpRequestWithResponseCapability,
+    ):
+        req = request.request
+
+        if req.method == "GET":
+            if req.query_params.get("action") == "read":
+                if await self.param.is_file():
+                    content = await self.param.read_bytes()
+                    response = HttpResponseData(
+                        status=200,
+                        headers={
+                            "Content-Type": "application/octet-stream"
+                        },
+                        body=content,
+                    )
+                    await self.context.send(
+                        request.response, response.model_dump()
+                    )
+                    return
+
+            # Respond with a capability descriptor
+            response = HttpResponseData(
+                status=200,
+                headers={"Content-Type": "application/json"},
+                body=JSONResponse(
+                    {
+                        "@context": ["https://node.town/2024/"],
+                        "@type": "File",
+                        "@id": self.context.actor,
+                        "name": self.param.name,
+                    }
+                ).body,
             )
-            request = request_with_response.request
+            await self.context.send(request.response, response.model_dump())
+            return
 
-            if request.method == "GET":
-                if request.query_params.get("action") == "read":
-                    if await file_path.is_file():
-                        content = await file_path.read_bytes()
-                        response_data = HttpResponseData(
-                            status=200,
-                            headers={
-                                "Content-Type": "application/octet-stream"
-                            },
-                            body=content,
-                        )
-                        await this.send(
-                            request_with_response.response,
-                            response_data.model_dump(),
-                        )
-                        continue
-
-                # Respond with a capability descriptor
-                response_data = HttpResponseData(
-                    status=200,
-                    headers={"Content-Type": "application/json"},
-                    body=JSONResponse(
-                        {
-                            "@context": ["https://node.town/2024/"],
-                            "@type": "File",
-                            "@id": this.actor,
-                            "name": file_path.name,
-                        }
-                    ).body,
-                )
-                await this.send(
-                    request_with_response.response,
-                    response_data.model_dump(),
-                )
-                continue
-
-            response_actor = request_with_response.response
-
+        try:
             fs_req = FSRequest.model_validate_json(
-                request.body.decode("utf-8") or "{}"
+                req.body.decode("utf-8") or "{}"
             )
 
             if fs_req.action == "open":
-                if file_path.is_file():
-                    content = await file_path.read_bytes()
-                    response_data = HttpResponseData(
+                if await self.param.is_file():
+                    content = await self.param.read_bytes()
+                    response = HttpResponseData(
                         status=200,
                         headers={
                             "Content-Type": "application/octet-stream"
@@ -332,109 +386,90 @@ async def file_actor(
                         body=content,
                     )
                 else:
-                    response_data = HttpResponseData(
+                    response = HttpResponseData(
                         status=400,
                         headers={},
                         body=b"This actor does not represent a file",
                     )
-
-                await this.send(response_actor, response_data.model_dump())
             else:
-                response_data = HttpResponseData(
+                response = HttpResponseData(
                     status=400,
                     headers={},
                     body=b"Unsupported action on a file actor",
                 )
-                await this.send(response_actor, response_data.model_dump())
 
-        except Exception:
-            this.logger.warning("invalid message received", message=message)
+            await self.context.send(request.response, response.model_dump())
+
+        except Exception as e:
+            self.logger.warning("error handling request", error=str(e))
+            response = HttpResponseData(
+                status=400,
+                headers={},
+                body=b"Invalid request",
+            )
+            await self.context.send(request.response, response.model_dump())
 
 
-rich.traceback.install()
-
-
-async def filesystem_actor(
-    this: ActorContext,
-    directory: trio.Path,
-):
+class FilesystemActor(Actor[trio.Path]):
     """
     A filesystem actor that represents a directory.
     """
-    this.logger.info("filesystem_actor spawned", directory=str(directory))
 
-    entries: dict[str, URIRef] = {}
+    async def run(self):
+        self.logger.info(
+            "filesystem_actor spawned", directory=str(self.param)
+        )
+        self.entries: dict[str, URIRef] = {}
 
-    for entry in await directory.iterdir():
-        child_actor = await this.spawn_child(file_actor, entry)
-        entries[entry.name] = child_actor
+        for entry in await self.param.iterdir():
+            child_actor = await self.spawn_child(FileActor, entry)
+            self.entries[entry.name] = child_actor
 
-    # Now run the main loop to handle requests
-    while True:
-        message = await this.receive()
+        while True:
+            message = await self.receive()
+            await self.handle_message(message)
+
+    async def handle_http_request(
+        self,
+        request: HttpRequestWithResponseCapability,
+    ):
         try:
-            request_with_response = (
-                HttpRequestWithResponseCapability.model_validate(message)
+            fs_req = FSRequest.model_validate_json(
+                request.request.body.decode("utf-8") or "{}"
             )
-            request = request_with_response.request
-            response_actor = request_with_response.response
+        except Exception:
+            fs_req = FSRequest(action="list")
 
-            # Try to parse the request body as a FSRequest
-            try:
-                fs_req = FSRequest.model_validate_json(
-                    request.body.decode("utf-8") or "{}"
-                )
-            except Exception:
-                # If no valid FSRequest is provided, assume "list"
-                fs_req = FSRequest(action="list")
-
-            this.logger.info(
-                "filesystem_actor received request",
-                fs_req=fs_req.model_dump(),
+        if fs_req.action == "list":
+            listing = {name: str(uri) for name, uri in self.entries.items()}
+            response = HttpResponseData(
+                status=200,
+                headers={"Content-Type": "application/json"},
+                body=JSONResponse(listing).body,
             )
+            await self.context.send(request.response, response.model_dump())
 
-            if fs_req.action == "list":
-                # Return a JSON with entries
-                listing = {name: str(uri) for name, uri in entries.items()}
-                response_data = HttpResponseData(
-                    status=200,
-                    headers={"Content-Type": "application/json"},
-                    body=JSONResponse(listing).body,
-                )
-                await this.send(response_actor, response_data.model_dump())
-
-            elif fs_req.action == "open" and fs_req.name is not None:
-                # Forward the request to the appropriate child actor if exists
-                if fs_req.name in entries:
-                    target_actor = entries[fs_req.name]
-                    # Forward the original request to target actor
-                    await this.send(
-                        target_actor, request_with_response.model_dump()
-                    )
-                else:
-                    response_data = HttpResponseData(
-                        status=404,
-                        headers={},
-                        body=b"No such file or directory",
-                    )
-                    await this.send(
-                        response_actor, response_data.model_dump()
-                    )
-
+        elif fs_req.action == "open" and fs_req.name is not None:
+            if fs_req.name in self.entries:
+                target_actor = self.entries[fs_req.name]
+                await self.context.send(target_actor, request.model_dump())
             else:
-                response_data = HttpResponseData(
-                    status=400,
+                response = HttpResponseData(
+                    status=404,
                     headers={},
-                    body=b"Unsupported action or missing parameters",
+                    body=b"No such file or directory",
                 )
-                await this.send(response_actor, response_data.model_dump())
+                await self.context.send(
+                    request.response, response.model_dump()
+                )
 
-        except Exception as e:
-            this.logger.warning(
-                "invalid message received by filesystem actor",
-                message=message,
-                error=str(e),
+        else:
+            response = HttpResponseData(
+                status=400,
+                headers={},
+                body=b"Unsupported action or missing parameters",
             )
+            await self.context.send(request.response, response.model_dump())
 
 
 async def get_request_body(receive: Receive) -> bytes:
@@ -453,6 +488,96 @@ async def get_request_body(receive: Receive) -> bytes:
     return body
 
 
+@dataclass
+class HTTPRequestContext:
+    scope: Scope
+    receive: Receive
+    send: Send
+    target: URIRef
+
+
+async def read_http_request(
+    scope: Scope, receive: Receive, path: str
+) -> HttpRequestData:
+    method = scope["method"]
+    raw_headers = scope.get("headers", [])
+    headers = {
+        k.decode("latin-1"): v.decode("latin-1") for k, v in raw_headers
+    }
+    query_string = scope.get("query_string", b"")
+    query_params = dict(parse_qsl(query_string.decode("latin-1")))
+
+    body = await get_request_body(receive)
+
+    request_data = HttpRequestData(
+        method=method,
+        headers=headers,
+        path=path,
+        query_params=query_params,
+        body=body,
+    )
+
+    return request_data
+
+
+class RequestHandlingActor(Actor[HTTPRequestContext]):
+    async def run(self):
+        request = await read_http_request(
+            self.param.scope, self.param.receive, self.param.target
+        )
+
+        request_model = HttpRequestWithResponseCapability(
+            request=request,
+            response=self.context.actor,
+        )
+
+        await self.send(self.param.target, request_model)
+        try:
+            response = await self.receive_model(HttpResponseData)
+        except Exception:
+            response = HttpResponseData(
+                status=500,
+                headers={},
+                body=b"Invalid response from actor",
+            )
+
+        await response.send(
+            self.param.scope, self.param.receive, self.param.send
+        )
+
+
+class MessageForActor(BaseModel):
+    """
+    A message format for sending messages to actors.
+    """
+
+    target: str
+    message: dict
+
+
+class RootActor(Actor[None]):
+    """
+    The root actor that handles messages from the websocket or HTTP requests.
+    """
+
+    async def run(self):
+        await self.spawn_child(FilesystemActor, trio.Path("vocab"))
+        while True:
+            message = await self.receive()
+            await self.handle_message(message)
+
+    async def handle_http_request(
+        self,
+        request: HttpRequestWithResponseCapability,
+    ):
+        response = HttpResponseData(
+            status=200,
+            headers={"Content-Type": "text/plain"},
+            body=b"Hello from the root actor!",
+        )
+        await self.context.send(request.response, response.model_dump())
+
+
 async def main_app(
     scope: Scope,
     receive: Receive,
@@ -467,12 +592,7 @@ async def main_app(
 
     if scope["type"] == "lifespan":
         try:
-            async with trio.open_nursery() as nursery:
-                await town.spawn_actor(nursery, root_actor)
-                await town.spawn_actor(
-                    nursery, filesystem_actor, trio.Path(".")
-                )
-
+            async with town.using_actor(RootActor, None):
                 while True:
                     message = await receive()
                     if message["type"] == "lifespan.shutdown":
@@ -487,77 +607,14 @@ async def main_app(
         # Handle HTTP requests
         path = scope["path"]
         if path == "/.well-known/did.json":
-            # Serve the DID document from the bootstrap app
             return await bootstrap_app(scope, receive, send)
         else:
-            # Check if this path corresponds to an actor
-            actor = URIRef(f"{town.base_url}{path}")
-            if actor in town.actors:
-                # Build the ActorRequest
-                method = scope["method"]
-                raw_headers = scope.get("headers", [])
-                headers = {
-                    k.decode("latin-1"): v.decode("latin-1")
-                    for k, v in raw_headers
-                }
-                query_string = scope.get("query_string", b"")
-                query_params = dict(
-                    parse_qsl(query_string.decode("latin-1"))
+            target = URIRef(f"{town.base_url}{path}")
+            if target in town.actors:
+                await town.run_actor(
+                    RequestHandlingActor,
+                    HTTPRequestContext(scope, receive, send, target),
                 )
-
-                # Read the request body
-                body = await get_request_body(receive)
-
-                async def response_actor(this: ActorContext):
-                    request_data = HttpRequestData(
-                        method=method,
-                        headers=headers,
-                        path=path,
-                        query_params=query_params,
-                        body=body,
-                    )
-                    request_model = HttpRequestWithResponseCapability(
-                        request=request_data,
-                        response=this.actor,
-                    )
-
-                    # Send the request structure to the target actor's mailbox
-                    await town.actors[actor].send(
-                        request_model.model_dump()
-                    )
-
-                    # Wait for the response
-                    response_model = await this.receive()
-                    try:
-                        response_data = HttpResponseData.model_validate(
-                            response_model
-                        )
-                        this.logger.info(
-                            "response received by actor",
-                            response=response_data,
-                        )
-                    except Exception:
-                        this.logger.warning(
-                            "invalid response received by actor",
-                            response=response_model,
-                        )
-                        response_data = HttpResponseData(
-                            status=500,
-                            headers={},
-                            body=b"Invalid response from actor",
-                        )
-
-                    response = starlette.responses.Response(
-                        content=response_data.body,
-                        status_code=response_data.status,
-                        headers=response_data.headers,
-                    )
-
-                    await response(scope, receive, send)
-                    return
-
-                await town.run_actor(response_actor)
-
             else:
                 # No such actor, return 404
                 logger.warning("no matching actor for request", path=path)
@@ -565,32 +622,27 @@ async def main_app(
                 await response(scope, receive, send)
 
     elif scope["type"] == "websocket":
-        # Handle WebSocket connections for actors
         websocket = WebSocket(scope, receive=receive, send=send)
-        path = scope["path"]
-        actor = URIRef(f"{town.base_url}{path}")
-
-        if actor not in town.actors:
-            logger.warning(
-                "received connection for invalid actor", actor=actor
-            )
-            await websocket.close(code=4004, reason="Invalid actor")
-            return
-
-        logger.info("actor connected via websocket", actor=actor)
         await websocket.accept()
+        logger.info("accepted WebSocket client", scope=scope)
 
         try:
             while True:
-                data = await websocket.receive_text()
-                logger.debug(
-                    "received websocket message from actor",
-                    actor=actor,
-                    length=len(data),
-                )
-                await town.actors[actor].send(data)
+                json_data = await websocket.receive_text()
+                message = MessageForActor.model_validate_json(json_data)
+
+                target = URIRef(message.target)
+                if target in town.actors:
+                    await town.send(target, message.message)
+                else:
+                    logger.warning(
+                        "no matching actor for request", target=target
+                    )
+                    await websocket.close(code=4004, reason="Invalid actor")
+                    return
+
         except Exception as e:
-            logger.info("actor disconnected", actor=actor, error=str(e))
+            logger.info("peer disconnected", error=str(e))
             await websocket.close()
 
     else:
@@ -625,6 +677,7 @@ async def new_town(base_url: str, bind: str):
     config.certfile = cert_path
     config.keyfile = key_path
     config.log.error_logger = logger.bind(name="hypercorn.error")
+    #    config.log.access_logger = logger.bind(name="hypercorn.access")
 
     # Run the bootstrap server to verify the DID document
     async with trio.open_nursery() as nursery:
