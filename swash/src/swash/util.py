@@ -181,8 +181,10 @@ def is_a(subject: S, type: S, graph=None) -> bool:
 
 
 def bubble(type: O, ns: Namespace, claims: dict[P, O] = {}) -> Graph:
-    graph = Graph(identifier=fresh_uri(ns))
-    graph.add((graph.identifier, RDF.type, type))
+    id = fresh_uri(ns)
+    graph = Graph(identifier=id, base=id)
+    graph.bind("", id)
+    graph.add((id, RDF.type, type))
     for predicate, object in claims.items():
         graph.add((graph.identifier, predicate, object))
     return graph

@@ -1,11 +1,15 @@
+from contextlib import asynccontextmanager
 import re
 from typing import Sequence
 
+from asgi_lifespan import LifespanManager
+from httpx import ASGITransport, AsyncClient
 import structlog
 
 from pytest import fixture
-from rdflib import Graph, Literal, URIRef, Namespace
+from rdflib import Dataset, Graph, Literal, URIRef, Namespace
 from pydantic import BaseModel
+from fastapi.testclient import TestClient
 
 from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
@@ -21,6 +25,7 @@ from bubble.town.town2 import (
     spawn,
     receive,
     using_actor_system,
+    new_town,
 )
 
 
@@ -89,3 +94,51 @@ async def test_counter_actor(logger):
             # Test get after increment
             x = await call(counter, bubble(EX.Get, EX))
             assert (x.identifier, EX.value, Literal(1)) in x
+
+
+@asynccontextmanager
+@fixture
+async def client():
+    app = new_town("http://example.com/", "localhost:8000")
+    async with LifespanManager(app) as manager:
+        async with AsyncClient(
+            base_url="http://example.com",
+            transport=ASGITransport(app=manager.app),
+        ) as client:
+            yield client
+
+
+async def test_health_check(client: AsyncClient, logger):
+    response = await client.get("/health")
+    assert response.status_code == 200
+    data = response.content
+    id = URIRef(response.links["self"]["url"])
+    dataset = Dataset()
+    dataset.parse(data, format="trig")
+    graph = dataset.graph(id)
+    logger.info("health check", data=data, base=dataset.base)
+    assert (None, NT.status, Literal("ok")) in graph
+    # Verify we got a valid actor system URI back
+    assert re.match(r"http://example.com/\w+", str(graph.identifier))
+
+
+async def test_actor_system_persistence(client):
+    # Make two requests and verify we get the same actor system URI
+    response1 = await client.get("/health")
+    assert response1.status_code == 200
+    id1 = URIRef(response1.links["self"]["url"])
+
+    response2 = await client.get("/health")
+    assert response2.status_code == 200
+    id2 = URIRef(response2.links["self"]["url"])
+
+    dataset = Dataset()
+    dataset.parse(response1.content, format="trig")
+    dataset.parse(response2.content, format="trig")
+    graph1 = dataset.graph(id1)
+    graph2 = dataset.graph(id2)
+
+    # The actor system URI should be the same across requests
+    system1 = get_single_object(id1, NT.actorSystem, graph=graph1)
+    system2 = get_single_object(id2, NT.actorSystem, graph=graph2)
+    assert system1 == system2

@@ -11,12 +11,15 @@ from typing import (
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from fastapi import Depends, FastAPI, Response
 from pydantic import BaseModel, JsonValue
 from swash.prfx import NT
+from swash.util import bubble
 import trio
 import structlog
+from fastapi.responses import JSONResponse
 
-from rdflib import Graph, URIRef, Namespace
+from rdflib import Graph, Literal, URIRef, Namespace
 
 from swash import Parameter, mint
 
@@ -142,7 +145,7 @@ async def using_actor_system(
         system = ActorSystem(site, nursery, logger)
         with current_actor_system.bind(system):
             async with system.as_actor(system.this()):
-                yield
+                yield system
             nursery.cancel_scope.cancel()
 
 
@@ -185,3 +188,55 @@ async def call(actor: URIRef, payload: Graph) -> Graph:
         )
         await send(actor, payload)
         return await receive()
+
+
+# FastAPI app
+
+
+def new_town(base_url: str, bind: str) -> FastAPI:
+    logger = structlog.get_logger(__name__).bind(bind=bind)
+    site = Namespace(base_url)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        logger.info("starting lifespan", app=app.state)
+        async with using_actor_system(base_url, logger) as system:
+            logger.info(
+                "setting actor system", app=app.state, actor_system=system
+            )
+            app.state.actor_system = system
+
+            yield
+
+    app = FastAPI(lifespan=lifespan)
+
+    async def bind_actor_system(request, call_next):
+        logger.info(
+            "binding actor system",
+            app=app.state,
+            actor_system=app.state.actor_system,
+        )
+        with current_actor_system.bind(app.state.actor_system):
+            return await call_next(request)
+
+    app.middleware("http")(bind_actor_system)
+
+    @app.get("/health")
+    async def health_check():
+        graph = bubble(
+            NT.HealthCheck,
+            site,
+            {
+                NT.status: Literal("ok"),
+                NT.actorSystem: this(),
+            },
+        )
+        return Response(
+            graph.serialize(format="trig"),
+            media_type="text/trig",
+            headers={
+                "Link": f'<{str(graph.identifier)}>; rel="self"',
+            },
+        )
+
+    return app

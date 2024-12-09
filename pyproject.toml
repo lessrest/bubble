@@ -78,6 +78,7 @@ dependencies = [
     "pytest-trio>=0.8.0",
     "colorama>=0.4.6",
     "cryptography>=44.0.0",
+    "asgi-lifespan>=2.1.0",
 ]
 
 [tool.uv.sources]
