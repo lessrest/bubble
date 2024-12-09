@@ -218,8 +218,7 @@ class LinkedDataResponse(JSONResponse):
             headers = {}
 
         headers["Content-Type"] = "application/ld+json"
-        if "@id" in jsonld:
-            headers["Link"] = f'<{jsonld["@id"]}>; rel="self"'
+        headers["Link"] = f'<{str(graph.identifier)}>; rel="self"'
 
         super().__init__(
             content=compacted,
@@ -266,15 +265,19 @@ def town_app(base_url: str, bind: str, repo: BubbleRepo) -> FastAPI:
 
     @app.get("/health")
     async def health_check():
-        graph = bubble(
-            NT.HealthCheck,
-            site,
-            {
-                NT.status: Literal("ok"),
-                NT.actorSystem: this(),
-            },
-        )
-        return LinkedDataResponse(graph)
+        doc_uri = site["health"]
+        with vars.graph.bind(
+            Graph(identifier=doc_uri, base=str(site))
+        ) as graph:
+            new(
+                NT.HealthCheck,
+                {
+                    NT.status: Literal("ok"),
+                    NT.actorSystem: this(),
+                },
+                subject=doc_uri,
+            )
+            return LinkedDataResponse(graph)
 
     @app.get("/.well-known/did.json")
     async def get_did_document():

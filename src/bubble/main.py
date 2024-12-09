@@ -133,18 +133,41 @@ def town2(
                 app = town_app(base_url, bind, repo)
 
                 async def serve():
-                    await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
+                    try:
+                        await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
+                    except trio.Cancelled:
+                        pass
+                    except Exception as e:
+                        logger.error("error serving town2", error=e)
+                        raise
 
                 nursery.start_soon(serve)
                 logger.info("starting bash")
-                await trio.run_process(
-                    ["bash", "-i"],
-                    stdin=None,
-                    env={"CURL_CA_BUNDLE": cert_path},
-                )
+                try:
+                    await start_bash_shell()
+                except trio.Cancelled:
+                    pass
+                except Exception as e:
+                    logger.error("error starting bash", error=e)
+                    raise
 
-                logger.info("cancelling nursery")
+                logger.info("shutting down")
                 nursery.cancel_scope.cancel()
+
+    async def start_bash_shell():
+        await trio.run_process(
+            ["bash", "-i"],
+            stdin=None,
+            check=False,
+            env={
+                "CURL_CA_BUNDLE": cert_path,
+                "PS1": get_bash_prompt(),
+                "BASH_SILENCE_DEPRECATION_WARNING": "1",
+            },
+        )
+
+    def get_bash_prompt():
+        return r"\[\e[1m\][\[\e[32m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
 
     trio.run(run)
 

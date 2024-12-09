@@ -17,6 +17,7 @@ from swash.util import O, P, S, get_single_object, is_a, get_single_subject
 from swash.util import bubble
 import trio
 from bubble.logs import configure_logging
+from bubble.repo import BubbleRepo, using_bubble_at
 from bubble.town.town2 import (
     ServerActor,
     call,
@@ -96,10 +97,17 @@ async def test_counter_actor(logger):
             assert (x.identifier, EX.value, Literal(1)) in x
 
 
+@fixture
+async def temp_repo(tmp_path):
+    """Create a temporary repository for testing"""
+    async with using_bubble_at(tmp_path) as repo:
+        yield repo
+
+
 @asynccontextmanager
 @fixture
-async def client():
-    app = town_app("http://example.com/", "localhost:8000")
+async def client(temp_repo):
+    app = town_app("http://example.com", "localhost:8000", repo=temp_repo)
     async with LifespanManager(app) as manager:
         async with AsyncClient(
             base_url="http://example.com",
@@ -113,16 +121,16 @@ async def test_health_check(client: AsyncClient, logger):
     assert response.status_code == 200
     data = response.content
     id = URIRef(response.links["self"]["url"])
-    dataset = Dataset()
-    dataset.parse(data, format="trig")
-    graph = dataset.graph(id)
-    logger.info("health check", data=data, base=dataset.base)
+
+    graph = Graph()
+    graph.parse(data, format="json-ld")
+    logger.info("health check", data=data, base=graph.base)
     assert (None, NT.status, Literal("ok")) in graph
     # Verify we got a valid actor system URI back
-    assert re.match(r"http://example.com/\w+", str(graph.identifier))
+    assert re.match(r"http://example.com/\w+", str(id))
 
 
-async def test_actor_system_persistence(client):
+async def test_actor_system_persistence(client, logger):
     # Make two requests and verify we get the same actor system URI
     response1 = await client.get("/health")
     assert response1.status_code == 200
@@ -132,11 +140,16 @@ async def test_actor_system_persistence(client):
     assert response2.status_code == 200
     id2 = URIRef(response2.links["self"]["url"])
 
-    dataset = Dataset()
-    dataset.parse(response1.content, format="trig")
-    dataset.parse(response2.content, format="trig")
-    graph1 = dataset.graph(id1)
-    graph2 = dataset.graph(id2)
+    logger.info("response1", content=response1.content, id=id1)
+    logger.info("response2", content=response2.content, id=id2)
+
+    graph1 = Dataset()
+    graph1.parse(response1.content, format="json-ld")
+    graph2 = Dataset()
+    graph2.parse(response2.content, format="json-ld")
+
+    logger.info("graph1", graph=graph1, id=id1)
+    logger.info("graph2", graph=graph2, id=id2)
 
     # The actor system URI should be the same across requests
     system1 = get_single_object(id1, NT.actorSystem, graph=graph1)
