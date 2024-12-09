@@ -36,12 +36,27 @@ def print_n3(graph: Optional[Graph] = None) -> None:
         print(n3)
 
 
-def get_single_subject(predicate, object):
+def graph_string(graph: Graph) -> str:
+    """Serialize a graph to a string"""
+    return graph.serialize(format="trig").replace("    ", "  ").strip()
+
+
+def get_single_subject(predicate, object, graph=None):
     """Get a single subject for a predicate-object pair from the current graph"""
-    subjects = get_subjects(predicate, object)
+    graph = graph if graph is not None else vars.graph.get()
+    subjects = list(graph.subjects(predicate, object))
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
     return subjects[0]
+
+
+def get_single_object(subject, predicate, graph=None):
+    """Get a single object for a subject-predicate pair from the current graph"""
+    graph = graph if graph is not None else vars.graph.get()
+    objects = list(graph.objects(subject, predicate))
+    if len(objects) != 1:
+        raise ValueError(f"Expected 1 object, got {len(objects)}")
+    return objects[0]
 
 
 def get_subjects(predicate, object):
@@ -147,9 +162,10 @@ def new(
     return subject
 
 
-def is_a(subject: S, type: S) -> bool:
+def is_a(subject: S, type: S, graph=None) -> bool:
+    graph = graph if graph is not None else vars.graph.get()
     if isinstance(subject, IdentifiedNode):
-        return type in vars.graph.get().objects(subject, RDF.type)
+        return type in graph.objects(subject, RDF.type)
     elif isinstance(subject, Literal):
         return subject.datatype == type
     else:

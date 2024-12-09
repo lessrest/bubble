@@ -13,6 +13,7 @@ from rich.containers import Renderables
 import rich.box
 
 import structlog
+from swash.util import graph_string
 
 # Custom theme for our logs
 THEME = Theme(
@@ -155,6 +156,8 @@ class RichConsoleRenderer:
                 continue
             if key == "actor":
                 table.add_row(key, Text(str(value), style="actor"))
+            elif key == "graph":
+                table.add_row(key, Text(graph_string(value), style="graph"))
             else:
                 table.add_row(key, rich.pretty.Pretty(value))
 

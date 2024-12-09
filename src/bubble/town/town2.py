@@ -1,15 +1,22 @@
 from typing import (
     Any,
+    AsyncGenerator,
+    Awaitable,
     Callable,
+    Generator,
     MutableMapping,
+    Optional,
+    Type,
 )
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+from pydantic import BaseModel, JsonValue
+from swash.prfx import NT
 import trio
 import structlog
 
-from rdflib import URIRef, Namespace
+from rdflib import Graph, URIRef, Namespace
 
 from swash import Parameter, mint
 
@@ -19,6 +26,8 @@ type Receive = Callable[[], Any]
 type Send = Callable[[Message], Any]
 type App = Callable[[Scope, Receive, Send], Any]
 
+logger = structlog.get_logger(__name__)
+
 
 @dataclass
 class ActorContext:
@@ -26,6 +35,13 @@ class ActorContext:
     uri: URIRef
     chan_send: trio.MemorySendChannel
     chan_recv: trio.MemoryReceiveChannel
+
+
+def new_context(parent: URIRef) -> ActorContext:
+    site = current_actor_system.get().site
+    uri = mint.fresh_uri(site)
+    chan_send, chan_recv = trio.open_memory_channel(8)
+    return ActorContext(parent, uri, chan_send, chan_recv)
 
 
 def root_context(site: Namespace) -> ActorContext:
@@ -59,7 +75,7 @@ class ActorSystem:
     def this(self) -> URIRef:
         return self.current_actor.get().uri
 
-    def spawn(self, action: Callable) -> URIRef:
+    def spawn(self, action: Callable[[], Awaitable[None]]) -> URIRef:
         uri = mint.fresh_uri(self.site)
         chan_send, chan_recv = trio.open_memory_channel(8)
 
@@ -81,7 +97,7 @@ class ActorSystem:
             self.nursery.start_soon(task)
         return uri
 
-    async def send(self, actor: URIRef, message: Message):
+    async def send(self, actor: URIRef, message: Graph):
         if actor not in self.actors:
             raise ValueError(f"Actor {actor} not found")
         await self.actors[actor].chan_send.send(message)
@@ -107,8 +123,9 @@ def spawn(action: Callable):
     return system.spawn(action)
 
 
-async def send(actor: URIRef, message: Message):
+async def send(actor: URIRef, message: Graph):
     system = current_actor_system.get()
+    logger.info("sending message", actor=actor, graph=message)
     return await system.send(actor, message)
 
 
@@ -126,3 +143,45 @@ async def using_actor_system(
         with current_actor_system.bind(system):
             async with system.as_actor(system.this()):
                 yield
+            nursery.cancel_scope.cancel()
+
+
+@asynccontextmanager
+async def as_temporary_actor() -> AsyncGenerator[URIRef, None]:
+    system = current_actor_system.get()
+    context = new_context(system.this())
+    system.actors[context.uri] = context
+    with current_actor_system.bind(system):
+        async with system.as_actor(context.uri):
+            yield context.uri
+
+
+class ServerActor[State]:
+    def __init__(self, state: State):
+        self.state = state
+
+    async def __call__(self):
+        while True:
+            msg = await receive()
+            logger.info("received message", graph=msg)
+            response = await self.handle(msg)
+            logger.info("sending response", graph=response)
+
+            for reply_to in msg.objects(msg.identifier, NT.replyTo):
+                await send(URIRef(reply_to), response)
+
+    async def handle(self, request: Graph) -> Graph:
+        raise NotImplementedError
+
+
+async def call(actor: URIRef, payload: Graph) -> Graph:
+    async with as_temporary_actor():
+        payload.add((payload.identifier, NT.replyTo, this()))
+
+        logger.info(
+            "sending request",
+            actor=actor,
+            graph=payload,
+        )
+        await send(actor, payload)
+        return await receive()
