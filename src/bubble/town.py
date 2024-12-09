@@ -349,9 +349,7 @@ class FileActor(Actor[trio.Path]):
                         },
                         body=content,
                     )
-                    await self.context.send(
-                        request.response, response.model_dump()
-                    )
+                    await self.send(request.response, response)
                     return
 
             # Respond with a capability descriptor
@@ -367,7 +365,7 @@ class FileActor(Actor[trio.Path]):
                     }
                 ).body,
             )
-            await self.context.send(request.response, response.model_dump())
+            await self.send(request.response, response)
             return
 
         try:
@@ -398,7 +396,7 @@ class FileActor(Actor[trio.Path]):
                     body=b"Unsupported action on a file actor",
                 )
 
-            await self.context.send(request.response, response.model_dump())
+            await self.send(request.response, response)
 
         except Exception as e:
             self.logger.warning("error handling request", error=str(e))
@@ -407,7 +405,7 @@ class FileActor(Actor[trio.Path]):
                 headers={},
                 body=b"Invalid request",
             )
-            await self.context.send(request.response, response.model_dump())
+            await self.send(request.response, response)
 
 
 class FilesystemActor(Actor[trio.Path]):
@@ -625,6 +623,13 @@ async def main_app(
         websocket = WebSocket(scope, receive=receive, send=send)
         await websocket.accept()
         logger.info("accepted WebSocket client", scope=scope)
+
+        # A WebSocket connection should be an actor that can receive messages.
+        # That way this becomes like a message bus.
+        #
+        # Either you connect anonymously and get a random actor ID,
+        # or you claim an actor ID with a DID document?
+        #
 
         try:
             while True:
