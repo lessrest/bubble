@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import sys
-from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl
 from typing import Protocol
 
@@ -13,14 +12,16 @@ import hypercorn.trio
 import structlog
 
 from rdflib import Namespace, URIRef
-from trio.abc import SendChannel, ReceiveChannel
-from starlette.types import Send, Scope, Receive
+from trio.abc import SendChannel
+from starlette.types import Send, Scope, Receive, Message
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.websockets import WebSocket
 from starlette.applications import Starlette
 
 from swash import mint
 from bubble.logs import configure_logging
+
+# from bubble.town.fsys import FilesystemActor
 from bubble.town.cert import generate_self_signed_cert, create_ssl_context
 
 from pydantic import BaseModel
@@ -59,7 +60,7 @@ class HttpResponseData(BaseModel):
         await response(scope, receive, send)
 
 
-class HttpRequestWithResponseCapability(BaseModel):
+class ActorHttpRequest(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     request: HttpRequestData
     response: URIRef
@@ -93,17 +94,41 @@ class ActorContext:
     def __init__(
         self,
         actor: URIRef,
-        receiver: ReceiveChannel,
-        town: TownProtocol,
+        receiver: Receive,
+        town: "Town",
+        nursery: trio.Nursery,
     ):
         self.actor = actor
         self.receiver = receiver
         self.town = town
+        self.nursery = nursery
         self.logger = structlog.get_logger().bind(actor=actor)
 
-    async def send(self, target: URIRef, message: dict):
+    async def send(self, target: URIRef, message: Message):
         """Helper method to send a message to another actor"""
         await self.town.send(target, message)
+
+    async def receive(self) -> Message:
+        return await self.receiver()
+
+    async def receive_model[T: BaseModel](self, model_class: type[T]) -> T:
+        message = await self.receive()
+        return model_class.model_validate(message)
+
+    async def send_model(self, target: URIRef, model: BaseModel):
+        await self.send(target, model.model_dump())
+
+    async def spawn[Param2](
+        self, actor_type: type["Actor[Param2]"], param: Param2
+    ) -> URIRef:
+        actor_id, receiver = self.town.register_actor()
+        self = ActorContext(
+            actor_id, receiver.receive, self.town, self.nursery
+        )
+
+        self.nursery.start_soon(actor_type(self.town, param).run, self)
+
+        return actor_id
 
 
 class Actor[Param]:
@@ -112,109 +137,26 @@ class Actor[Param]:
     Provides common functionality and a standard interface.
     """
 
-    nursery: trio.Nursery | None = None
+    town: "Town"
 
-    def __init__(self, context: ActorContext, param: Param):
-        """
-        Initialize the actor with its context.
-
-        :param context: The ActorContext providing access to actor capabilities
-        :param param: The parameter to pass to the actor's run method
-        """
-        self.context = context
+    def __init__(self, town: "Town", param: Param):
+        self.town = town
         self.param = param
-        self.logger = self.context.logger
+        self.logger = structlog.get_logger().bind(actor=self.param)
 
-    async def run(self):
-        """
-        Main entry point for actor execution. All actors must implement this method.
-        """
+    async def __call__(self):
+        async with trio.open_nursery() as nursery:
+            actor, channel = self.town.register_actor()
+            context = ActorContext(
+                actor, channel.receive, self.town, nursery
+            )
+            try:
+                await self.run(context)
+            finally:
+                self.town.unregister_actor(actor)
+
+    async def run(self, context: ActorContext):
         raise NotImplementedError("Actors must implement run()")
-
-    async def run_and_unregister(self):
-        """Run the actor and unregister it from the town"""
-        try:
-            async with trio.open_nursery() as nursery:
-                self.nursery = nursery
-                await self.run()
-        finally:
-            self.context.town.unregister_actor(self.context.actor)
-            self.nursery = None
-
-    async def spawn_child[Param2](
-        self, actor_type: type["Actor[Param2]"], param: Param2
-    ) -> URIRef:
-        """Spawn a child actor in this actor's nursery"""
-        assert self.nursery is not None
-
-        actor_id, receiver = self.context.town.register_actor()
-        context = ActorContext(actor_id, receiver, self.context.town)
-
-        self.nursery.start_soon(
-            actor_type(context, param).run_and_unregister
-        )
-
-        return actor_id
-
-    async def handle_message(self, message: dict) -> None:
-        """
-        Default message handler that processes HTTP requests.
-        Actors can override this to handle different message types.
-        """
-        try:
-            request = HttpRequestWithResponseCapability.model_validate(
-                message
-            )
-            self.logger.info("request received by actor", request=request)
-            await self.handle_http_request(request)
-        except Exception as e:
-            self.logger.warning(
-                "invalid or unrecognized message received by actor",
-                message=message,
-                error=str(e),
-            )
-
-    async def handle_http_request(
-        self,
-        request: HttpRequestWithResponseCapability,
-    ) -> None:
-        """
-        Handle HTTP requests. Actors should override this method to provide custom HTTP handling.
-        """
-        response = HttpResponseData(
-            status=501,
-            headers={"Content-Type": "text/plain"},
-            body=b"Not implemented",
-        )
-        await self.context.send(request.response, response.model_dump())
-
-    async def receive(self):
-        """Helper method to receive the next message"""
-        return await self.context.receiver.receive()
-
-    async def receive_model[T: BaseModel](self, model_class: type[T]) -> T:
-        """
-        Receive and validate a message against a Pydantic model.
-
-        :param model_class: The Pydantic model class to validate against
-        :return: An instance of the model class
-        :raises: ValidationError if the message doesn't match the model
-        """
-        message = await self.receive()
-        try:
-            return model_class.model_validate(message)
-        except Exception as e:
-            self.logger.warning(
-                "failed to validate received message",
-                model=model_class.__name__,
-                error=str(e),
-                message=message,
-            )
-            raise
-
-    async def send(self, target: URIRef, model: BaseModel):
-        """Send a message to another actor"""
-        await self.context.town.send(target, model.model_dump())
 
 
 class Town:
@@ -248,7 +190,7 @@ class Town:
         logger.info("unregistering actor", actor=actor)
         del self.actors[actor]
 
-    async def send(self, target: URIRef, message: dict):
+    async def send(self, target: URIRef, message: Message):
         """Helper method to send messages between actors"""
         if target in self.actors:
             await self.actors[target].send(message)
@@ -263,24 +205,8 @@ class Town:
         actor_type: type["Actor[Param]"],
         param: Param,
     ):
-        async with self.using_actor_instance(actor_type, param) as actor:
-            await actor.run()
-
-    @asynccontextmanager
-    async def using_actor_instance[Param](
-        self, actor_type: type["Actor[Param]"], param: Param
-    ):
-        actor, receiver = self.register_actor()
-        context = ActorContext(actor, receiver, self)
-        instance = actor_type(context, param)
-
-        async with trio.open_nursery() as nursery:
-            instance.nursery = nursery
-            try:
-                yield instance
-            finally:
-                self.unregister_actor(actor)
-                instance.nursery = None
+        app = actor_type(self, param)
+        await app()
 
 
 async def serve_app(app: Starlette, config: hypercorn.Config) -> None:
@@ -307,172 +233,7 @@ async def verify_base_url(
 
     logger.info("successfully verified control over base URL")
 
-
-class FSRequest(BaseModel):
-    """
-    A general request format to the filesystem actors.
-    You can customize this as needed.
-    """
-
-    action: str  # e.g. "list", "open"
-    name: str | None = None  # For "open" requests
     # You could also include offset/length for partial reads, etc.
-
-
-class FileActor(Actor[trio.Path]):
-    """
-    A file actor that serves a single file in a read-only manner.
-    """
-
-    async def run(self):
-        while True:
-            try:
-                message = await self.receive()
-                await self.handle_message(message)
-            except trio.Cancelled:
-                self.logger.info("file actor cancelled")
-                return
-
-    async def handle_http_request(
-        self,
-        request: HttpRequestWithResponseCapability,
-    ):
-        req = request.request
-
-        if req.method == "GET":
-            if req.query_params.get("action") == "read":
-                if await self.param.is_file():
-                    content = await self.param.read_bytes()
-                    response = HttpResponseData(
-                        status=200,
-                        headers={
-                            "Content-Type": "application/octet-stream"
-                        },
-                        body=content,
-                    )
-                    await self.send(request.response, response)
-                    return
-
-            # Respond with a capability descriptor
-            response = HttpResponseData(
-                status=200,
-                headers={"Content-Type": "application/json"},
-                body=JSONResponse(
-                    {
-                        "@context": ["https://node.town/2024/"],
-                        "@type": "File",
-                        "@id": self.context.actor,
-                        "name": self.param.name,
-                    }
-                ).body,
-            )
-            await self.send(request.response, response)
-            return
-
-        try:
-            fs_req = FSRequest.model_validate_json(
-                req.body.decode("utf-8") or "{}"
-            )
-
-            if fs_req.action == "open":
-                if await self.param.is_file():
-                    content = await self.param.read_bytes()
-                    response = HttpResponseData(
-                        status=200,
-                        headers={
-                            "Content-Type": "application/octet-stream"
-                        },
-                        body=content,
-                    )
-                else:
-                    response = HttpResponseData(
-                        status=400,
-                        headers={},
-                        body=b"This actor does not represent a file",
-                    )
-            else:
-                response = HttpResponseData(
-                    status=400,
-                    headers={},
-                    body=b"Unsupported action on a file actor",
-                )
-
-            await self.send(request.response, response)
-
-        except Exception as e:
-            self.logger.warning("error handling request", error=str(e))
-            response = HttpResponseData(
-                status=400,
-                headers={},
-                body=b"Invalid request",
-            )
-            await self.send(request.response, response)
-
-
-class FilesystemActor(Actor[trio.Path]):
-    """
-    A filesystem actor that represents a directory.
-    """
-
-    async def run(self):
-        self.logger.info(
-            "filesystem_actor spawned", directory=str(self.param)
-        )
-        self.entries: dict[str, URIRef] = {}
-
-        for entry in await self.param.iterdir():
-            child_actor = await self.spawn_child(FileActor, entry)
-            self.entries[entry.name] = child_actor
-
-        while True:
-            try:
-                message = await self.receive()
-                await self.handle_message(message)
-            except trio.Cancelled:
-                self.logger.info("filesystem actor cancelled")
-                return
-
-    async def handle_http_request(
-        self,
-        request: HttpRequestWithResponseCapability,
-    ):
-        try:
-            fs_req = FSRequest.model_validate_json(
-                request.request.body.decode("utf-8") or "{}"
-            )
-        except Exception:
-            fs_req = FSRequest(action="list")
-
-        if fs_req.action == "list":
-            listing = {name: str(uri) for name, uri in self.entries.items()}
-            response = HttpResponseData(
-                status=200,
-                headers={"Content-Type": "application/json"},
-                body=JSONResponse(listing).body,
-            )
-            await self.context.send(request.response, response.model_dump())
-
-        elif fs_req.action == "open" and fs_req.name is not None:
-            if fs_req.name in self.entries:
-                target_actor = self.entries[fs_req.name]
-                await self.context.send(target_actor, request.model_dump())
-            else:
-                response = HttpResponseData(
-                    status=404,
-                    headers={},
-                    body=b"No such file or directory",
-                )
-                await self.context.send(
-                    request.response, response.model_dump()
-                )
-
-        else:
-            response = HttpResponseData(
-                status=400,
-                headers={},
-                body=b"Unsupported action or missing parameters",
-            )
-            await self.context.send(request.response, response.model_dump())
 
 
 async def get_request_body(receive: Receive) -> bytes:
@@ -524,19 +285,19 @@ async def read_http_request(
 
 
 class RequestHandlingActor(Actor[HTTPRequestContext]):
-    async def run(self):
+    async def run(self, context: ActorContext):
         request = await read_http_request(
             self.param.scope, self.param.receive, self.param.target
         )
 
-        request_model = HttpRequestWithResponseCapability(
+        request_model = ActorHttpRequest(
             request=request,
-            response=self.context.actor,
+            response=context.actor,
         )
 
-        await self.send(self.param.target, request_model)
+        await context.send_model(self.param.target, request_model)
         try:
-            response = await self.receive_model(HttpResponseData)
+            response = await context.receive_model(HttpResponseData)
         except Exception:
             response = HttpResponseData(
                 status=500,
@@ -570,25 +331,31 @@ class RootActor(Actor[ASGIContext]):
     The root actor that handles messages from the websocket or HTTP requests.
     """
 
-    async def run(self):
-        await self.spawn_child(FilesystemActor, trio.Path("vocab"))
+    async def run(self, context: ActorContext):
+        #        await context.spawn(FilesystemActor, trio.Path("vocab"))
         while True:
             try:
-                message = await self.receive()
-                await self.handle_message(message)
+                message = await context.receive()
+                await self.handle_message(message, context)
             except trio.Cancelled:
                 return
 
+    async def handle_message(self, message: Message, context: ActorContext):
+        if message["type"] == "http.request":
+            request = ActorHttpRequest.model_validate(message)
+            await self.handle_http_request(request, context)
+
     async def handle_http_request(
         self,
-        request: HttpRequestWithResponseCapability,
+        request: ActorHttpRequest,
+        context: ActorContext,
     ):
         response = HttpResponseData(
             status=200,
             headers={"Content-Type": "text/plain"},
             body=b"Hello from the root actor!",
         )
-        await self.context.send(request.response, response.model_dump())
+        await context.send(request.response, response.model_dump())
 
 
 class LifespanActor(Actor[ASGIContext]):
@@ -596,9 +363,9 @@ class LifespanActor(Actor[ASGIContext]):
     An actor that handles the lifespan of the application.
     """
 
-    async def run(self):
+    async def run(self, context: ActorContext):
         try:
-            await self.spawn_child(RootActor, self.param)
+            await context.spawn(RootActor, self.param)
             while True:
                 message = await self.param.receive()
                 logger.info("lifespan message", message=message)
