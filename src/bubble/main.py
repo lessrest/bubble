@@ -15,7 +15,7 @@ from bubble.cred import get_anthropic_credential
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.logs import configure_logging
-from bubble.cert import generate_self_signed_cert
+from bubble.town.cert import generate_self_signed_cert
 
 
 console = Console(width=80)
@@ -81,7 +81,7 @@ def town(
     ),
 ) -> None:
     """Serve the Town websocket interface."""
-    from bubble.town import new_town
+    from bubble.town.town import new_town
 
     config = hypercorn.Config()
     config.bind = [bind]

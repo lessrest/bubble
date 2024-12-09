@@ -13,7 +13,7 @@ from anthropic.types.message import Message
 from anthropic.types.tool_use_block import ToolUseBlock
 from rdflib.query import ResultRow
 
-from bubble.bash import get_shell_tool_spec, handle_shell_tool
+from bubble.tool.bash import get_shell_tool_spec, handle_shell_tool
 from bubble.repo import current_bubble
 from bubble.slop import Claude
 from swash.util import select_rows

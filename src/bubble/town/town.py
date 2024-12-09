@@ -15,7 +15,6 @@ import structlog
 from rdflib import Namespace, URIRef
 from trio.abc import SendChannel, ReceiveChannel
 from starlette.types import Send, Scope, Receive
-from starlette.routing import Route
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.websockets import WebSocket
 from starlette.applications import Starlette
@@ -96,12 +95,10 @@ class ActorContext:
         actor: URIRef,
         receiver: ReceiveChannel,
         town: TownProtocol,
-        nursery: trio.Nursery,
     ):
         self.actor = actor
         self.receiver = receiver
         self.town = town
-        self.nursery = nursery
         self.logger = structlog.get_logger().bind(actor=actor)
 
     async def send(self, target: URIRef, message: dict):
@@ -114,6 +111,8 @@ class Actor[Param]:
     Base class for all actors in the system.
     Provides common functionality and a standard interface.
     """
+
+    nursery: trio.Nursery | None = None
 
     def __init__(self, context: ActorContext, param: Param):
         """
@@ -132,15 +131,29 @@ class Actor[Param]:
         """
         raise NotImplementedError("Actors must implement run()")
 
+    async def run_and_unregister(self):
+        """Run the actor and unregister it from the town"""
+        try:
+            async with trio.open_nursery() as nursery:
+                self.nursery = nursery
+                await self.run()
+        finally:
+            self.context.town.unregister_actor(self.context.actor)
+            self.nursery = None
+
     async def spawn_child[Param2](
         self, actor_type: type["Actor[Param2]"], param: Param2
     ) -> URIRef:
         """Spawn a child actor in this actor's nursery"""
+        assert self.nursery is not None
+
         actor_id, receiver = self.context.town.register_actor()
-        context = ActorContext(
-            actor_id, receiver, self.context.town, self.context.nursery
+        context = ActorContext(actor_id, receiver, self.context.town)
+
+        self.nursery.start_soon(
+            actor_type(context, param).run_and_unregister
         )
-        self.context.nursery.start_soon(actor_type(context, param).run)
+
         return actor_id
 
     async def handle_message(self, message: dict) -> None:
@@ -225,13 +238,14 @@ class Town:
     ) -> tuple[URIRef, trio.MemoryReceiveChannel]:
         """Helper method to create a new actor with channels"""
         actor = mint.fresh_uri(Namespace(f"{self.base_url}/"))
-        logger.info("spawning new actor", actor=actor)
+        logger.info("registering actor", actor=actor)
         sender, receiver = trio.open_memory_channel(10)
         self.actors[actor] = sender
         return actor, receiver
 
     def unregister_actor(self, actor: URIRef) -> None:
         """Helper method to remove an actor from the town"""
+        logger.info("unregistering actor", actor=actor)
         del self.actors[actor]
 
     async def send(self, target: URIRef, message: dict):
@@ -256,19 +270,17 @@ class Town:
     async def using_actor_instance[Param](
         self, actor_type: type["Actor[Param]"], param: Param
     ):
+        actor, receiver = self.register_actor()
+        context = ActorContext(actor, receiver, self)
+        instance = actor_type(context, param)
+
         async with trio.open_nursery() as nursery:
-            actor, receiver = self.register_actor()
-            context = ActorContext(
-                actor,
-                receiver,
-                self,
-                nursery,
-            )
-            instance = actor_type(context, param)
+            instance.nursery = nursery
             try:
                 yield instance
             finally:
                 self.unregister_actor(actor)
+                instance.nursery = None
 
 
 async def serve_app(app: Starlette, config: hypercorn.Config) -> None:
@@ -296,43 +308,6 @@ async def verify_base_url(
     logger.info("successfully verified control over base URL")
 
 
-def create_profile_app() -> Starlette:
-    """
-    Create a profile application that responds to DID document requests.
-    """
-
-    async def did_document(request):
-        """
-        Handle requests to the DID document endpoint.
-        """
-        host = (
-            request.headers.get("host", "")
-            .removeprefix("https://")
-            .removesuffix("/")
-        )
-        did = f"did:web:{host}"
-        document = {
-            "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": did,
-            "verificationMethod": [],
-        }
-        logger.info("responding to DID document request", document=document)
-        return JSONResponse(document)
-
-    @asynccontextmanager
-    async def lifespan_context(app):
-        logger.info("starting base URL verification server")
-        try:
-            yield
-        finally:
-            logger.info("stopping base URL verification server")
-
-    return Starlette(
-        routes=[Route("/.well-known/did.json", did_document)],
-        lifespan=lifespan_context,
-    )
-
-
 class FSRequest(BaseModel):
     """
     A general request format to the filesystem actors.
@@ -350,11 +325,13 @@ class FileActor(Actor[trio.Path]):
     """
 
     async def run(self):
-        self.logger.info("file actor spawned", file=str(self.param))
-
         while True:
-            message = await self.receive()
-            await self.handle_message(message)
+            try:
+                message = await self.receive()
+                await self.handle_message(message)
+            except trio.Cancelled:
+                self.logger.info("file actor cancelled")
+                return
 
     async def handle_http_request(
         self,
@@ -448,8 +425,12 @@ class FilesystemActor(Actor[trio.Path]):
             self.entries[entry.name] = child_actor
 
         while True:
-            message = await self.receive()
-            await self.handle_message(message)
+            try:
+                message = await self.receive()
+                await self.handle_message(message)
+            except trio.Cancelled:
+                self.logger.info("filesystem actor cancelled")
+                return
 
     async def handle_http_request(
         self,
@@ -592,8 +573,11 @@ class RootActor(Actor[ASGIContext]):
     async def run(self):
         await self.spawn_child(FilesystemActor, trio.Path("vocab"))
         while True:
-            message = await self.receive()
-            await self.handle_message(message)
+            try:
+                message = await self.receive()
+                await self.handle_message(message)
+            except trio.Cancelled:
+                return
 
     async def handle_http_request(
         self,
@@ -613,16 +597,55 @@ class LifespanActor(Actor[ASGIContext]):
     """
 
     async def run(self):
-        await self.spawn_child(RootActor, self.param)
-        while True:
-            message = await self.param.receive()
-            if message["type"] == "lifespan.shutdown":
-                await self.param.send(
-                    {"type": "lifespan.shutdown.complete"}
-                )
-                return
-            elif message["type"] == "lifespan.startup":
-                await self.param.send({"type": "lifespan.startup.complete"})
+        try:
+            await self.spawn_child(RootActor, self.param)
+            while True:
+                message = await self.param.receive()
+                logger.info("lifespan message", message=message)
+                if message["type"] == "lifespan.shutdown":
+                    await self.param.send(
+                        {"type": "lifespan.shutdown.complete"}
+                    )
+                    return
+                elif message["type"] == "lifespan.startup":
+                    await self.param.send(
+                        {"type": "lifespan.startup.complete"}
+                    )
+        except* Exception as e:
+            logger.error("lifespan failed", error=str(e))
+            raise
+        finally:
+            logger.info("lifespan actor completed")
+
+
+class DIDDocumentMiddleware:
+    """
+    Middleware that handles DID document requests.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if (
+            scope["type"] == "http"
+            and scope["path"] == "/.well-known/did.json"
+        ):
+            host = dict(scope["headers"]).get(b"host", b"").decode("utf-8")
+            host = host.removeprefix("https://").removesuffix("/")
+            did = f"did:web:{host}"
+            document = {
+                "@context": ["https://www.w3.org/ns/did/v1"],
+                "id": did,
+                "verificationMethod": [],
+            }
+            logger.info(
+                "responding to DID document request", document=document
+            )
+            response = JSONResponse(document)
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
 
 
 async def main_app(
@@ -630,7 +653,6 @@ async def main_app(
     receive: Receive,
     send: Send,
     town: Town,
-    profile_app: Starlette,
 ):
     """
     The main application callable (ASGI) handling lifespan, DID document requests,
@@ -641,38 +663,30 @@ async def main_app(
 
     if scope["type"] == "lifespan":
         try:
-            await town.run_actor(RootActor, context)
+            await town.run_actor(LifespanActor, context)
+        except BaseExceptionGroup as e:
+            logger.info("lifespan failed", error=e)
 
         finally:
             logger.info("lifespan completed")
 
     elif scope["type"] == "http":
         path = scope["path"]
-        if path == "/.well-known/did.json":
-            return await profile_app(scope, receive, send)
+        target = URIRef(f"{town.base_url}{path}")
+        if target in town.actors:
+            await town.run_actor(
+                RequestHandlingActor,
+                HTTPRequestContext(scope, receive, send, target),
+            )
         else:
-            target = URIRef(f"{town.base_url}{path}")
-            if target in town.actors:
-                await town.run_actor(
-                    RequestHandlingActor,
-                    HTTPRequestContext(scope, receive, send, target),
-                )
-            else:
-                logger.warning("target actor not found", target=target)
-                response = PlainTextResponse("Not found", status_code=404)
-                await response(scope, receive, send)
+            logger.warning("target actor not found", target=target)
+            response = PlainTextResponse("Not found", status_code=404)
+            await response(scope, receive, send)
 
     elif scope["type"] == "websocket":
         websocket = WebSocket(scope, receive=receive, send=send)
         await websocket.accept()
         logger.info("accepted WebSocket client", scope=scope)
-
-        # A WebSocket connection should be an actor that can receive messages.
-        # That way this becomes like a message bus.
-        #
-        # Either you connect anonymously and get a random actor ID,
-        # or you claim an actor ID with a DID document?
-        #
 
         try:
             while True:
@@ -713,15 +727,15 @@ async def new_town(base_url: str, bind: str):
         )
         raise ValueError("base_url must use HTTPS")
 
-    profile_app = create_profile_app()
-
     hostname = base_url.replace("https://", "").rstrip("/")
     cert_path, key_path = generate_self_signed_cert(hostname)
 
     config = create_http_server_config(bind, cert_path, key_path)
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(serve_app, profile_app, config)
+        verification_app = Starlette(debug=True)
+        verification_app.add_middleware(DIDDocumentMiddleware)
+        nursery.start_soon(serve_app, verification_app, config)
 
         try:
             await verify_base_url(base_url, cert_path, key_path)
@@ -736,9 +750,14 @@ async def new_town(base_url: str, bind: str):
     town = Town(base_url)
 
     async def app(scope: Scope, receive: Receive, send: Send):
-        return await main_app(scope, receive, send, town, profile_app)
+        try:
+            return await main_app(scope, receive, send, town)
+        except* Exception as e:
+            logger.info("main app failed", error=str(e))
+            raise
 
-    return app
+    # Wrap the main app with the DID document middleware
+    return DIDDocumentMiddleware(app)
 
 
 def create_http_server_config(bind, cert_path, key_path):
