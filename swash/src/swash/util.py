@@ -3,13 +3,21 @@
 import sys
 from typing import Any, Optional, overload
 
-from rdflib import RDF, BNode, Graph, IdentifiedNode, Literal, URIRef
+from rdflib import (
+    RDF,
+    BNode,
+    Graph,
+    IdentifiedNode,
+    Literal,
+    Namespace,
+    URIRef,
+)
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
 import swash.vars as vars
 from swash.mint import fresh_uri
-from swash.prfx import NT, SWA, JSON, AI
+from swash.prfx import NT, RDF, SWA, JSON, AI
 
 S = _SubjectType
 P = _PredicateType
@@ -170,3 +178,11 @@ def is_a(subject: S, type: S, graph=None) -> bool:
         return subject.datatype == type
     else:
         raise ValueError(f"Unexpected subject type: {subject}")
+
+
+def bubble(type: O, ns: Namespace, claims: dict[P, O] = {}) -> Graph:
+    graph = Graph(identifier=fresh_uri(ns))
+    graph.add((graph.identifier, RDF.type, type))
+    for predicate, object in claims.items():
+        graph.add((graph.identifier, predicate, object))
+    return graph

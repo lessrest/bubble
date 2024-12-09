@@ -1,4 +1,5 @@
 import re
+from typing import Sequence
 
 import structlog
 
@@ -8,7 +9,8 @@ from pydantic import BaseModel
 
 from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
-from swash.util import get_single_object, is_a, get_single_subject
+from swash.util import O, P, S, get_single_object, is_a, get_single_subject
+from swash.util import bubble
 import trio
 from bubble.logs import configure_logging
 from bubble.town.town2 import (
@@ -64,23 +66,9 @@ class CounterActor(ServerActor[int]):
     async def handle(self, request: Graph) -> Graph:
         if is_a(request.identifier, EX.Inc, graph=request):
             self.state += 1
-            response_graph = Graph(identifier=fresh_uri(EX))
-            response_graph.add(
-                (response_graph.identifier, RDF.type, EX.Inc)
-            )
-            response_graph.add(
-                (response_graph.identifier, EX.value, Literal(self.state))
-            )
-            return response_graph
+            return bubble(EX.Inc, EX, {EX.value: Literal(self.state)})
         elif is_a(request.identifier, EX.Get, graph=request):
-            response_graph = Graph(identifier=fresh_uri(EX))
-            response_graph.add(
-                (response_graph.identifier, RDF.type, EX.Get)
-            )
-            response_graph.add(
-                (response_graph.identifier, EX.value, Literal(self.state))
-            )
-            return response_graph
+            return bubble(EX.Get, EX, {EX.value: Literal(self.state)})
         else:
             raise ValueError(f"Unknown action: {request.identifier}")
 
@@ -91,19 +79,13 @@ async def test_counter_actor(logger):
             counter = spawn(CounterActor(0))
 
             # Test initial value
-            get_graph = Graph(identifier=fresh_uri(EX))
-            get_graph.add((get_graph.identifier, RDF.type, EX.Get))
-            x = await call(counter, get_graph)
+            x = await call(counter, bubble(EX.Get, EX))
             assert (x.identifier, EX.value, Literal(0)) in x
 
             # Test increment
-            inc_graph = Graph(identifier=fresh_uri(EX))
-            inc_graph.add((inc_graph.identifier, RDF.type, EX.Inc))
-            x = await call(counter, inc_graph)
+            x = await call(counter, bubble(EX.Inc, EX))
             assert (x.identifier, EX.value, Literal(1)) in x
 
             # Test get after increment
-            get_graph = Graph(identifier=fresh_uri(EX))
-            get_graph.add((get_graph.identifier, RDF.type, EX.Get))
-            x = await call(counter, get_graph)
+            x = await call(counter, bubble(EX.Get, EX))
             assert (x.identifier, EX.value, Literal(1)) in x
