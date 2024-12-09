@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import sys
 from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl
+from typing import Protocol
 
 import starlette
 import starlette.responses
@@ -21,7 +22,7 @@ from starlette.applications import Starlette
 
 from swash import mint
 from bubble.logs import configure_logging
-from bubble.cert import generate_self_signed_cert, create_ssl_context
+from bubble.town.cert import generate_self_signed_cert, create_ssl_context
 
 from pydantic import BaseModel
 
@@ -65,6 +66,25 @@ class HttpRequestWithResponseCapability(BaseModel):
     response: URIRef
 
 
+class TownProtocol(Protocol):
+    """
+    Protocol defining the interface that ActorContext needs from Town.
+    This decouples the ActorContext from the specific Town implementation.
+    """
+
+    async def send(self, target: URIRef, message: dict) -> None:
+        """Send a message to a target actor"""
+        ...
+
+    def register_actor(self) -> tuple[URIRef, trio.MemoryReceiveChannel]:
+        """Register a new actor in the town"""
+        ...
+
+    def unregister_actor(self, actor: URIRef) -> None:
+        """Unregister an actor from the town"""
+        ...
+
+
 class ActorContext:
     """
     Encapsulates the context needed for an actor to operate, including its URI,
@@ -75,7 +95,7 @@ class ActorContext:
         self,
         actor: URIRef,
         receiver: ReceiveChannel,
-        town: "Town",
+        town: TownProtocol,
         nursery: trio.Nursery,
     ):
         self.actor = actor
@@ -116,8 +136,11 @@ class Actor[Param]:
         self, actor_type: type["Actor[Param2]"], param: Param2
     ) -> URIRef:
         """Spawn a child actor in this actor's nursery"""
-        actor_id, receiver, _ = self.context.town._create_actor()
-        self.context.nursery.start_soon(actor_type(self.context, param).run)
+        actor_id, receiver = self.context.town.register_actor()
+        context = ActorContext(
+            actor_id, receiver, self.context.town, self.context.nursery
+        )
+        self.context.nursery.start_soon(actor_type(context, param).run)
         return actor_id
 
     async def handle_message(self, message: dict) -> None:
@@ -197,24 +220,28 @@ class Town:
         self.base_url = base_url
         logger.info("initialized town", base=base_url)
 
-    def _create_actor(
+    def register_actor(
         self,
-    ) -> tuple[URIRef, trio.MemoryReceiveChannel, trio.MemorySendChannel]:
+    ) -> tuple[URIRef, trio.MemoryReceiveChannel]:
         """Helper method to create a new actor with channels"""
         actor = mint.fresh_uri(Namespace(f"{self.base_url}/"))
         logger.info("spawning new actor", actor=actor)
         sender, receiver = trio.open_memory_channel(10)
         self.actors[actor] = sender
-        return actor, receiver, sender
+        return actor, receiver
 
-    async def send(self, target_actor: URIRef, message: dict):
+    def unregister_actor(self, actor: URIRef) -> None:
+        """Helper method to remove an actor from the town"""
+        del self.actors[actor]
+
+    async def send(self, target: URIRef, message: dict):
         """Helper method to send messages between actors"""
-        if target_actor in self.actors:
-            await self.actors[target_actor].send(message)
+        if target in self.actors:
+            await self.actors[target].send(message)
         else:
             logger.warning(
                 "attempted to send message to non-existent actor",
-                target=target_actor,
+                target=target,
             )
 
     async def run_actor[Param](
@@ -222,15 +249,15 @@ class Town:
         actor_type: type["Actor[Param]"],
         param: Param,
     ):
-        async with self.using_actor(actor_type, param):
-            pass
+        async with self.using_actor_instance(actor_type, param) as actor:
+            await actor.run()
 
     @asynccontextmanager
-    async def using_actor[Param](
+    async def using_actor_instance[Param](
         self, actor_type: type["Actor[Param]"], param: Param
     ):
         async with trio.open_nursery() as nursery:
-            actor, receiver, _ = self._create_actor()
+            actor, receiver = self.register_actor()
             context = ActorContext(
                 actor,
                 receiver,
@@ -239,11 +266,9 @@ class Town:
             )
             instance = actor_type(context, param)
             try:
-                nursery.start_soon(instance.run)
-                yield actor
+                yield instance
             finally:
-                logger.info("actor completed", actor=actor)
-                del self.actors[actor]
+                self.unregister_actor(actor)
 
 
 async def serve_app(app: Starlette, config: hypercorn.Config) -> None:
@@ -271,10 +296,9 @@ async def verify_base_url(
     logger.info("successfully verified control over base URL")
 
 
-def create_bootstrap_app() -> Starlette:
+def create_profile_app() -> Starlette:
     """
-    Create a bootstrap application that responds to DID document requests.
-    Used temporarily to verify we have control over the base URL before starting the main app.
+    Create a profile application that responds to DID document requests.
     """
 
     async def did_document(request):
@@ -553,7 +577,14 @@ class MessageForActor(BaseModel):
     message: dict
 
 
-class RootActor(Actor[None]):
+@dataclass
+class ASGIContext:
+    scope: Scope
+    receive: Receive
+    send: Send
+
+
+class RootActor(Actor[ASGIContext]):
     """
     The root actor that handles messages from the websocket or HTTP requests.
     """
@@ -576,36 +607,49 @@ class RootActor(Actor[None]):
         await self.context.send(request.response, response.model_dump())
 
 
+class LifespanActor(Actor[ASGIContext]):
+    """
+    An actor that handles the lifespan of the application.
+    """
+
+    async def run(self):
+        await self.spawn_child(RootActor, self.param)
+        while True:
+            message = await self.param.receive()
+            if message["type"] == "lifespan.shutdown":
+                await self.param.send(
+                    {"type": "lifespan.shutdown.complete"}
+                )
+                return
+            elif message["type"] == "lifespan.startup":
+                await self.param.send({"type": "lifespan.startup.complete"})
+
+
 async def main_app(
     scope: Scope,
     receive: Receive,
     send: Send,
     town: Town,
-    bootstrap_app: Starlette,
+    profile_app: Starlette,
 ):
     """
     The main application callable (ASGI) handling lifespan, DID document requests,
     actor websockets, and HTTP requests destined for actors.
     """
 
+    context = ASGIContext(scope, receive, send)
+
     if scope["type"] == "lifespan":
         try:
-            async with town.using_actor(RootActor, None):
-                while True:
-                    message = await receive()
-                    if message["type"] == "lifespan.shutdown":
-                        await send({"type": "lifespan.shutdown.complete"})
-                        return
-                    elif message["type"] == "lifespan.startup":
-                        await send({"type": "lifespan.startup.complete"})
+            await town.run_actor(RootActor, context)
+
         finally:
             logger.info("lifespan completed")
 
     elif scope["type"] == "http":
-        # Handle HTTP requests
         path = scope["path"]
         if path == "/.well-known/did.json":
-            return await bootstrap_app(scope, receive, send)
+            return await profile_app(scope, receive, send)
         else:
             target = URIRef(f"{town.base_url}{path}")
             if target in town.actors:
@@ -614,8 +658,7 @@ async def main_app(
                     HTTPRequestContext(scope, receive, send, target),
                 )
             else:
-                # No such actor, return 404
-                logger.warning("no matching actor for request", path=path)
+                logger.warning("target actor not found", target=target)
                 response = PlainTextResponse("Not found", status_code=404)
                 await response(scope, receive, send)
 
@@ -670,23 +713,15 @@ async def new_town(base_url: str, bind: str):
         )
         raise ValueError("base_url must use HTTPS")
 
-    # Create a temporary bootstrap app for DID document verification
-    bootstrap_app = create_bootstrap_app()
+    profile_app = create_profile_app()
 
-    # Generate a self-signed certificate for testing and set up the Hypercorn config
     hostname = base_url.replace("https://", "").rstrip("/")
     cert_path, key_path = generate_self_signed_cert(hostname)
 
-    config = hypercorn.Config()
-    config.bind = [bind]
-    config.certfile = cert_path
-    config.keyfile = key_path
-    config.log.error_logger = logger.bind(name="hypercorn.error")
-    #    config.log.access_logger = logger.bind(name="hypercorn.access")
+    config = create_http_server_config(bind, cert_path, key_path)
 
-    # Run the bootstrap server to verify the DID document
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(serve_app, bootstrap_app, config)
+        nursery.start_soon(serve_app, profile_app, config)
 
         try:
             await verify_base_url(base_url, cert_path, key_path)
@@ -696,13 +731,20 @@ async def new_town(base_url: str, bind: str):
             )
             raise RuntimeError(f"Failed to verify base URL {base_url}: {e}")
         finally:
-            # Stop the bootstrap server after verification
             nursery.cancel_scope.cancel()
 
-    # Create the main Town and return its ASGI application
     town = Town(base_url)
 
     async def app(scope: Scope, receive: Receive, send: Send):
-        return await main_app(scope, receive, send, town, bootstrap_app)
+        return await main_app(scope, receive, send, town, profile_app)
 
     return app
+
+
+def create_http_server_config(bind, cert_path, key_path):
+    config = hypercorn.Config()
+    config.bind = [bind]
+    config.certfile = cert_path
+    config.keyfile = key_path
+    config.log.error_logger = logger.bind(name="hypercorn.error")
+    return config
