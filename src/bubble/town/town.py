@@ -66,25 +66,6 @@ class ActorHttpRequest(BaseModel):
     response: URIRef
 
 
-class TownProtocol(Protocol):
-    """
-    Protocol defining the interface that ActorContext needs from Town.
-    This decouples the ActorContext from the specific Town implementation.
-    """
-
-    async def send(self, target: URIRef, message: dict) -> None:
-        """Send a message to a target actor"""
-        ...
-
-    def register_actor(self) -> tuple[URIRef, trio.MemoryReceiveChannel]:
-        """Register a new actor in the town"""
-        ...
-
-    def unregister_actor(self, actor: URIRef) -> None:
-        """Unregister an actor from the town"""
-        ...
-
-
 class ActorContext:
     """
     Encapsulates the context needed for an actor to operate, including its URI,

@@ -26,6 +26,8 @@ from .html import (
     LiveMessage,
 )
 
+from .vars import Parameter
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -51,4 +53,5 @@ __all__ = [
     "appending",
     "live_node",
     "LiveMessage",
+    "Parameter",
 ]
