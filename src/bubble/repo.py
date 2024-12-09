@@ -144,17 +144,20 @@ class BubbleRepo:
     @staticmethod
     async def open(path: Path) -> "BubbleRepo":
         if not await trio.Path(path).exists():
+            logger.info("creating bubble", path=str(path))
             await trio.Path(path).mkdir(parents=True)
 
         should_commit = False
 
         if not await trio.Path(path / "root.n3").exists():
+            logger.info("describing new bubble", path=str(path))
             graph = await describe_new_bubble(path)
             graph.serialize(destination=path / "root.n3", format="n3")
             should_commit = True
 
         dataset = Dataset(default_union=True)
 
+        logger.info("parsing root.n3", path=str(path / "root.n3"))
         with vars.graph.bind(
             Graph().parse(path / "root.n3", format="n3")
         ) as graph:
@@ -164,8 +167,9 @@ class BubbleRepo:
                 bubble_graph.add(triple)
 
         repo = BubbleRepo(path, dataset, URIRef(bubble))
-
+        logger.info("created repo", repo=repo)
         if should_commit:
+            logger.info("committing bubble", repo=repo)
             await repo.commit()
 
         return repo
@@ -252,6 +256,7 @@ async def using_bubble_at(path: Path):
 
 @asynccontextmanager
 async def loading_bubble_from(path: Path):
+    logger.info("loading bubble", path=str(path))
     repo = await BubbleRepo.load(path)
     with using_bubble(repo):
         yield repo

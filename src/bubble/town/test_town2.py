@@ -25,7 +25,7 @@ from bubble.town.town2 import (
     spawn,
     receive,
     using_actor_system,
-    new_town,
+    town_app,
 )
 
 
@@ -99,7 +99,7 @@ async def test_counter_actor(logger):
 @asynccontextmanager
 @fixture
 async def client():
-    app = new_town("http://example.com/", "localhost:8000")
+    app = town_app("http://example.com/", "localhost:8000")
     async with LifespanManager(app) as manager:
         async with AsyncClient(
             base_url="http://example.com",

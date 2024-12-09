@@ -3,9 +3,10 @@ from contextvars import ContextVar
 import secrets
 
 from xid import XID
-from rdflib import URIRef, Namespace
+from rdflib import Graph, URIRef, Namespace
 
 from swash.prfx import SWA
+import swash.vars as vars
 
 
 class Mint:
@@ -63,12 +64,15 @@ class Mint:
 mintvar = ContextVar("mint", default=Mint())
 
 
-def fresh_uri(namespace: Namespace) -> URIRef:
+def fresh_uri(namespace: Namespace | Graph) -> URIRef:
+    if isinstance(namespace, Graph):
+        namespace = Namespace(str(namespace.base))
     return mintvar.get().fresh_secure_iri(namespace)
 
 
 def fresh_iri() -> URIRef:
-    return fresh_uri(SWA)
+    graph = vars.graph.get()
+    return fresh_uri(graph)
 
 
 def fresh_id() -> str:

@@ -1,33 +1,30 @@
+import json
+
 from typing import (
     Any,
-    AsyncGenerator,
-    Awaitable,
+    Dict,
     Callable,
-    Generator,
-    MutableMapping,
     Optional,
-    Type,
+    Awaitable,
+    AsyncGenerator,
+    MutableMapping,
 )
+from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from fastapi import Depends, FastAPI, Response
-from pydantic import BaseModel, JsonValue
-from swash.prfx import NT
-from swash.util import bubble
+import pyld
 import trio
 import structlog
+
+from rdflib import XSD, Graph, URIRef, Literal, Namespace
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from rdflib import Graph, Literal, URIRef, Namespace
-
-from swash import Parameter, mint
-
-type Message = MutableMapping[str, Any]
-type Scope = MutableMapping[str, Any]
-type Receive = Callable[[], Any]
-type Send = Callable[[Message], Any]
-type App = Callable[[Scope, Receive, Send], Any]
+from swash import Parameter, mint, vars
+from swash.prfx import NT, DID
+from swash.util import new, bubble
+from bubble.repo import BubbleRepo, using_bubble
 
 logger = structlog.get_logger(__name__)
 
@@ -190,36 +187,82 @@ async def call(actor: URIRef, payload: Graph) -> Graph:
         return await receive()
 
 
+class LinkedDataResponse(JSONResponse):
+    def __init__(
+        self,
+        graph: Graph,
+        *,
+        vocab: Optional[Namespace] = None,
+        context: Optional[Dict] = None,
+        status_code: int = 200,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        if context is None:
+            context = {
+                "nt": str(NT),
+                "w3": "https://www.w3.org/ns/",
+                # "did": str(DID),
+                "@base": str(graph.base),
+            }
+
+        if vocab is not None:
+            context["@vocab"] = str(vocab)
+
+        jsonld = json.loads(graph.serialize(format="json-ld"))
+
+        compacted = pyld.jsonld.compact(
+            jsonld, context, {"base": str(graph.base)}
+        )
+
+        if headers is None:
+            headers = {}
+
+        headers["Content-Type"] = "application/ld+json"
+        if "@id" in jsonld:
+            headers["Link"] = f'<{jsonld["@id"]}>; rel="self"'
+
+        super().__init__(
+            content=compacted,
+            status_code=status_code,
+            headers=headers,
+        )
+
+
 # FastAPI app
 
 
-def new_town(base_url: str, bind: str) -> FastAPI:
+def town_app(base_url: str, bind: str, repo: BubbleRepo) -> FastAPI:
     logger = structlog.get_logger(__name__).bind(bind=bind)
-    site = Namespace(base_url)
+    site = Namespace(base_url + "/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        logger.info("starting lifespan", app=app.state)
+        logger.info("web app starting", app=app.state)
         async with using_actor_system(base_url, logger) as system:
-            logger.info(
-                "setting actor system", app=app.state, actor_system=system
-            )
             app.state.actor_system = system
 
             yield
+            logger.info("web app ending", app=app.state)
 
     app = FastAPI(lifespan=lifespan)
 
+    @app.middleware("http")
+    async def catch_errors(request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as e:
+            logger.error("error", error=e)
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
+    @app.middleware("http")
     async def bind_actor_system(request, call_next):
-        logger.info(
-            "binding actor system",
-            app=app.state,
-            actor_system=app.state.actor_system,
-        )
         with current_actor_system.bind(app.state.actor_system):
             return await call_next(request)
 
-    app.middleware("http")(bind_actor_system)
+    @app.middleware("http")
+    async def bind_bubble(request, call_next):
+        with using_bubble(repo):
+            return await call_next(request)
 
     @app.get("/health")
     async def health_check():
@@ -231,12 +274,34 @@ def new_town(base_url: str, bind: str) -> FastAPI:
                 NT.actorSystem: this(),
             },
         )
-        return Response(
-            graph.serialize(format="trig"),
-            media_type="text/trig",
-            headers={
-                "Link": f'<{str(graph.identifier)}>; rel="self"',
-            },
+        return LinkedDataResponse(graph)
+
+    @app.get("/.well-known/did.json")
+    async def get_did_document():
+        did_uri = URIRef(
+            str(site).replace("https://", "did:web:").rstrip("/")
         )
+        doc_uri = site[".well-known/did.json"]
+
+        with vars.graph.bind(Graph(base=str(site))) as graph:
+            new(
+                DID.DIDDocument,
+                {
+                    DID.id: did_uri,
+                    DID.controller: did_uri,
+                    DID.created: Literal(
+                        datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+                    ),
+                    DID.verificationMethod: [
+                        new(
+                            DID.Ed25519VerificationKey2020,
+                            {DID.controller: did_uri},
+                        )
+                    ],
+                },
+                subject=doc_uri,
+            )
+
+        return LinkedDataResponse(graph, vocab=DID)
 
     return app

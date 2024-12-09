@@ -1,23 +1,25 @@
 """Utility functions for N3 processing."""
 
 import sys
+
 from typing import Any, Optional, overload
 
 from rdflib import (
     RDF,
     BNode,
     Graph,
-    IdentifiedNode,
+    URIRef,
     Literal,
     Namespace,
-    URIRef,
+    IdentifiedNode,
 )
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
 import swash.vars as vars
+
 from swash.mint import fresh_uri
-from swash.prfx import NT, RDF, SWA, JSON, AI
+from swash.prfx import AI, NT, JSON
 
 S = _SubjectType
 P = _PredicateType
@@ -149,10 +151,10 @@ def new(
     properties: Optional[dict[P, Any]] = None,
     subject: Optional[URIRef | BNode] = None,
 ) -> URIRef | BNode:
-    if subject is None:
-        subject = fresh_uri(SWA)
-
     graph = vars.graph.get()
+
+    if subject is None:
+        subject = fresh_uri(graph)
 
     if type is not None:
         graph.add((subject, RDF.type, type))
@@ -182,7 +184,7 @@ def is_a(subject: S, type: S, graph=None) -> bool:
 
 def bubble(type: O, ns: Namespace, claims: dict[P, O] = {}) -> Graph:
     id = fresh_uri(ns)
-    graph = Graph(identifier=id, base=id)
+    graph = Graph(identifier=id, base=str(ns))
     graph.bind("", id)
     graph.add((id, RDF.type, type))
     for predicate, object in claims.items():

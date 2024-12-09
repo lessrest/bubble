@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Optional
 
+from rdflib import Graph
 from rich.console import Console, RenderableType
 from rich.panel import Panel
 import rich.pretty
@@ -157,7 +158,12 @@ class RichConsoleRenderer:
             if key == "actor":
                 table.add_row(key, Text(str(value), style="actor"))
             elif key == "graph":
-                table.add_row(key, Text(graph_string(value), style="graph"))
+                if isinstance(value, Graph):
+                    table.add_row(
+                        key, Text(graph_string(value), style="graph")
+                    )
+                else:
+                    table.add_row(key, Text(str(value), style="graph"))
             else:
                 table.add_row(key, rich.pretty.Pretty(value))
 

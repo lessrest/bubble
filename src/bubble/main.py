@@ -1,3 +1,4 @@
+from functools import partial
 import pathlib
 from urllib.parse import urlparse
 
@@ -100,3 +101,53 @@ def town(
         await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
 
     trio.run(run)
+
+
+@app.command()
+def town2(
+    bind: str = Option("127.0.0.1:2026", "--bind", help="Bind address"),
+    base_url: str = Option(
+        "https://localhost:2026", "--base-url", help="Public base URL"
+    ),
+    bubble_path: str = BubblePath,
+) -> None:
+    """Serve the Town2 JSON-LD interface."""
+    from bubble.town.town2 import town_app
+
+    config = hypercorn.Config()
+    config.bind = [bind]
+    logger = configure_logging()
+    config.log.error_logger = logger.bind(name="hypercorn.error")  # type: ignore
+
+    assert base_url.startswith("https://")
+    hostname = urlparse(base_url).hostname
+    assert hostname
+    cert_path, key_path = generate_self_signed_cert(hostname)
+    config.certfile = cert_path
+    config.keyfile = key_path
+
+    async def run():
+        async with trio.open_nursery() as nursery:
+            logger.info("starting town2", bubble_path=bubble_path)
+            async with loading_bubble_from(trio.Path(bubble_path)) as repo:
+                app = town_app(base_url, bind, repo)
+
+                async def serve():
+                    await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
+
+                nursery.start_soon(serve)
+                logger.info("starting bash")
+                await trio.run_process(
+                    ["bash", "-i"],
+                    stdin=None,
+                    env={"CURL_CA_BUNDLE": cert_path},
+                )
+
+                logger.info("cancelling nursery")
+                nursery.cancel_scope.cancel()
+
+    trio.run(run)
+
+
+if __name__ == "__main__":
+    app()
