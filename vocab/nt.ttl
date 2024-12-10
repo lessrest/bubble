@@ -2,6 +2,7 @@
 @prefix as: <http://www.w3.org/ns/activitystreams#> .
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix deepgram: <https://node.town/2024/deepgram/#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix iaodev: <http://purl.obolibrary.org/obo/iao/dev/> .
 @prefix nt: <https://node.town/2024/> .
@@ -64,7 +65,6 @@ nt:Surface rdfs:label "surface"@en .
 nt:WebService rdfs:label "web service"@en .
 ai:ImageModel rdfs:label "image model"@en .
 recraft:RecraftV3Style rdfs:label "Recraft v3 style"@en .
-
 protege:defaultLanguage rdfs:label "has default language"@en .
 obo:IAO_0000113 rdfs:label "has branch"@en .
 obo:IAO_0000114 rdfs:label "has curation status"@en .
@@ -476,3 +476,49 @@ nt:bitWidth a owl:DatatypeProperty ;
    rdfs:domain nt:Architecture ;
    rdfs:range xsd:integer ;
    rdfs:label "has bit width"@en , "har bitbredd"@sv , "ir bitu platums"@lv .
+nt:created a owl:DatatypeProperty ;
+   rdfs:domain nt:InformationContentEntity ;
+   rdfs:range xsd:dateTime ;
+   rdfs:label "created"@en , "skapad"@sv , "izveidota"@lv .
+nt:affordance a owl:ObjectProperty ;
+   rdfs:domain nt:InformationContentEntity ;
+   rdfs:range nt:Capability ;
+   rdfs:label "has affordance"@en .
+nt:has a owl:ObjectProperty ;
+   rdfs:label "has"@en .
+nt:UploadEndpoint a nt:Capability ;
+   rdfs:label "upload endpoint"@en .
+nt:accepts a owl:ObjectProperty ;
+   rdfs:label "accepts input of type"@en .
+nt:produces a owl:ObjectProperty ;
+   rdfs:label "produces output of type"@en .
+nt:method a owl:ObjectProperty ;
+   rdfs:label "expects HTTP method"@en .
+nt:Method a owl:Class ;
+   rdfs:label "HTTP method"@en .
+nt:PUT a nt:Method ;
+   rdfs:label "HTTP PUT"@en .
+nt:GET a nt:Method ;
+   rdfs:label "HTTP GET"@en .
+nt:POST a nt:Method ;
+   rdfs:label "HTTP POST"@en .
+nt:DELETE a nt:Method ;
+   rdfs:label "HTTP DELETE"@en .
+nt:PATCH a nt:Method ;
+   rdfs:label "HTTP PATCH"@en .
+nt:EventStream a owl:Class ;
+   rdfs:label "event stream"@en .
+nt:replyTo a owl:ObjectProperty ;
+   rdfs:label "expects response to"@en .
+nt:isResponseTo a owl:ObjectProperty ;
+   rdfs:label "is a response to"@en .
+nt:target a owl:ObjectProperty ;
+   rdfs:label "is addressed to"@en .
+deepgram:Client a owl:Class ;
+   rdfs:label "Deepgram client"@en .
+deepgram:Session a owl:Class ;
+   rdfs:label "Deepgram session"@en .
+deepgram:TranscriptionHypothesis a owl:Class ;
+   rdfs:label "transcription hypothesis"@en .
+deepgram:Start a nt:Step ;
+   rdfs:label "request to start a Deepgram session"@en .

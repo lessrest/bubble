@@ -54,6 +54,12 @@ class BubbleRepo:
     # The graph containing vocabulary/ontology
     vocab: Graph
 
+    # The graph containing transient data
+    transient: Graph
+
+    # The graph containing pending data
+    pending: Graph
+
     # The blob store for binary data
     blobs: BlobStore
 
@@ -65,6 +71,8 @@ class BubbleRepo:
         self.dataset = dataset
         self.graph = self.dataset.graph(NT.bubble)
         self.vocab = self.dataset.graph(NT.vocabulary)
+        self.transient = self.dataset.graph(NT.transient)
+        self.pending = self.dataset.graph(NT.pending)
         self.blobs = BlobStore(str(path / "blobs.db"))
 
     def blob(self, stream_id: URIRef, seq: int = 0) -> BlobStream:

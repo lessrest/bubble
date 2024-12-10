@@ -28,7 +28,6 @@ from swash.util import is_a, get_single_subject
 from swash.vars import Parameter
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, save_bubble, using_bubble
-from bubble.talk import handle_websocket_voice_ingress
 
 logger = structlog.get_logger()
 
@@ -116,7 +115,8 @@ async def websocket_endpoint(websocket: WebSocket, id: str):
         if is_a(entity, NT.UploadCapability):
             stream = get_single_subject(NT.hasPart, entity)
             assert isinstance(stream, URIRef)
-            await handle_websocket_voice_ingress(websocket, stream, bubble)
+            raise Exception("Not implemented")
+        #            await handle_websocket_voice_ingress(websocket, stream, bubble)
         else:
             await websocket.close(code=1008, reason="No capability")
 

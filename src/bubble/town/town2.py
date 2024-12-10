@@ -1,6 +1,7 @@
 from base64 import b64encode
 import json
 
+import pathlib
 import sys
 from typing import (
     Any,
@@ -16,26 +17,27 @@ from datetime import UTC, datetime
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 
+from fastapi.staticfiles import StaticFiles
 import importhook
 
 from pydantic import BaseModel
+from swash import rdfa
+from swash.html import HypermediaResponse, document
+from swash.rdfa import get_subject_data, rdf_resource
 import trio
 import structlog
 
-from rdflib import XSD, Graph, URIRef, Literal, Namespace
-from fastapi import Body, FastAPI, Request, WebSocket
+from rdflib import XSD, BNode, Dataset, Graph, URIRef, Literal, Namespace
+from fastapi import Body, FastAPI, Form, Request, Response, WebSocket
 from fastapi.responses import JSONResponse, StreamingResponse
 from trio_websocket import WebSocketConnection
 
 from swash import Parameter, mint, vars
-from swash.prfx import NT, DID
-from swash.util import add, get_single_object, is_a, new, bubble
-from bubble.repo import BubbleRepo, using_bubble
-from bubble.talk import (
-    DeepgramMessage,
-    DeepgramParams,
-    using_deepgram_live_session,
-)
+from swash.prfx import DEEPGRAM, NT, DID, RDF
+from swash.util import new
+from bubble.page import base_html
+from bubble.repo import BubbleRepo, using_bubble, current_bubble
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @importhook.on_import("aiohttp")  # type: ignore
@@ -97,7 +99,9 @@ class ActorSystem:
     def this(self) -> URIRef:
         return self.current_actor.get().uri
 
-    def spawn(self, action: Callable[[], Awaitable[None]]) -> URIRef:
+    def spawn(
+        self, action: Callable[..., Awaitable[None]], *args
+    ) -> URIRef:
         uri = mint.fresh_uri(self.site)
         chan_send, chan_recv = trio.open_memory_channel(8)
 
@@ -108,14 +112,18 @@ class ActorSystem:
 
             async def task():
                 try:
-                    await action()
+                    await action(*args)
+                    self.logger.info("actor finished", actor=uri)
 
                     # If an exception happens here, what happens?
                     # If we don't catch it, the nursery will crash.
                     # Propagating is okay for now.
 
+                except Exception as e:
+                    logger.error("actor crashed", actor=uri, error=e)
+                    raise
+
                 finally:
-                    self.logger.info("actor exited", actor=uri)
                     del self.actors[uri]
 
             self.nursery.start_soon(task)
@@ -131,6 +139,9 @@ class ActorSystem:
         with self.current_actor.bind(self.actors[actor]):
             try:
                 yield
+            except Exception as e:
+                logger.error("error in actor", error=e, actor=actor)
+                raise
             finally:
                 del self.actors[actor]
 
@@ -142,9 +153,9 @@ def this() -> URIRef:
     return current_actor_system.get().this()
 
 
-def spawn(action: Callable):
+def spawn(action: Callable, *args):
     system = current_actor_system.get()
-    return system.spawn(action)
+    return system.spawn(action, *args)
 
 
 async def send(actor: URIRef, message: Optional[Graph] = None):
@@ -164,19 +175,26 @@ async def receive() -> Graph:
 async def using_actor_system(
     site: str, logger: structlog.stdlib.BoundLogger
 ):
-    async with trio.open_nursery() as nursery:
-        system = ActorSystem(site, nursery, logger)
-        with current_actor_system.bind(system):
-            async with system.as_actor(system.this()):
-                yield system
-            nursery.cancel_scope.cancel()
+    try:
+        async with trio.open_nursery() as nursery:
+            system = ActorSystem(site, nursery, logger)
+            with current_actor_system.bind(system):
+                async with system.as_actor(system.this()):
+                    yield system
+                nursery.cancel_scope.cancel()
+    except BaseException as e:
+        logger.error("error using actor system", error=e)
+        raise
 
 
 @asynccontextmanager
 async def as_temporary_actor() -> AsyncGenerator[URIRef, None]:
     system = current_actor_system.get()
+    logger.info("as_temporary_actor", system=system)
     context = new_context(system.this())
+    logger.info("as_temporary_actor", context=context)
     system.actors[context.uri] = context
+    logger.info("as_temporary_actor", system=system)
     with current_actor_system.bind(system):
         async with system.as_actor(context.uri):
             yield context.uri
@@ -211,22 +229,29 @@ class ServerActor[State]:
         self.state = state
 
     async def __call__(self):
-        while True:
-            msg = await receive()
-            logger.info("received message", graph=msg)
-            response = await self.handle(msg)
-            logger.info("sending response", graph=response)
+        try:
+            while True:
+                msg = await receive()
+                logger.info("received message", graph=msg)
+                response = await self.handle(msg)
+                logger.info("sending response", graph=response)
 
-            for reply_to in msg.objects(msg.identifier, NT.replyTo):
-                await send(URIRef(reply_to), response)
+                for reply_to in msg.objects(msg.identifier, NT.replyTo):
+                    await send(URIRef(reply_to), response)
+        except BaseException as e:
+            logger.error("server actor crashed", error=e)
+            raise
 
     async def handle(self, graph: Graph) -> Graph:
         raise NotImplementedError
 
 
-async def call(actor: URIRef, payload: Graph) -> Graph:
-    async with as_temporary_actor():
-        payload.add((payload.identifier, NT.replyTo, this()))
+async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
+    if payload is None:
+        payload = vars.graph.get()
+
+    async with as_temporary_actor() as tmp:
+        payload.add((payload.identifier, NT.replyTo, tmp))
 
         logger.info(
             "sending request",
@@ -238,7 +263,7 @@ async def call(actor: URIRef, payload: Graph) -> Graph:
 
 
 @contextmanager
-def in_fresh_graph(
+def with_transient_graph(
     suffix: Optional[str] = None,
 ) -> Generator[URIRef, None, None]:
     site = current_actor_system.get().site
@@ -247,11 +272,38 @@ def in_fresh_graph(
     else:
         id = site[suffix]
 
-    with vars.graph.bind(Graph(base=str(site), identifier=id)) as graph:
+    with vars.graph.bind(Graph(base=str(site), identifier=id)):
         yield id
 
 
-class LinkedDataResponse(JSONResponse):
+class LinkedDataResponse(HypermediaResponse):
+    def __init__(
+        self,
+        graph: Optional[Graph] = None,
+        *,
+        vocab: Optional[Namespace] = None,
+        context: Optional[Dict] = None,
+        status_code: int = 200,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        if graph is None:
+            graph = vars.graph.get()
+
+        if headers is None:
+            headers = {}
+
+        headers["Link"] = f'<{str(graph.identifier)}>; rel="self"'
+
+        with base_html("Bubble"):
+            rdf_resource(graph.identifier)
+
+        super().__init__(
+            status_code=status_code,
+            headers=headers,
+        )
+
+
+class JSONLinkedDataResponse(JSONResponse):
     def __init__(
         self,
         graph: Optional[Graph] = None,
@@ -268,7 +320,6 @@ class LinkedDataResponse(JSONResponse):
             context = {
                 "nt": str(NT),
                 "w3": "https://www.w3.org/ns/",
-                # "did": str(DID),
                 "@base": str(graph.base),
             }
 
@@ -276,7 +327,6 @@ class LinkedDataResponse(JSONResponse):
             context["@vocab"] = str(vocab)
 
         jsonld = json.loads(graph.serialize(format="json-ld"))
-
         compacted = pyld.jsonld.compact(
             jsonld, context, {"base": str(graph.base)}
         )
@@ -291,10 +341,29 @@ class LinkedDataResponse(JSONResponse):
             content=compacted,
             status_code=status_code,
             headers=headers,
+            media_type="application/ld+json",
         )
 
 
-# FastAPI app
+def persist(graph: Graph):
+    current_bubble.get().graph += graph
+
+
+@contextmanager
+def with_new_transaction(graph: Optional[Graph] = None):
+    site = current_actor_system.get().site
+    uri = mint.fresh_uri(site)
+    g = Graph(base=str(site), identifier=uri)
+    g.bind("nt", NT)
+    g.bind("deepgram", DEEPGRAM)
+    g.bind("site", site)
+    if graph is not None:
+        g += graph
+
+    with vars.graph.bind(g):
+        yield g
+    logger.info("persisting transaction", graph=g)
+    persist(g)
 
 
 def town_app(
@@ -306,55 +375,111 @@ def town_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("web app starting", site=site)
+        app.mount(
+            "/static",
+            StaticFiles(
+                directory=str(
+                    pathlib.Path(__file__).parent.parent / "static"
+                )
+            ),
+        )
         async with using_actor_system(str(site), logger) as system:
             app.state.actor_system = system
 
             root_actor_uri = spawn(root_actor)
             logger.info("spawned root actor", actor=root_actor_uri)
 
+            create_affordance_button(root_actor_uri)
+
             app.state.root_actor = root_actor_uri
 
             yield
             logger.info("web app ending", app=app.state)
 
-    app = FastAPI(lifespan=lifespan)
+    def create_affordance_button(root_actor_uri):
+        with with_new_transaction():
+            new(
+                URIRef("https://node.town/2024/deepgram/#Client"),
+                {
+                    NT.affordance: [
+                        new(
+                            NT.Button,
+                            {
+                                NT.label: Literal("Start", "en"),
+                                NT.message: URIRef(
+                                    "https://node.town/2024/deepgram/#Start"
+                                ),
+                                NT.target: root_actor_uri,
+                            },
+                            mint.fresh_uri(site),
+                        )
+                    ]
+                },
+                root_actor_uri,
+            )
 
-    @app.middleware("http")
-    async def catch_errors(request, call_next):
-        try:
+    app = FastAPI(lifespan=lifespan, debug=True)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Allows all origins
+        allow_credentials=True,
+        allow_methods=["*"],  # Allows all methods
+        allow_headers=["*"],  # Allows all headers
+    )
+
+    @app.exception_handler(Exception)
+    async def all_exception_handler(request: Request, exc: Exception):
+        logger.error("Unhandled exception", error=str(exc))
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "details": str(exc)},
+        )
+
+    async def bind_document(request, call_next):
+        with document():
             return await call_next(request)
-        except Exception as e:
-            logger.error("error", error=e)
-            return JSONResponse(status_code=500, content={"error": str(e)})
 
-    @app.middleware("http")
     async def bind_actor_system(request, call_next):
         with current_actor_system.bind(app.state.actor_system):
             return await call_next(request)
 
-    @app.middleware("http")
     async def bind_bubble(request, call_next):
         with using_bubble(repo):
+            repo.dataset.bind("site", site)
             return await call_next(request)
+
+    app.middleware("http")(bind_document)
+    app.middleware("http")(bind_actor_system)
+    app.middleware("http")(bind_bubble)
+
+    app.include_router(rdfa.router)
+
+    @app.get("/favicon.ico")
+    async def favicon():
+        return Response(status_code=204)
 
     @app.get("/health")
     async def health_check():
-        with in_fresh_graph("health") as id:
-            new(
-                NT.HealthCheck,
-                {
-                    NT.status: Literal("ok"),
-                    NT.actorSystem: this(),
-                },
-                subject=id,
-            )
+        with with_transient_graph("health") as id:
+            generate_health_status(id)
             return LinkedDataResponse()
+
+    def generate_health_status(id):
+        new(
+            NT.HealthCheck,
+            {
+                NT.status: Literal("ok"),
+                NT.actorSystem: this(),
+            },
+            subject=id,
+        )
 
     @app.get("/.well-known/did.json")
     async def get_did_document():
         did_uri = generate_did_uri()
 
-        with in_fresh_graph(".well-known/did.json") as id:
+        with with_transient_graph(".well-known/did.json") as id:
             build_did_document(did_uri, id)
 
             return LinkedDataResponse(vocab=DID)
@@ -381,56 +506,98 @@ def town_app(
             subject=doc_uri,
         )
 
-    @app.websocket("/ws")
-    async def ws(websocket: WebSocket):
-        await websocket.accept()
-        async with as_temporary_actor():
-            while True:
-                msg = await receive()
-                await websocket.send_json(msg.serialize(format="json-ld"))
-
     @app.post("/{id}")
     async def actor_post(id: str, body: dict = Body(...)):
-        if id == "root":
-            actor = app.state.root_actor
-        else:
-            actor = site[id]
+        actor = site[id]
+        with with_new_transaction() as g:
+            body["@id"] = str(g.identifier)
+            g.parse(data=json.dumps(body), format="json-ld")
+            result = await call(actor, g)
+            return LinkedDataResponse(result)
 
-        g = Graph(base=str(site), identifier=mint.fresh_uri(site))
-        body["@id"] = str(g.identifier)
-        g.parse(data=json.dumps(body), format="json-ld")
-        response = await call(actor, g)
-        return LinkedDataResponse(response)
+    @app.post("/{id}/message")
+    async def actor_message(id: str, type: str = Form(...)):
+        actor = site[id]
+        with with_new_transaction() as g:
+            record_message(type, actor, g)
+
+            result = await call(actor, g)
+            return LinkedDataResponse(result)
+
+    def record_message(type, actor, g):
+        new(
+            URIRef(type),
+            {
+                NT.created: Literal(
+                    datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+                ),
+                NT.target: actor,
+            },
+            g.identifier,
+        )
+
+    async def handle_upload_stream(
+        actor: URIRef, stream: AsyncGenerator[bytes, None]
+    ):
+        """Handle a stream of bytes for uploading, regardless of source."""
+        async for chunk in stream:
+            await send_chunk_to_actor(actor, chunk)
+
+        # Send end marker
+        with with_transient_graph() as id:
+            new(NT.End, {}, id)
+            await send(actor)
+
+        # Return completion message
+        with with_transient_graph() as id:
+            new(NT.Done, {}, id)
+            return vars.graph.get()
 
     @app.put("/{id}")
     async def actor_put(id: str, request: Request):
-        if id == "root":
-            actor = app.state.root_actor
-        else:
-            actor = site[id]
+        actor = site[id]
+        async with as_temporary_actor():
 
-        async with as_temporary_actor() as temp_actor:
-            logger.info("starting put", actor=actor, temp_actor=temp_actor)
-            async for chunk in request.stream():
-                logger.info("received chunk", chunk=len(chunk))
-                with in_fresh_graph() as id:
-                    new(
-                        NT.Chunk,
-                        {
-                            NT.chunk: Literal(
-                                b64encode(chunk), datatype=XSD.base64Binary
-                            )
-                        },
-                        id,
-                    )
-                    await send(actor)
-            with in_fresh_graph() as id:
-                new(NT.End, {}, id)
-                await send(actor)
+            async def request_stream():
+                async for chunk in request.stream():
+                    yield chunk
 
-            with in_fresh_graph() as id:
-                new(NT.Done, {}, id)
-                return LinkedDataResponse()
+            result = await handle_upload_stream(actor, request_stream())
+            return LinkedDataResponse(result)
+
+    @contextmanager
+    def install_context():
+        """Install the actor system and bubble context for request handling."""
+        with current_actor_system.bind(app.state.actor_system):
+            with using_bubble(repo):
+                yield
+
+    @app.websocket("/{id}/upload")
+    async def ws_upload(websocket: WebSocket, id: str):
+        await websocket.accept()
+        actor = site[id]
+        logger.info("starting websocket upload", actor=actor)
+
+        async def websocket_stream():
+            while True:
+                message = await websocket.receive_bytes()
+                yield message
+
+        with install_context():
+            try:
+                result = await handle_upload_stream(
+                    actor, websocket_stream()
+                )
+                await websocket.send_json(
+                    result.serialize(format="json-ld")
+                )
+
+            except Exception as e:
+                logger.error("error in websocket upload", error=e)
+                await websocket.close(code=1011, reason=str(e))
+                raise
+            finally:
+                await websocket.close()
 
     @app.get("/{id}")
     async def actor_get(id: str):
@@ -446,95 +613,31 @@ def town_app(
             receive_messages_for_actor(), media_type="text/event-stream"
         )
 
+    @app.get("/")
+    async def root():
+        with base_html("Bubble"):
+            rdf_resource(app.state.root_actor)
+        return HypermediaResponse()
+
+    async def send_chunk_to_actor(actor: URIRef, message: bytes) -> URIRef:
+        with with_transient_graph() as id:
+            new(
+                NT.Chunk,
+                {
+                    NT.bytes: Literal(
+                        b64encode(message),
+                        datatype=XSD.base64Binary,
+                    )
+                },
+                id,
+            )
+            await send(actor)
+        return id
+
     return app
-
-
-# Let's define a Deepgram client actor...
-
-Deepgram = Namespace("https://node.town/2024/deepgram/#")
 
 
 @contextmanager
 def in_request_graph(g: Graph):
     with vars.graph.bind(g):
         yield g.identifier
-
-
-class DeepgramClientActor(ServerActor[str]):
-    async def handle(self, graph: Graph) -> Graph:
-        with in_request_graph(graph) as msg:
-            if is_a(msg, Deepgram.Start):
-
-                async def deepgram_results_actor():
-                    while True:
-                        await trio.sleep(1)
-
-                results = spawn(deepgram_results_actor)
-
-                async def deepgram_client_actor():
-                    # Wait for first chunk before starting session
-                    with in_request_graph(await receive()) as msg:
-                        logger.info("received first message", msg=msg)
-                        if not is_a(msg, NT.Chunk):
-                            logger.error("expected chunk message")
-                            return
-
-                        first_chunk = get_single_object(
-                            msg, NT.chunk
-                        ).toPython()
-
-                        async with using_deepgram_live_session(
-                            DeepgramParams()
-                        ) as client:
-
-                            async def receive_results():
-                                while True:
-                                    result = await client.get_message()
-                                    message = (
-                                        DeepgramMessage.model_validate_json(
-                                            result
-                                        )
-                                    )
-                                    if message.channel.alternatives[
-                                        0
-                                    ].transcript:
-                                        logger.info(
-                                            "Deepgram message",
-                                            message=message,
-                                        )
-                                        with in_fresh_graph() as id:
-                                            new(
-                                                Deepgram.Result,
-                                                {
-                                                    Deepgram.transcript: message.channel.alternatives[
-                                                        0
-                                                    ].transcript
-                                                },
-                                                id,
-                                            )
-                                            await send(results)
-
-                            spawn(receive_results)
-
-                            # Send the first chunk we received
-                            await client.send_message(first_chunk)
-
-                            # Handle remaining messages
-                            while True:
-                                with in_request_graph(
-                                    await receive()
-                                ) as msg:
-                                    if is_a(msg, NT.Chunk):
-                                        chunk = get_single_object(
-                                            msg, NT.chunk
-                                        )
-                                        bytes = chunk.toPython()
-                                        await client.send_message(bytes)
-
-                session = spawn(deepgram_client_actor)
-                add(msg, {NT.spawned: session})
-                add(msg, {NT.spawned: results})
-                new(Deepgram.Session, {}, session)
-                new(Deepgram.Results, {}, results)
-
-            return graph

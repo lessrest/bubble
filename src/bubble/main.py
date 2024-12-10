@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import hypercorn
 import hypercorn.trio
+from swash.util import new
 import trio
 import typer
 
@@ -17,6 +18,7 @@ from bubble.cred import get_anthropic_credential
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.logs import configure_logging
+from bubble.town.Deepgram import DeepgramClientActor, Deepgram
 from bubble.town.cert import generate_self_signed_cert
 
 
@@ -113,7 +115,7 @@ def town2(
     bubble_path: str = BubblePath,
 ) -> None:
     """Serve the Town2 JSON-LD interface."""
-    from bubble.town.town2 import town_app, DeepgramClientActor
+    from bubble.town.town2 import town_app, spawn
 
     config = hypercorn.Config()
     config.bind = [bind]
@@ -134,6 +136,7 @@ def town2(
                 root_actor = DeepgramClientActor(
                     os.environ["DEEPGRAM_API_KEY"]
                 )
+
                 app = town_app(base_url, bind, repo, root_actor)
 
                 async def serve():
@@ -141,19 +144,22 @@ def town2(
                         await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
                     except trio.Cancelled:
                         pass
-                    except Exception as e:
+                    except BaseException as e:
                         logger.error("error serving town2", error=e)
-                        raise
+                        return
 
                 nursery.start_soon(serve)
-                logger.info("starting bash")
-                try:
-                    await start_bash_shell()
-                except trio.Cancelled:
-                    pass
-                except Exception as e:
-                    logger.error("error starting bash", error=e)
-                    raise
+                # logger.info("starting bash")
+                # try:
+                #     await start_bash_shell()
+                # except trio.Cancelled:
+                #     pass
+                # except Exception as e:
+                #     logger.error("error starting bash", error=e)
+                #     raise
+
+                while True:
+                    await trio.sleep(1)
 
                 logger.info("shutting down")
                 nursery.cancel_scope.cancel()

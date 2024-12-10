@@ -48,7 +48,8 @@ def print_n3(graph: Optional[Graph] = None) -> None:
 
 def graph_string(graph: Graph) -> str:
     """Serialize a graph to a string"""
-    return graph.serialize(format="trig").replace("    ", "  ").strip()
+    s = graph.serialize(format="trig").replace("    ", "  ").strip()
+    return f"[id={graph.identifier}]\n{s}"
 
 
 def get_single_subject(predicate, object, graph=None):
@@ -73,6 +74,12 @@ def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
     g = vars.graph.get()
     return list(g.subjects(predicate, object))
+
+
+def get_objects(subject, predicate):
+    """Get all objects for a subject-predicate pair from the current graph"""
+    g = vars.graph.get()
+    return list(g.objects(subject, predicate))
 
 
 class QueryError(Exception):
@@ -131,26 +138,20 @@ def add(subject: S, properties: dict[P, Any]) -> None:
 
 
 @overload
-def new(type: None = None, properties: dict[P, Any] = {}) -> URIRef: ...
+def new(type: None = None, properties: dict[P, Any] = {}) -> S: ...
 @overload
 def new(
     type: S | None = None,
     properties: dict[P, Any] = {},
-    subject: URIRef = ...,
-) -> URIRef: ...
-@overload
-def new(
-    type: S | None = None,
-    properties: dict[P, Any] = {},
-    subject: URIRef | BNode | None = None,
-) -> URIRef | BNode: ...
+    subject: S | None = None,
+) -> S: ...
 
 
 def new(
     type: Optional[S] = None,
     properties: Optional[dict[P, Any]] = None,
-    subject: Optional[URIRef | BNode] = None,
-) -> URIRef | BNode:
+    subject: Optional[S] = None,
+) -> S:
     graph = vars.graph.get()
 
     if subject is None:

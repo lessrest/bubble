@@ -47,7 +47,7 @@ language_preferences = vars.Parameter(
     "language_preferences", default=["en", "sv", "lv"]
 )
 
-expansion_depth = vars.Parameter("expansion_depth", default=0)
+expansion_depth = vars.Parameter("expansion_depth", default=4)
 visited_resources = vars.Parameter("visited_resources", default=set())
 
 
@@ -59,8 +59,6 @@ def autoexpanding(depth: int):
 
 
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
-    logger.info(f"Getting label for {uri} from {dataset}")
-
     # Get all labels with their languages
     labels = []
     for s, p, o, c in dataset.quads((None, RDFS.label, None, None)):
@@ -88,12 +86,11 @@ def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
 
 
 def get_subject_data(
-    dataset: Dataset, subject: S, context: Optional[Graph] = None
+    dataset: Optional[Dataset], subject: S, context: Optional[Graph] = None
 ) -> Dict[str, Optional[S]]:
     data = {"type": None, "predicates": []}
     graph = context or dataset
-    logger.info(f"Getting subject data for {subject}")
-    logger.info(f"Graph: {len(graph)} triples")
+    assert isinstance(graph, Graph)
     for predicate, obj in graph.predicate_objects(subject):
         if predicate == RDF.type:
             data["type"] = obj
@@ -186,7 +183,6 @@ def render_expander(obj, predicate):
 
 @router.get("/resource/{subject:path}")
 def get_rdf_resource(subject: str) -> None:
-    logger.info(f"Getting RDF resource for {subject}")
     subject = (
         BNode(subject.removeprefix("_:"))
         if subject.startswith("_")
@@ -196,10 +192,8 @@ def get_rdf_resource(subject: str) -> None:
 
 
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
-    logger.info(f"Rendering RDF resource for {subject}")
     if data is None:
         data = get_subject_data(current_bubble.get().dataset, subject)
-    logger.info(f"Data: {data}")
 
     if data["type"] == NT.Image:
         render_image_resource(subject, data)
@@ -207,8 +201,10 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_video_resource(subject, data)
     elif data["type"] == NT.VoiceRecording:
         render_voice_recording_resource(subject, data)
-    elif data["type"] == NT.UploadCapability:
+    elif data["type"] == NT.UploadEndpoint:
         render_upload_capability_resource(subject, data)
+    elif data["type"] == NT.Button:
+        render_button_resource(subject, data)
     else:
         render_default_resource(subject, data)
 
@@ -216,12 +212,15 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
 @html.div("flex flex-col items-start gap-1")
 def render_upload_capability_resource(subject: S, data: Dict):
     render_resource_header(subject, data)
+    url = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.url), None
+    )
     with tag(
-        "voice-recorder-writer",
+        "audio-recorder",
         classes=[
             "text-lg font-serif py-1",
         ],
-        endpoint=str(subject),
+        endpoint=url,
     ):
         pass
     render_properties(data)
@@ -294,6 +293,39 @@ def render_audio_player_and_header(subject, data, audio_url, duration):
     # if audio_url:
     #     render_audio_charm(audio_url, duration)
     render_resource_header(subject, data)
+
+
+@html.form()
+def render_button_resource(subject, data):
+    label = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.label), None
+    )
+    if label is None:
+        label = "Button"
+
+    target = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.target), None
+    )
+
+    attr("hx-post", str(target) + "/message")
+    attr("hx-swap", "afterend")
+
+    message_uri = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.message),
+        None,
+    )
+
+    if message_uri is None:
+        raise ValueError("Button resource has no message")
+
+    with tag("input", type="hidden", name="type", value=str(message_uri)):
+        pass
+
+    with tag(
+        "button",
+        classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4",
+    ):
+        text(label)
 
 
 @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
@@ -464,8 +496,6 @@ def _render_bnode(obj: BNode) -> None:
 
 
 def _render_literal(obj: Literal) -> None:
-    logger.info(f"Rendering literal: {obj}")
-    rich.inspect(obj)
     datatype_handlers = {
         XSD.string: _render_string_literal,
         XSD.boolean: _render_boolean_literal,
@@ -508,9 +538,6 @@ def get_json(json_hash: str):
         literal = o
         dictionary = json.loads(literal)
         hash = hashlib.sha256(literal.encode()).hexdigest()
-        logger.info(
-            "Checking JSON literal",
-        )
         if hash == json_hash:
             render_json(dictionary)
             return
@@ -611,7 +638,6 @@ def _render_any_uri_literal(obj: Literal) -> None:
 
 @html.span("text-orange-600 dark:text-orange-400")
 def _render_default_literal(obj: Literal) -> None:
-    logger.info(f"Rendering default literal: {obj}")
     text(f'"{obj.value}" ({obj.datatype})')
 
 

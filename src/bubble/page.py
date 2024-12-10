@@ -30,6 +30,7 @@ def base_html(title: str):
                 tag("script", src=script)
             tag("script", type="module", src="/static/type-writer.js")
             tag("script", type="module", src="/static/voice-writer.js")
+            tag("script", type="module", src="/static/audio-recorder.js")
             tag("script", type="module", src="/static/live.js")
             json_assignment_script("htmx.config", htmx_config)
 

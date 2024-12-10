@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/bubble/**/*.{html,js,py}"],
+  content: ["./src/bubble/**/*.{html,js,py}", "./swash/**/*.{html,js,py}"],
   theme: {
     extend: {
       fontFamily: {

@@ -69,14 +69,14 @@ async def test_basic_actor_system(logger):
 
 
 class CounterActor(ServerActor[int]):
-    async def handle(self, request: Graph) -> Graph:
-        if is_a(request.identifier, EX.Inc, graph=request):
+    async def handle(self, graph: Graph) -> Graph:
+        if is_a(graph.identifier, EX.Inc, graph=graph):
             self.state += 1
             return bubble(EX.Inc, EX, {EX.value: Literal(self.state)})
-        elif is_a(request.identifier, EX.Get, graph=request):
+        elif is_a(graph.identifier, EX.Get, graph=graph):
             return bubble(EX.Get, EX, {EX.value: Literal(self.state)})
         else:
-            raise ValueError(f"Unknown action: {request.identifier}")
+            raise ValueError(f"Unknown action: {graph.identifier}")
 
 
 async def test_counter_actor(logger):
@@ -107,7 +107,12 @@ async def temp_repo(tmp_path):
 @asynccontextmanager
 @fixture
 async def client(temp_repo):
-    app = town_app("http://example.com", "localhost:8000", repo=temp_repo)
+    app = town_app(
+        "http://example.com",
+        "localhost:8000",
+        repo=temp_repo,
+        root_actor=CounterActor(0),
+    )
     async with LifespanManager(app) as manager:
         async with AsyncClient(
             base_url="http://example.com",

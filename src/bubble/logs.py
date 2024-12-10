@@ -11,9 +11,14 @@ from rich.padding import Padding
 from rich.columns import Columns
 from rich.text import Text
 from rich.containers import Renderables
+import rich.traceback
 import rich.box
-
+import trio
+import hypercorn
+import hypercorn.trio
+import outcome
 import structlog
+import starlette
 from swash.util import graph_string
 
 # Custom theme for our logs
@@ -164,6 +169,27 @@ class RichConsoleRenderer:
                     )
                 else:
                     table.add_row(key, Text(str(value), style="graph"))
+            elif key == "error":
+                # show the error as a traceback
+                # using rich.traceback.Traceback
+                table.add_row(
+                    key,
+                    rich.traceback.Traceback.from_exception(
+                        exc_type=type(value),
+                        exc_value=value,
+                        traceback=value.__traceback__,
+                        show_locals=False,
+                        max_frames=1,
+                        suppress=[
+                            structlog,
+                            trio,
+                            hypercorn,
+                            hypercorn.trio,
+                            outcome,
+                            starlette,
+                        ],
+                    ),
+                )
             else:
                 table.add_row(key, rich.pretty.Pretty(value))
 
@@ -178,29 +204,39 @@ class RichConsoleRenderer:
             self._handle_hypercorn_error(
                 event_dict.get("timestamp", ""), event_dict.get("event", "")
             )
+            self._console.print(event_dict)
             return ""
 
-        # Format the log entry components
-        timestamp, name, module, file_location, event, remaining_dict = (
-            self._format_log_entry(name, event_dict)
-        )
+        try:
+            # Format the log entry components
+            (
+                timestamp,
+                name,
+                module,
+                file_location,
+                event,
+                remaining_dict,
+            ) = self._format_log_entry(name, event_dict)
 
-        # Create header
-        header = self._create_header(
-            timestamp, name, module, file_location, event
-        )
+            # Create header
+            header = self._create_header(
+                timestamp, name, module, file_location, event
+            )
 
-        # Build the complete renderable
-        elements: list[RenderableType] = [header]
+            # Build the complete renderable
+            elements: list[RenderableType] = [header]
 
-        # Add fields table if we have additional fields
-        if remaining_dict:
-            fields_table = self._create_fields_table(remaining_dict)
-            elements.append(Padding(fields_table, (0, 0, 0, 0)))
+            # Add fields table if we have additional fields
+            if remaining_dict:
+                fields_table = self._create_fields_table(remaining_dict)
+                elements.append(Padding(fields_table, (0, 0, 0, 0)))
 
-        # Render the final output
-        self._render_output(name, elements)
-        return ""
+            # Render the final output
+            self._render_output(name, elements)
+            return ""
+        except Exception as e:
+            self._console.print(f"Error rendering log entry: {e}")
+            return ""
 
     def _render_output(
         self, name: str, elements: list[RenderableType]
