@@ -45,6 +45,7 @@ def base_html(title: str):
                 type="module",
                 src="/static/voice-recorder-writer.js",
             )
+            tag("script", type="module", src="/static/jsonld-socket.js")
 
 
 def action_button(label: str, **attrs):

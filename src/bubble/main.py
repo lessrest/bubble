@@ -3,6 +3,7 @@ import pathlib
 
 from urllib.parse import urlparse
 
+from fastapi import FastAPI
 from rdflib import URIRef
 from swash.prfx import NT
 from swash.util import add, new
@@ -23,7 +24,9 @@ from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.town.cert import generate_self_signed_cert
 from bubble.town.Deepgram import DeepgramClientActor
-from bubble.town.town import TownApp, spawn
+from bubble.town.town import SimpleSupervisor, TownApp, spawn
+from bubble.town.uptime import UptimeActor
+from datetime import datetime, UTC
 
 console = Console(width=80)
 
@@ -80,6 +83,14 @@ def server(
     trio.run(run)
 
 
+async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
+    await hypercorn.trio.serve(
+        app,  # type: ignore
+        config,
+        mode="asgi",
+    )
+
+
 @app.command()
 def town(
     bind: str = Option("127.0.0.1:2026", "--bind", help="Bind address"),
@@ -87,6 +98,7 @@ def town(
         "https://localhost:2026", "--base-url", help="Public base URL"
     ),
     bubble_path: str = BubblePath,
+    shell: bool = Option(False, "--shell", help="Start a bash subshell"),
 ) -> None:
     """Serve the Town2 JSON-LD interface."""
     config = hypercorn.Config()
@@ -97,9 +109,9 @@ def town(
     assert base_url.startswith("https://")
     hostname = urlparse(base_url).hostname
     assert hostname
-    cert_path, key_path = generate_self_signed_cert(hostname)
-    config.certfile = cert_path
-    config.keyfile = key_path
+    # cert_path, key_path = generate_self_signed_cert(hostname)
+    config.certfile = "./priv/localhost.pem"
+    config.keyfile = "./priv/localhost-key.pem"
 
     async def run():
         async with trio.open_nursery() as nursery:
@@ -107,36 +119,31 @@ def town(
             async with loading_bubble_from(trio.Path(bubble_path)) as repo:
                 town = TownApp(base_url, bind, repo)
                 with town.install_context():
-                    deepgram_client = await spawn(
-                        nursery, DeepgramClientActor("Deepgram Client")
+                    supervisor = await spawn(
+                        nursery,
+                        SimpleSupervisor(
+                            DeepgramClientActor("Deepgram Client")
+                        ),
                     )
 
-                    add(URIRef(base_url), {NT.has: deepgram_client})
+                    uptime = await spawn(
+                        nursery,
+                        UptimeActor(datetime.now(UTC)),
+                        name="uptime",
+                    )
 
-                    async def serve():
-                        try:
-                            await hypercorn.trio.serve(
-                                town.get_fastapi_app(),  # type: ignore
-                                config,
-                                mode="asgi",
-                            )
-                        except Exception as e:
-                            logger.error("error serving Node.Town", error=e)
-                            return
+                    add(URIRef(base_url), {NT.has: supervisor})
+                    add(URIRef(base_url), {NT.has: uptime})
 
-                    nursery.start_soon(serve)
+                    nursery.start_soon(
+                        serve_fastapi_app, config, town.get_fastapi_app()
+                    )
 
-                    # logger.info("starting bash")
-                    # try:
-                    #     await start_bash_shell()
-                    # except trio.Cancelled:
-                    #     pass
-                    # except Exception as e:
-                    #     logger.error("error starting bash", error=e)
-                    #     raise
-
-                    while True:
-                        await trio.sleep(1)
+                    if shell:
+                        await start_bash_shell()
+                    else:
+                        while True:
+                            await trio.sleep(1)
 
     async def start_bash_shell():
         await trio.run_process(
@@ -144,7 +151,7 @@ def town(
             stdin=None,
             check=False,
             env={
-                "CURL_CA_BUNDLE": cert_path,
+                # "CURL_CA_BUNDLE": cert_path,
                 "PS1": get_bash_prompt(),
                 "BASH_SILENCE_DEPRECATION_WARNING": "1",
             },

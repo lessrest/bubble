@@ -59,7 +59,7 @@ async def receive_results(client: WebSocketConnection, results: URIRef):
 
 
 def chunk_data(id: S) -> bytes:
-    chunk = get_single_object(id, NT.Bytes)
+    chunk = get_single_object(id, NT.bytes)
     data = chunk.toPython()
     assert isinstance(data, bytes)
     return data

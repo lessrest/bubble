@@ -211,6 +211,28 @@ export class AudioRecorder extends HTMLElement {
     this.container.classList.remove("recording")
     this.internals.states.delete("recording")
   }
+
+  async sendChunk(chunk) {
+    if (this.socket) {
+      this.socket.send({
+        "@id": generateRandomId(),
+        "@type": "Chunk",
+        bytes: await this.encodeChunk(chunk),
+      })
+    }
+  }
+
+  async stop() {
+    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
+      this.mediaRecorder.stop()
+      if (this.socket) {
+        this.socket.send({
+          "@id": generateRandomId(),
+          "@type": "End",
+        })
+      }
+    }
+  }
 }
 
 // Register the custom element

@@ -28,10 +28,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from swash import Parameter, mint, rdfa, vars
-from swash.html import HypermediaResponse, document
+from swash.html import HypermediaResponse, attr, document, tag, text
 from swash.prfx import NT, DID, DEEPGRAM
 from swash.rdfa import rdf_resource
-from swash.util import S, new
+from swash.util import S, add, get_objects, get_single_subject, new
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
 
@@ -256,8 +256,8 @@ class ServerActor[State]:
 
     async def __call__(self):
         """Main actor message processing loop with error handling."""
-        try:
-            async with trio.open_nursery() as nursery:
+        async with trio.open_nursery() as nursery:
+            try:
                 await self.init()
                 while True:
                     msg = await receive()
@@ -267,15 +267,46 @@ class ServerActor[State]:
 
                     for reply_to in msg.objects(msg.identifier, NT.replyTo):
                         await send(URIRef(reply_to), response)
-        except Exception as e:
-            logger.error("actor message handling error", error=e)
-            raise  # Let it crash
+            except Exception as e:
+                logger.error("actor message handling error", error=e)
+                raise
 
     async def init(self):
         pass
 
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         raise NotImplementedError
+
+
+logger = structlog.get_logger()
+
+
+class SimpleSupervisor:
+    def __init__(self, actor: Callable):
+        self.actor = actor
+
+    async def __call__(self):
+        with with_new_transaction() as g:
+            new(NT.Supervisor, {}, this())
+
+        while True:
+            try:
+                async with trio.open_nursery() as nursery:
+                    logger.info("starting supervised actor tree")
+                    child = await spawn(nursery, self.actor)
+                    add(this(), {NT.has: child})
+            except trio.Cancelled as e:
+                logger.info(
+                    "supervised actor tree crashed; restarting in 1s",
+                    error=e,
+                )
+                await trio.sleep(1)
+            except BaseExceptionGroup as e:
+                logger.info(
+                    "supervised actor tree crashed (group); restarting in 1s",
+                    error=e,
+                )
+                await trio.sleep(1)
 
 
 async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
@@ -546,6 +577,7 @@ class TownApp:
         self.app.websocket("/{id}/upload")(self.ws_upload)
         self.app.get("/{id}")(self.actor_get)
         self.app.get("/")(self.root)
+        self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
 
     async def health_check(self):
         with with_transient_graph("health") as id:
@@ -667,10 +699,64 @@ class TownApp:
             stream_messages(), media_type="text/event-stream"
         )
 
+    # Add uptime actor URI to the HTML template
     async def root(self):
+        uptime_actor = get_single_subject(RDF.type, NT.UptimeActor)
+
         with base_html("Bubble"):
+            # Create uptime actor element with endpoint and target attributes
+            with tag("jsonld-socket"):
+                attr("endpoint", f"{self.get_websocket_base()}/foo/jsonld")
+                attr("uptime-target", str(uptime_actor))
+
             rdf_resource(self.base)
         return HypermediaResponse()
+
+    def get_websocket_base(self):
+        return self.base_url.replace("https://", "wss://")
+
+    async def ws_jsonld(self, websocket: WebSocket, id: str):
+        """WebSocket handler for JSON-LD messages with actor system integration."""
+        try:
+            await websocket.accept()
+            logger.info("starting jsonld websocket connection", id=id)
+
+            while True:
+                try:
+                    data = await websocket.receive_json()
+                    logger.info("received json-ld message", data=data)
+
+                    # Create a graph from the JSON-LD message
+                    g = Graph(identifier=data["@id"])
+                    g.parse(data=json.dumps(data), format="json-ld")
+                    logger.info("parsed json-ld message", graph=g)
+
+                    # Find target actor and send message
+                    target = list(g.objects(g.identifier, NT.target))
+                    if target:
+                        response = await call(URIRef(target[0]), g)
+                        await websocket.send_json(
+                            json.loads(response.serialize(format="json-ld"))
+                        )
+                    else:
+                        await websocket.send_json(
+                            {"error": "No target actor specified"}
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        "error processing websocket message", error=e
+                    )
+                    await websocket.send_json({"error": str(e)})
+
+        except Exception as e:
+            logger.error("websocket handler error", error=e)
+            try:
+                await websocket.close(code=1011, reason=str(e))
+            except Exception:
+                pass
+        finally:
+            await websocket.close()
 
     @contextmanager
     def install_context(self):
