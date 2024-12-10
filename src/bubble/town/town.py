@@ -3,6 +3,8 @@ import pathlib
 
 from base64 import b64encode
 from typing import (
+    Any,
+    Set,
     Dict,
     Callable,
     Optional,
@@ -10,16 +12,15 @@ from typing import (
     Generator,
     AsyncGenerator,
     MutableMapping,
-    Set,
 )
 from datetime import UTC, datetime
 from contextlib import contextmanager
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
 
+import tenacity
 import trio
 import structlog
-import importhook
 
 from rdflib import RDF, XSD, Graph, URIRef, Literal, Namespace
 from fastapi import Body, Form, FastAPI, Request, Response, WebSocket
@@ -28,169 +29,177 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from swash import Parameter, mint, rdfa, vars
-from swash.html import HypermediaResponse, attr, document, tag, text
+from swash.html import HypermediaResponse, tag, attr, document
 from swash.prfx import NT, DID, DEEPGRAM
 from swash.rdfa import rdf_resource
-from swash.util import S, add, get_objects, get_single_subject, new
+from swash.util import S, add, new, get_single_subject
+from swash.json import pyld
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
+from PIL import Image
+from io import BytesIO
 
-
-@importhook.on_import("aiohttp")  # type: ignore
-def on_aiohttp_import(aiohttp):
-    # This is a hack to avoid PyLD crashing on load in IPython.
-    raise ImportError("hehe")
-
-
-try:
-    import pyld
-finally:
-    pass
 
 logger = structlog.get_logger(__name__)
 
 
 @dataclass
 class ActorContext:
-    parent: URIRef
-    uri: URIRef
-    chan_send: trio.MemorySendChannel
-    chan_recv: trio.MemoryReceiveChannel
-    trap_exit: bool = False
-    name: str = "unnamed"
+    boss: URIRef
+    addr: URIRef
+    send: trio.MemorySendChannel
+    recv: trio.MemoryReceiveChannel
+    trap: bool = False
+    name: str = "anonymous"
+
+
+def fresh_uri(site: Optional[Namespace] = None) -> URIRef:
+    if site is None:
+        site = hub.get().site
+    return mint.fresh_uri(site)
 
 
 def new_context(parent: URIRef, name: str = "unnamed") -> ActorContext:
-    site = current_actor_system.get().site
-    uri = mint.fresh_uri(site)
     chan_send, chan_recv = trio.open_memory_channel(8)
-    return ActorContext(parent, uri, chan_send, chan_recv, name=name)
+    return ActorContext(
+        parent, fresh_uri(), chan_send, chan_recv, name=name
+    )
 
 
 def root_context(site: Namespace, name: str = "root") -> ActorContext:
-    uri = mint.fresh_uri(site)
+    uri = fresh_uri(site)
     chan_send, chan_recv = trio.open_memory_channel(8)
     return ActorContext(uri, uri, chan_send, chan_recv, name=name)
 
 
-class ActorSystem:
+class Town:
     site: Namespace
-    current_actor: Parameter[ActorContext]
-    actors: MutableMapping[URIRef, ActorContext]
-    logger: structlog.stdlib.BoundLogger
+    curr: Parameter[ActorContext]
+    deck: MutableMapping[URIRef, ActorContext]
+    yell: structlog.stdlib.BoundLogger
 
     def __init__(
         self,
         site: str,
-        logger: structlog.stdlib.BoundLogger,
+        yell: structlog.stdlib.BoundLogger,
     ):
         self.site = Namespace(site)
-        self.logger = logger.bind(site=site)
+        self.yell = yell.bind(site=site)
 
         root = root_context(self.site)
-        self.current_actor = Parameter("current_actor", root)
-        self.actors = {root.uri: root}
+        self.curr = Parameter("current_actor", root)
+        self.deck = {root.addr: root}
 
     def this(self) -> URIRef:
-        return self.current_actor.get().uri
+        return self.curr.get().addr
 
     async def spawn(
         self,
-        nursery: trio.Nursery,
-        action: Callable[..., Awaitable[None]],
+        crib: trio.Nursery,
+        code: Callable[..., Awaitable[None]],
         *args,
         name: Optional[str] = None,
     ) -> URIRef:
         if name is None:
-            if hasattr(action, "__name__"):
-                name = action.__name__
+            if hasattr(code, "__name__"):
+                name = code.__name__
             else:
-                name = action.__class__.__name__
+                name = code.__class__.__name__
 
-        parent_ctx = self.current_actor.get()
-        context = new_context(parent_ctx.uri, name=name)
-        self.actors[context.uri] = context
+        parent_ctx = self.curr.get()
+        context = new_context(parent_ctx.addr, name=name)
+        self.deck[context.addr] = context
 
-        self.logger.info(
+        self.yell.info(
             "spawning",
-            actor=context.uri,
+            actor=context.addr,
             actor_name=name,
-            parent=parent_ctx.uri,
+            parent=parent_ctx.addr,
         )
 
         async def task():
-            with self.current_actor.bind(context):
+            with self.curr.bind(context):
                 try:
-                    await action(*args)
-                    self.logger.info(
-                        "actor finished", actor=context.uri, actor_name=name
+                    await code(*args)
+                    self.yell.info(
+                        "actor finished",
+                        actor=context.addr,
+                        actor_name=name,
                     )
                 except BaseException as e:
                     logger.error(
                         "actor crashed",
-                        actor=context.uri,
+                        actor=context.addr,
                         actor_name=name,
                         error=e,
-                        parent=context.parent,
+                        parent=context.boss,
                     )
 
-                    if parent_ctx and parent_ctx.trap_exit:
-                        self.logger.info(
+                    if parent_ctx and parent_ctx.trap:
+                        self.yell.info(
                             "sending exit signal",
-                            to=parent_ctx.uri,
+                            to=parent_ctx.addr,
                         )
                         await self.send_exit_signal(
-                            parent_ctx.uri, context.uri, e
+                            parent_ctx.addr, context.addr, e
                         )
                     else:
-                        self.logger.info("raising exception")
+                        self.yell.info("raising exception")
                         raise
                 finally:
-                    self.logger.info(
-                        "deleting actor", actor=(context.uri, name)
+                    self.yell.info(
+                        "deleting actor", actor=(context.addr, name)
                     )
-                    del self.actors[context.uri]
+                    del self.deck[context.addr]
                     self.print_actor_tree()
 
-        nursery.start_soon(task)
-        return context.uri
+        crib.start_soon(task)
+        return context.addr
 
     async def send_exit_signal(
         self, parent: URIRef, child: URIRef, error: BaseException
     ):
-        g = create_graph()
-        g.add((g.identifier, RDF.type, NT.Exit))
-        g.add((g.identifier, NT.actor, child))
-        g.add((g.identifier, NT.message, Literal(str(error))))
-        child_ctx = self.actors.get(child)
-        child_name = child_ctx.name if child_ctx else "unknown"
-        self.logger.info(
-            "sending exit signal",
-            to=parent,
-            child=child,
-            child_name=child_name,
-            error=error,
-        )
-        await self.send(parent, g)
+        with with_transient_graph() as id:
+            new(
+                NT.Exit,
+                {NT.actor: child, NT.message: Literal(str(error))},
+                id,
+            )
 
-    async def send(self, actor: URIRef, message: Graph):
-        if actor not in self.actors:
+            child_ctx = self.deck.get(child)
+            child_name = child_ctx.name if child_ctx else "unknown"
+            self.yell.info(
+                "sending exit signal",
+                to=parent,
+                child=child,
+                child_name=child_name,
+                error=error,
+            )
+
+            await self.send(parent)
+
+    async def send(self, actor: URIRef, message: Optional[Graph] = None):
+        if message is None:
+            message = vars.graph.get()
+
+        if actor not in self.deck:
             raise ValueError(f"Actor {actor} not found")
-        await self.actors[actor].chan_send.send(message)
+
+        await self.deck[actor].send.send(message)
 
     def get_actor_hierarchy(self) -> Dict[URIRef, Set[URIRef]]:
         """Get the parent-child relationships between actors."""
-        children = defaultdict(set)
-        for actor_uri, ctx in self.actors.items():
-            if ctx.parent != ctx.uri:  # Skip root which is its own parent
-                children[ctx.parent].add(actor_uri)
-        return dict(children)
+        kids = defaultdict(set)
+        for addr, ctx in self.deck.items():
+            if ctx.boss != ctx.addr:  # Skip root which is its own parent
+                kids[ctx.boss].add(addr)
+        return dict(kids)
 
     def format_actor_tree(
         self, root: URIRef, indent: str = "", is_last: bool = True
     ) -> str:
         """Format the actor hierarchy as a tree string starting from given root."""
-        ctx = self.actors.get(root)
+        ctx = self.deck.get(root)
         if not ctx:
             return f"{indent}[deleted actor {root}]\n"
 
@@ -213,17 +222,17 @@ class ActorSystem:
         """Print the complete actor hierarchy tree."""
         # Find the root (actor that is its own parent)
         root = next(
-            uri for uri, ctx in self.actors.items() if ctx.parent == ctx.uri
+            uri for uri, ctx in self.deck.items() if ctx.boss == ctx.addr
         )
         tree = self.format_actor_tree(root)
-        self.logger.info("Actor hierarchy:\n" + tree)
+        self.yell.info("Actor hierarchy:\n" + tree)
 
 
-current_actor_system = Parameter[ActorSystem]("current_actor_system")
+hub = Parameter[Town]("hub")
 
 
 def this() -> URIRef:
-    return current_actor_system.get().this()
+    return hub.get().this()
 
 
 async def spawn(
@@ -232,12 +241,12 @@ async def spawn(
     *args,
     name: Optional[str] = None,
 ):
-    system = current_actor_system.get()
+    system = hub.get()
     return await system.spawn(nursery, action, *args, name=name)
 
 
 async def send(actor: URIRef, message: Optional[Graph] = None):
-    system = current_actor_system.get()
+    system = hub.get()
     if message is None:
         message = vars.graph.get()
     logger.info("sending message", actor=actor, graph=message)
@@ -245,8 +254,8 @@ async def send(actor: URIRef, message: Optional[Graph] = None):
 
 
 async def receive() -> Graph:
-    system = current_actor_system.get()
-    return await system.current_actor.get().chan_recv.receive()
+    system = hub.get()
+    return await system.curr.get().recv.receive()
 
 
 class ServerActor[State]:
@@ -286,38 +295,40 @@ class SimpleSupervisor:
         self.actor = actor
 
     async def __call__(self):
-        with with_new_transaction() as g:
+        with with_new_transaction():
             new(NT.Supervisor, {}, this())
 
-        while True:
-            try:
+        def retry_sleep(retry_state: tenacity.RetryCallState) -> Any:
+            return logger.warning(
+                "supervised actor tree crashed; retrying after exponential backoff",
+                retrying=retry_state,
+            )
+
+        retry = tenacity.AsyncRetrying(
+            wait=tenacity.wait_exponential(multiplier=1, max=60),
+            retry=tenacity.retry_if_exception_type(
+                (trio.Cancelled, BaseExceptionGroup)
+            ),
+            before_sleep=retry_sleep,
+        )
+
+        async for attempt in retry:
+            with attempt:
                 async with trio.open_nursery() as nursery:
                     logger.info("starting supervised actor tree")
                     child = await spawn(nursery, self.actor)
                     add(this(), {NT.has: child})
-            except trio.Cancelled as e:
-                logger.info(
-                    "supervised actor tree crashed; restarting in 1s",
-                    error=e,
-                )
-                await trio.sleep(1)
-            except BaseExceptionGroup as e:
-                logger.info(
-                    "supervised actor tree crashed (group); restarting in 1s",
-                    error=e,
-                )
-                await trio.sleep(1)
 
 
 async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
     if payload is None:
         payload = vars.graph.get()
 
-    send_chan, recv_chan = trio.open_memory_channel[Graph](1)
+    sendchan, recvchan = trio.open_memory_channel[Graph](1)
 
-    tmp = mint.fresh_uri(get_site())
-    current_actor_system.get().actors[tmp] = ActorContext(
-        parent=this(), uri=tmp, chan_send=send_chan, chan_recv=recv_chan
+    tmp = fresh_uri()
+    hub.get().deck[tmp] = ActorContext(
+        boss=this(), addr=tmp, send=sendchan, recv=recvchan
     )
 
     payload.add((payload.identifier, NT.replyTo, tmp))
@@ -330,7 +341,7 @@ async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
 
     await send(actor, payload)
 
-    return await recv_chan.receive()
+    return await recvchan.receive()
 
 
 def create_graph(
@@ -366,7 +377,9 @@ def with_new_transaction(graph: Optional[Graph] = None):
 
     with vars.graph.bind(g):
         yield g
+
     logger.info("persisting transaction", graph=g)
+
     persist(g)
 
 
@@ -457,7 +470,7 @@ def persist(graph: Graph):
 
 def get_site() -> Namespace:
     """Get the site namespace from the current actor system."""
-    return current_actor_system.get().site
+    return hub.get().site
 
 
 def record_message(type: str, actor: URIRef, g: Graph):
@@ -519,14 +532,15 @@ class TownApp:
         self.bind = bind
         self.repo = repo
         self.site = Namespace(base_url + "/")
-        self.logger = structlog.get_logger(__name__).bind(bind=bind)
+        self.yell = structlog.get_logger(__name__).bind(bind=bind)
         self.app = FastAPI()
+
         self._setup_error_handlers()
         self._setup_middleware()
         self._setup_routes()
 
-        self.system = ActorSystem(str(self.site), self.logger)
-        current_actor_system.set(self.system)
+        self.system = Town(str(self.site), self.yell)
+        hub.set(self.system)
 
     def _setup_error_handlers(self):
         """Setup comprehensive error handling for the web layer."""
@@ -606,7 +620,7 @@ class TownApp:
             return await call_next(request)
 
     async def bind_actor_system(self, request, call_next):
-        with current_actor_system.bind(self.system):
+        with hub.bind(self.system):
             return await call_next(request)
 
     async def bind_bubble(self, request, call_next):
@@ -616,14 +630,59 @@ class TownApp:
 
     # Route handlers
     async def all_exception_handler(self, request: Request, exc: Exception):
-        self.logger.error("Unhandled exception", error=exc)
+        self.yell.error("Unhandled exception", error=exc)
         return JSONResponse(
             status_code=500,
             content={"error": "Internal Server Error", "details": str(exc)},
         )
 
     async def favicon(self):
-        return Response(status_code=204)
+        """Generate a detailed favicon with color gradation from ASCII art."""
+
+        ascii_art = [
+            "    ********    ",
+            "  **@@####@@**  ",
+            " *@#$$$$$$##@* ",
+            "*@#$$&&&&$$##@*",
+            "*#$&&&**&&&$#@*",
+            "@#$&******&$#@*",
+            "@#$&******&$#@*",
+            "@#$&******&$#@*",
+            "@#$&******&$#@*",
+            "*#$&&&**&&&$#*",
+            "*@#$$&&&&$$#@*",
+            " *@#$$$$$$#@* ",
+            "  **@@##@@**  ",
+            "    ********    ",
+            "              ",
+            "              ",
+        ]
+
+        img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        pixels = img.load()
+        assert pixels is not None
+
+        colors = {
+            "*": (100, 149, 237, 255),  # Base color (Cornflower blue)
+            "@": (130, 169, 247, 255),  # Lighter shade
+            "#": (80, 129, 217, 255),  # Darker shade
+            "$": (150, 189, 255, 255),  # Highlight
+            "&": (180, 209, 255, 255),  # Brightest highlight
+            " ": (0, 0, 0, 0),  # Transparent
+        }
+
+        for y, row in enumerate(ascii_art):
+            for x, char in enumerate(row):
+                if char != " ":
+                    pixels[x, y] = colors[char]
+
+        img = img.resize((32, 32), Image.Resampling.NEAREST)
+
+        ico_buffer = BytesIO()
+        img.save(ico_buffer, format="ICO")
+        ico_data = ico_buffer.getvalue()
+
+        return Response(content=ico_data, media_type="image/x-icon")
 
     async def actor_post(self, id: str, body: dict = Body(...)):
         actor = self.site[id]
@@ -677,13 +736,13 @@ class TownApp:
             await websocket.close()
 
     async def actor_get(self, id: str):
-        actor = current_actor_system.get().actors[self.site[id]]
+        actor = hub.get().deck[self.site[id]]
 
         async def stream_messages():
             try:
                 while True:
                     try:
-                        graph: Graph = await actor.chan_recv.receive()
+                        graph: Graph = await actor.recv.receive()
                         jsonld = graph.serialize(format="json-ld")
                         yield f"event: message\ndata: {jsonld}\n\n"
                     except (
@@ -761,7 +820,7 @@ class TownApp:
     @contextmanager
     def install_context(self):
         """Install the actor system and bubble context for request handling."""
-        with current_actor_system.bind(self.system):
+        with hub.bind(self.system):
             with using_bubble(self.repo):
                 yield
 

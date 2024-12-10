@@ -81,6 +81,8 @@ dependencies = [
     "asgi-lifespan>=2.1.0",
     "pyld>=2.0.4",
     "importhook>=1.0.9",
+    "tenacity>=9.0.0",
+    "pillow>=11.0.0",
 ]
 
 [tool.uv.sources]

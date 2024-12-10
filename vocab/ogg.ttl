@@ -1,0 +1,255 @@
+@prefix ogg: <https://swa.sh/2024/ogg#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix bin: <https://swa.sh/2024/bin#> .
+@prefix ff: <https://swa.sh/2024/ff#> .
+
+# Common integer field types
+bin:U8 a owl:Class ;
+    rdfs:subClassOf bin:Field ;
+    bin:length 8 ;
+    bin:type bin:UnsignedInt .
+
+bin:U16 a owl:Class ;
+    rdfs:subClassOf bin:Field ;
+    bin:length 16 ;
+    bin:type bin:UnsignedInt .
+
+bin:U32 a owl:Class ;
+    rdfs:subClassOf bin:Field ;
+    bin:length 32 ;
+    bin:type bin:UnsignedInt .
+
+bin:S32 a owl:Class ;
+    rdfs:subClassOf bin:Field ;
+    bin:length 32 ;
+    bin:type bin:SignedInt .
+
+bin:S64 a owl:Class ;
+    rdfs:subClassOf bin:Field ;
+    bin:length 64 ;
+    bin:type bin:SignedInt .
+
+# Conceptual properties first
+ogg:granulePosition a owl:ObjectProperty ;
+    rdfs:label "granule position"@en ;
+    skos:definition "Position in codec-dependent units"@en .
+
+ogg:pageSequenceNumber a owl:ObjectProperty ;
+    rdfs:label "page sequence number"@en ;
+    skos:definition "Monotonically increasing page counter"@en .
+
+ogg:streamSerialNumber a owl:ObjectProperty ;
+    rdfs:label "stream serial number"@en ;
+    skos:definition "Unique identifier for logical stream"@en .
+
+ogg:pageFlags a owl:ObjectProperty ;
+    rdfs:label "page flags"@en ;
+    skos:definition "Flags indicating page characteristics"@en .
+
+ogg:checksum a owl:ObjectProperty ;
+    rdfs:label "checksum"@en ;
+    skos:definition "CRC32 of entire page"@en .
+
+ogg:segmentCount a owl:ObjectProperty ;
+    rdfs:label "segment count"@en ;
+    skos:definition "Number of segments in page"@en .
+
+ogg:vendorString a owl:ObjectProperty ;
+    rdfs:label "vendor string"@en ;
+    skos:definition "Vendor/version string of the encoder"@en .
+
+ogg:userCommentCount a owl:ObjectProperty ;
+    rdfs:label "user comment count"@en ;
+    skos:definition "Number of user-supplied comments"@en .
+
+ogg:userComment a owl:ObjectProperty ;
+    rdfs:label "user comment"@en ;
+    skos:definition "User-supplied metadata tag"@en .
+
+ogg:commentLength a owl:ObjectProperty ;
+    rdfs:label "comment length"@en ;
+    skos:definition "Length of a comment string in bytes"@en .
+
+# Binary structures with simplified field definitions
+ogg:OggPageHeader a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "ogg page header"@en ;
+    skos:definition "Binary header structure at start of each Ogg page"@en ;
+    bin:fields (
+        [ bin:length 32 ;
+          bin:type bin:FixedString ;
+          bin:value "OggS" ;
+          bin:encodes ogg:capturePattern ]
+        [ a bin:U8 ;
+          bin:encodes ogg:version ]
+        [ a bin:U8 ;
+          bin:encodes ogg:pageFlags ]
+        [ a bin:S64 ;
+          bin:encodes ogg:granulePosition ]
+        [ a bin:U32 ;
+          bin:encodes ogg:streamSerialNumber ]
+        [ a bin:U32 ;
+          bin:encodes ogg:pageSequenceNumber ]
+        [ a bin:U32 ;
+          bin:encodes ogg:checksum ]
+        [ a bin:U8 ;
+          bin:encodes ogg:segmentCount ]
+    ) .
+
+ogg:OpusHeader a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "opus header"@en ;
+    skos:definition "Binary structure of Opus header packet"@en ;
+    bin:fields (
+        [ bin:length 64 ;
+          bin:type bin:FixedString ;
+          bin:value "OpusHead" ;
+          bin:encodes ogg:opusSignature ]
+        [ a bin:U8 ;
+          bin:encodes ogg:version ]
+        [ a bin:U8 ;
+          bin:encodes ogg:channelCount ]
+        [ a bin:U16 ;
+          bin:encodes ogg:preSkip ]
+        [ a bin:U32 ;
+          bin:encodes ogg:inputSampleRate ]
+        [ a bin:S16 ;
+          bin:encodes ogg:outputGain ]
+        [ a bin:U8 ;
+          bin:encodes ogg:channelMappingFamily ]
+    ) .
+
+ogg:OpusCommentHeader a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "opus comment header"@en ;
+    skos:definition "Binary structure of Opus comments packet"@en ;
+    bin:fields (
+        [ bin:length 64 ;
+          bin:type bin:FixedString ;
+          bin:value "OpusTags" ;
+          bin:encodes ogg:opusTagsSignature ]
+        [ a bin:U32 ;
+          bin:encodes ogg:vendorLength ]
+        [ bin:type bin:UTF8String ;
+          bin:lengthField ogg:vendorLength ;
+          bin:encodes ogg:vendorString ]
+        [ a bin:U32 ;
+          bin:alignment bin:ByteAligned ;
+          bin:encodes ogg:userCommentCount ]
+    ) .
+
+# Variable-length structures
+ogg:UserCommentList a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "user comment list"@en ;
+    bin:variableLength true ;
+    bin:lengthField ogg:userCommentCount ;
+    bin:fields (
+        [ bin:type bin:Array ;
+          bin:elementType ogg:UserComment ]
+    ) .
+
+ogg:UserComment a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "user comment"@en ;
+    skos:definition "Length-prefixed user comment string"@en ;
+    bin:fields (
+        [ a bin:U32 ;
+          bin:encodes ogg:commentLength ]
+        [ bin:type bin:UTF8String ;
+          bin:lengthField ogg:commentLength ;
+          bin:encodes ogg:userComment ]
+    ) .
+
+# Channel mapping structures
+ogg:ChannelMapping a owl:Class ;
+    rdfs:subClassOf bin:Structure ;
+    rdfs:label "channel mapping"@en ;
+    skos:definition "Channel mapping configuration"@en ;
+    bin:fields (
+        [ a bin:U8 ;
+          bin:encodes ogg:streamCount ]
+        [ a bin:U8 ;
+          bin:encodes ogg:coupledCount ]
+        [ bin:type bin:Array ;
+          bin:elementSize 8 ;
+          bin:elementCount "channel_count" ;
+          bin:encodes ogg:channelMapping ]
+    ) .
+
+# Checksum algorithm with finite field polynomial
+ogg:CRC32 a owl:Class ;
+    rdfs:subClassOf bin:ChecksumAlgorithm ;
+    rdfs:label "CRC32"@en ;
+    ff:polynomial [
+        a ff:Polynomial ;
+        ff:terms (
+            [ a ff:Term ; ff:degree 32 ]
+            [ a ff:Term ; ff:degree 26 ]
+            [ a ff:Term ; ff:degree 23 ]
+            [ a ff:Term ; ff:degree 22 ]
+            [ a ff:Term ; ff:degree 16 ]
+            [ a ff:Term ; ff:degree 12 ]
+            [ a ff:Term ; ff:degree 11 ]
+            [ a ff:Term ; ff:degree 10 ]
+            [ a ff:Term ; ff:degree 8 ]
+            [ a ff:Term ; ff:degree 7 ]
+            [ a ff:Term ; ff:degree 5 ]
+            [ a ff:Term ; ff:degree 4 ]
+            [ a ff:Term ; ff:degree 2 ]
+            [ a ff:Term ; ff:degree 1 ]
+            [ a ff:Term ; ff:degree 0 ]
+        )
+    ] .
+
+# Processing rules
+ogg:LacingValue a owl:Class ;
+    rdfs:subClassOf bin:EncodingRule ;
+    rdfs:label "lacing value"@en ;
+    bin:condition [
+        a bin:PacketContinues ;
+        bin:requiresValue [
+            a bin:BitPattern ;
+            bin:value "11111111"
+        ]
+    ] .
+
+# Binary Layout Expressions
+bin:ByteOffset a owl:Class ;
+    rdfs:label "byte offset"@en ;
+    skos:definition "Fixed offset in bytes"@en .
+
+bin:BitOffset a owl:Class ;
+    rdfs:label "bit offset"@en ;
+    skos:definition "Fixed offset in bits"@en .
+
+bin:AfterField a owl:Class ;
+    rdfs:label "after field"@en ;
+    skos:definition "Offset after another field"@en ;
+    bin:field owl:ObjectProperty .
+
+bin:ByteAligned a owl:Class ;
+    rdfs:label "byte aligned"@en ;
+    skos:definition "Next byte boundary after an offset"@en ;
+    bin:offset owl:ObjectProperty .
+
+# Finite Field Mathematics
+ff:Polynomial a owl:Class ;
+    rdfs:label "finite field polynomial"@en ;
+    skos:definition "Polynomial over GF(2)"@en .
+
+ff:Term a owl:Class ;
+    rdfs:label "polynomial term"@en ;
+    skos:definition "Term in a GF(2) polynomial"@en .
+
+ff:degree a owl:DatatypeProperty ;
+    rdfs:range xsd:nonNegativeInteger ;
+    rdfs:label "term degree"@en .
+
+ff:terms a owl:ObjectProperty ;
+    rdfs:range rdf:List ;
+    rdfs:label "polynomial terms"@en .
