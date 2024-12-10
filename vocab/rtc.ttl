@@ -7,6 +7,7 @@
 @prefix ro: <https://node.town/ro#> .
 @prefix rtc: <https://node.town/rtc#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix talk: <https://node.town/2024/talk/#> .
 
 ## Basic Formal Ontology (BFO)
 
@@ -340,21 +341,21 @@ rtc:MediaPlayer a iao:InformationEntity ;
 
 ### OCCURRENTS: PROCESSES ###
 
-# ICE Negotiation
+#### ICE Negotiation
 rtc:ICENegotiationProcess a iao:PlannedProcess ;
    rdfs:label "ICE Negotiation Process"@en ;
    rdfs:comment "A process for determining the optimal network route between peers."@en ;
    skos:definition "A planned process involving the discovery and evaluation of ICE candidates for connectivity establishment."@en ;
    ro:participatesIn rtc:IceCandidate .
 
-# Signaling
+#### Signaling
 rtc:SignalingProcess a iao:PlannedProcess ;
    rdfs:label "Signaling Process"@en ;
    rdfs:comment "Exchanges configuration information between peers to establish a WebRTC connection."@en ;
    skos:definition "A planned process in which SDP offers and answers are exchanged to establish connection parameters."@en ;
    ro:participatesIn rtc:SessionDescription .
 
-# Media Source Process
+#### Media Source Process
 rtc:MediaSourceProcess a iao:PlannedProcess ;
    rdfs:label "Media Source Process"@en ;
    rdfs:comment "The process of reading media from a source for transmission."@en ;
@@ -362,7 +363,7 @@ rtc:MediaSourceProcess a iao:PlannedProcess ;
    ro:participatesIn rtc:MediaPlayer ;
    ro:realizes rtc:MediaStreamTrack .
 
-# Media Relay Process
+#### Media Relay Process
 rtc:MediaRelayProcess a iao:PlannedProcess ;
    rdfs:label "Media Relay Process"@en ;
    rdfs:comment "Relays media from a source track to one or more consumers."@en ;
@@ -373,3 +374,37 @@ rtc:MediaRelayProcess a iao:PlannedProcess ;
 rtc:PeerConnection ro:participatesIn rtc:SignalingProcess , rtc:MediaSourceProcess .
 rtc:SessionDescription ro:participatesIn rtc:SignalingProcess .
 rtc:MediaStreamTrack ro:participatesIn rtc:MediaSourceProcess , rtc:MediaRelayProcess .
+
+# Non-RTC-specific ontology of speech, audio, and transcription
+talk:SpeakingProcess a owl:Class ;
+   rdfs:subClassOf bfo:Process ;
+   rdfs:label "speaking process"@en ;
+   skos:definition "a communication process whose medium is spoken language"@en .
+talk:RecordingProcess a owl:Class ;
+   rdfs:subClassOf bfo:Process ;
+   rdfs:label "recording process"@en ;
+   skos:definition "a process that transmits sound as an audio signal"@en .
+talk:SignalTransmission a owl:Class ;
+   rdfs:subClassOf iao:PlannedProcess ;
+   rdfs:label "signal transmission"@en ;
+   skos:definition "a planned process whereby a signal is simultaneously transmitted and received"@en .
+talk:AudioSignal a owl:Class ;
+   rdfs:subClassOf talk:Signal ;
+   rdfs:label "audio signal"@en ;
+   skos:definition "a signal that encodes sound"@en .
+talk:TranscriptionProcess a owl:Class ;
+   rdfs:subClassOf bfo:PlannedProcess ;
+   rdfs:label "transcription process"@en ;
+   skos:definition "a process that results in hypotheses relating audio signals to speaking processes"@en .
+talk:TranscriptionHypothesis a owl:Class ;
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "transcription hypothesis"@en ;
+   skos:definition "an outcome of a transcription process that is subject to verification and revision"@en .
+talk:AudioArchive a owl:Class ;
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "audio archive"@en ;
+   skos:definition "a database of audio signals"@en .
+talk:AudioFile a owl:Class ;
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "audio file"@en ;
+   skos:definition "an audio signal that is stored in an archive"@en .

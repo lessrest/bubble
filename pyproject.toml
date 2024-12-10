@@ -80,6 +80,7 @@ dependencies = [
     "cryptography>=44.0.0",
     "asgi-lifespan>=2.1.0",
     "pyld>=2.0.4",
+    "importhook>=1.0.9",
 ]
 
 [tool.uv.sources]
@@ -147,7 +148,7 @@ mock_use_standalone_module = true
 markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]
 
 # Run tests in parallel
-addopts = "-n 4"
+# addopts = "-n 4"
 
 [tool.hatch.metadata]
 allow-direct-references = true

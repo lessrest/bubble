@@ -1,4 +1,5 @@
 from functools import partial
+import os
 import pathlib
 from urllib.parse import urlparse
 
@@ -112,7 +113,7 @@ def town2(
     bubble_path: str = BubblePath,
 ) -> None:
     """Serve the Town2 JSON-LD interface."""
-    from bubble.town.town2 import town_app
+    from bubble.town.town2 import town_app, DeepgramClientActor
 
     config = hypercorn.Config()
     config.bind = [bind]
@@ -130,7 +131,10 @@ def town2(
         async with trio.open_nursery() as nursery:
             logger.info("starting town2", bubble_path=bubble_path)
             async with loading_bubble_from(trio.Path(bubble_path)) as repo:
-                app = town_app(base_url, bind, repo)
+                root_actor = DeepgramClientActor(
+                    os.environ["DEEPGRAM_API_KEY"]
+                )
+                app = town_app(base_url, bind, repo, root_actor)
 
                 async def serve():
                     try:

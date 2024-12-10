@@ -41,8 +41,17 @@ class Parameter(Generic[T]):
         finally:
             self._var.reset(token)
 
+    def set(self, value: T):
+        self._var.set(value)
+
 
 graph = Parameter("graph", Graph())
+
+
+@contextmanager
+def in_graph(g: Graph):
+    with graph.bind(g):
+        yield g
 
 
 def quote(triples: Sequence[_TripleType]) -> QuotedGraph:

@@ -218,6 +218,7 @@ dependencies = [
     { name = "httpx" },
     { name = "hypercorn" },
     { name = "hypothesis" },
+    { name = "importhook" },
     { name = "invoke" },
     { name = "ipykernel" },
     { name = "openai" },
@@ -279,6 +280,7 @@ requires-dist = [
     { name = "httpx", specifier = "==0.*" },
     { name = "hypercorn", specifier = "==0.17.*" },
     { name = "hypothesis", specifier = ">=6.119.4" },
+    { name = "importhook", specifier = ">=1.0.9" },
     { name = "invoke", specifier = ">=2.2.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "openai", specifier = "==1.55.*" },
@@ -732,6 +734,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442 },
+]
+
+[[package]]
+name = "importhook"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/20/ba0146cefd926dd6bff3657418b467a3c227af6b4a9c2e1b5fc68d8a1deb/importhook-1.0.9.tar.gz", hash = "sha256:635ad367225fa022221025545c167b09d09ada671821b6e587df0d5ae4bf0aab", size = 6294 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/76/e833efe967ee1e18a54ce6a2e8e58d351c2844fec3afeedb5ea368406f67/importhook-1.0.9-py3-none-any.whl", hash = "sha256:64500997b59abf054ddd5037c5133879a4b3ee2091370b46af30befd0be331c1", size = 7857 },
 ]
 
 [[package]]
