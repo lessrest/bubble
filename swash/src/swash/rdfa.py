@@ -1,13 +1,14 @@
+import re
 import json
 import hashlib
-import re
-import urllib.parse
 import contextlib
+import urllib.parse
+
 from typing import Dict, List, Tuple, Optional
 
 import arrow
+import structlog
 
-from fastapi import APIRouter, HTTPException
 from rdflib import (
     RDF,
     XSD,
@@ -18,22 +19,20 @@ from rdflib import (
     Dataset,
     Literal,
 )
-import rich
-import structlog
+from fastapi import APIRouter, HTTPException
 
-from swash.util import P, S
-from bubble.repo import current_bubble
-
-from swash.prfx import NT
+from swash import vars
 from swash.html import (
     HypermediaResponse,
-    html,
     tag,
     attr,
+    html,
     text,
     classes,
 )
-from swash import vars
+from swash.prfx import NT
+from swash.util import P, S
+from bubble.repo import current_bubble
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 

@@ -1,517 +1,737 @@
+import json
+import pathlib
+
+from base64 import b64encode
+from typing import (
+    Dict,
+    Callable,
+    Optional,
+    Awaitable,
+    Generator,
+    AsyncGenerator,
+    MutableMapping,
+    Set,
+)
+from datetime import UTC, datetime
+from contextlib import contextmanager
 from dataclasses import dataclass
-import sys
-from urllib.parse import parse_qsl
-from typing import Protocol
+from collections import defaultdict
 
-import starlette
-import starlette.responses
 import trio
-import httpx
-import hypercorn
-import hypercorn.trio
 import structlog
+import importhook
 
-from rdflib import Namespace, URIRef
-from trio.abc import SendChannel
-from starlette.types import Send, Scope, Receive, Message
-from starlette.responses import JSONResponse, PlainTextResponse
-from starlette.websockets import WebSocket
-from starlette.applications import Starlette
+from rdflib import RDF, XSD, Graph, URIRef, Literal, Namespace
+from fastapi import Body, Form, FastAPI, Request, Response, WebSocket
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
-from swash import mint
-from bubble.logs import configure_logging
-
-# from bubble.town.fsys import FilesystemActor
-from bubble.town.cert import generate_self_signed_cert, create_ssl_context
-
-from pydantic import BaseModel
-
-# Configure structured logging at the start of the application.
-configure_logging(colors=sys.stderr.isatty())
-logger = structlog.get_logger()
+from swash import Parameter, mint, rdfa, vars
+from swash.html import HypermediaResponse, document
+from swash.prfx import NT, DID, DEEPGRAM
+from swash.rdfa import rdf_resource
+from swash.util import S, new
+from bubble.page import base_html
+from bubble.repo import BubbleRepo, using_bubble, current_bubble
 
 
-class HttpRequestData(BaseModel):
-    """
-    A structured representation of an incoming HTTP request destined for an actor.
-    """
-
-    method: str
-    headers: dict[str, str]
-    path: str
-    query_params: dict[str, str]
-    body: bytes
+@importhook.on_import("aiohttp")  # type: ignore
+def on_aiohttp_import(aiohttp):
+    # This is a hack to avoid PyLD crashing on load in IPython.
+    raise ImportError("hehe")
 
 
-class HttpResponseData(BaseModel):
-    status: int
-    headers: dict[str, str]
-    body: bytes
+try:
+    import pyld
+finally:
+    pass
 
-    def to_response(self) -> starlette.responses.Response:
-        return starlette.responses.Response(
-            content=self.body,
-            status_code=self.status,
-            headers=self.headers,
-        )
-
-    async def send(self, scope: Scope, receive: Receive, send: Send):
-        response = self.to_response()
-        await response(scope, receive, send)
+logger = structlog.get_logger(__name__)
 
 
-class ActorHttpRequest(BaseModel):
-    model_config = {"arbitrary_types_allowed": True}
-    request: HttpRequestData
-    response: URIRef
-
-
+@dataclass
 class ActorContext:
-    """
-    Encapsulates the context needed for an actor to operate, including its URI,
-    receive channel, and nursery for spawning child actors.
-    """
+    parent: URIRef
+    uri: URIRef
+    chan_send: trio.MemorySendChannel
+    chan_recv: trio.MemoryReceiveChannel
+    trap_exit: bool = False
+    name: str = "unnamed"
+
+
+def new_context(parent: URIRef, name: str = "unnamed") -> ActorContext:
+    site = current_actor_system.get().site
+    uri = mint.fresh_uri(site)
+    chan_send, chan_recv = trio.open_memory_channel(8)
+    return ActorContext(parent, uri, chan_send, chan_recv, name=name)
+
+
+def root_context(site: Namespace, name: str = "root") -> ActorContext:
+    uri = mint.fresh_uri(site)
+    chan_send, chan_recv = trio.open_memory_channel(8)
+    return ActorContext(uri, uri, chan_send, chan_recv, name=name)
+
+
+class ActorSystem:
+    site: Namespace
+    current_actor: Parameter[ActorContext]
+    actors: MutableMapping[URIRef, ActorContext]
+    logger: structlog.stdlib.BoundLogger
 
     def __init__(
         self,
-        actor: URIRef,
-        receiver: Receive,
-        town: "Town",
-        nursery: trio.Nursery,
+        site: str,
+        logger: structlog.stdlib.BoundLogger,
     ):
-        self.actor = actor
-        self.receiver = receiver
-        self.town = town
-        self.nursery = nursery
-        self.logger = structlog.get_logger().bind(actor=actor)
+        self.site = Namespace(site)
+        self.logger = logger.bind(site=site)
 
-    async def send(self, target: URIRef, message: Message):
-        """Helper method to send a message to another actor"""
-        await self.town.send(target, message)
+        root = root_context(self.site)
+        self.current_actor = Parameter("current_actor", root)
+        self.actors = {root.uri: root}
 
-    async def receive(self) -> Message:
-        return await self.receiver()
+    def this(self) -> URIRef:
+        return self.current_actor.get().uri
 
-    async def receive_model[T: BaseModel](self, model_class: type[T]) -> T:
-        message = await self.receive()
-        return model_class.model_validate(message)
-
-    async def send_model(self, target: URIRef, model: BaseModel):
-        await self.send(target, model.model_dump())
-
-    async def spawn[Param2](
-        self, actor_type: type["Actor[Param2]"], param: Param2
+    async def spawn(
+        self,
+        nursery: trio.Nursery,
+        action: Callable[..., Awaitable[None]],
+        *args,
+        name: Optional[str] = None,
     ) -> URIRef:
-        actor_id, receiver = self.town.register_actor()
-        self = ActorContext(
-            actor_id, receiver.receive, self.town, self.nursery
+        if name is None:
+            if hasattr(action, "__name__"):
+                name = action.__name__
+            else:
+                name = action.__class__.__name__
+
+        parent_ctx = self.current_actor.get()
+        context = new_context(parent_ctx.uri, name=name)
+        self.actors[context.uri] = context
+
+        self.logger.info(
+            "spawning",
+            actor=context.uri,
+            actor_name=name,
+            parent=parent_ctx.uri,
         )
 
-        self.nursery.start_soon(actor_type(self.town, param).run, self)
+        async def task():
+            with self.current_actor.bind(context):
+                try:
+                    await action(*args)
+                    self.logger.info(
+                        "actor finished", actor=context.uri, actor_name=name
+                    )
+                except BaseException as e:
+                    logger.error(
+                        "actor crashed",
+                        actor=context.uri,
+                        actor_name=name,
+                        error=e,
+                        parent=context.parent,
+                    )
 
-        return actor_id
+                    if parent_ctx and parent_ctx.trap_exit:
+                        self.logger.info(
+                            "sending exit signal",
+                            to=parent_ctx.uri,
+                        )
+                        await self.send_exit_signal(
+                            parent_ctx.uri, context.uri, e
+                        )
+                    else:
+                        self.logger.info("raising exception")
+                        raise
+                finally:
+                    self.logger.info(
+                        "deleting actor", actor=(context.uri, name)
+                    )
+                    del self.actors[context.uri]
+                    self.print_actor_tree()
+
+        nursery.start_soon(task)
+        return context.uri
+
+    async def send_exit_signal(
+        self, parent: URIRef, child: URIRef, error: BaseException
+    ):
+        g = create_graph()
+        g.add((g.identifier, RDF.type, NT.Exit))
+        g.add((g.identifier, NT.actor, child))
+        g.add((g.identifier, NT.message, Literal(str(error))))
+        child_ctx = self.actors.get(child)
+        child_name = child_ctx.name if child_ctx else "unknown"
+        self.logger.info(
+            "sending exit signal",
+            to=parent,
+            child=child,
+            child_name=child_name,
+            error=error,
+        )
+        await self.send(parent, g)
+
+    async def send(self, actor: URIRef, message: Graph):
+        if actor not in self.actors:
+            raise ValueError(f"Actor {actor} not found")
+        await self.actors[actor].chan_send.send(message)
+
+    def get_actor_hierarchy(self) -> Dict[URIRef, Set[URIRef]]:
+        """Get the parent-child relationships between actors."""
+        children = defaultdict(set)
+        for actor_uri, ctx in self.actors.items():
+            if ctx.parent != ctx.uri:  # Skip root which is its own parent
+                children[ctx.parent].add(actor_uri)
+        return dict(children)
+
+    def format_actor_tree(
+        self, root: URIRef, indent: str = "", is_last: bool = True
+    ) -> str:
+        """Format the actor hierarchy as a tree string starting from given root."""
+        ctx = self.actors.get(root)
+        if not ctx:
+            return f"{indent}[deleted actor {root}]\n"
+
+        marker = "└── " if is_last else "├── "
+        result = f"{indent}{marker}{ctx.name} ({root})\n"
+
+        children = self.get_actor_hierarchy().get(root, set())
+        child_list = sorted(children)  # Sort for consistent output
+
+        for i, child in enumerate(child_list):
+            is_last_child = i == len(child_list) - 1
+            next_indent = indent + ("    " if is_last else "│   ")
+            result += self.format_actor_tree(
+                child, next_indent, is_last_child
+            )
+
+        return result
+
+    def print_actor_tree(self):
+        """Print the complete actor hierarchy tree."""
+        # Find the root (actor that is its own parent)
+        root = next(
+            uri for uri, ctx in self.actors.items() if ctx.parent == ctx.uri
+        )
+        tree = self.format_actor_tree(root)
+        self.logger.info("Actor hierarchy:\n" + tree)
 
 
-class Actor[Param]:
-    """
-    Base class for all actors in the system.
-    Provides common functionality and a standard interface.
-    """
+current_actor_system = Parameter[ActorSystem]("current_actor_system")
 
-    town: "Town"
 
-    def __init__(self, town: "Town", param: Param):
-        self.town = town
-        self.param = param
-        self.logger = structlog.get_logger().bind(actor=self.param)
+def this() -> URIRef:
+    return current_actor_system.get().this()
+
+
+async def spawn(
+    nursery: trio.Nursery,
+    action: Callable,
+    *args,
+    name: Optional[str] = None,
+):
+    system = current_actor_system.get()
+    return await system.spawn(nursery, action, *args, name=name)
+
+
+async def send(actor: URIRef, message: Optional[Graph] = None):
+    system = current_actor_system.get()
+    if message is None:
+        message = vars.graph.get()
+    logger.info("sending message", actor=actor, graph=message)
+    return await system.send(actor, message)
+
+
+async def receive() -> Graph:
+    system = current_actor_system.get()
+    return await system.current_actor.get().chan_recv.receive()
+
+
+class ServerActor[State]:
+    def __init__(self, state: State, name: Optional[str] = None):
+        self.state = state
+        self.name = name or self.__class__.__name__
 
     async def __call__(self):
-        async with trio.open_nursery() as nursery:
-            actor, channel = self.town.register_actor()
-            context = ActorContext(
-                actor, channel.receive, self.town, nursery
-            )
-            try:
-                await self.run(context)
-            finally:
-                self.town.unregister_actor(actor)
+        """Main actor message processing loop with error handling."""
+        try:
+            async with trio.open_nursery() as nursery:
+                await self.init()
+                while True:
+                    msg = await receive()
+                    logger.info("received message", graph=msg)
+                    response = await self.handle(nursery, msg)
+                    logger.info("sending response", graph=response)
 
-    async def run(self, context: ActorContext):
-        raise NotImplementedError("Actors must implement run()")
+                    for reply_to in msg.objects(msg.identifier, NT.replyTo):
+                        await send(URIRef(reply_to), response)
+        except Exception as e:
+            logger.error("actor message handling error", error=e)
+            raise  # Let it crash
 
+    async def init(self):
+        pass
 
-class Town:
-    """
-    A Town represents a collection of actors, each identified by a URIRef.
-    Actors can be dynamically spawned, and each is associated with a send channel.
-    """
-
-    def __init__(self, base_url: str):
-        """
-        Initialize the Town with the given base URL.
-
-        :param base_url: The base HTTPS URL under which the Town and its actors operate.
-        """
-        self.actors: dict[URIRef, SendChannel] = {}
-        self.base_url = base_url
-        logger.info("initialized town", base=base_url)
-
-    def register_actor(
-        self,
-    ) -> tuple[URIRef, trio.MemoryReceiveChannel]:
-        """Helper method to create a new actor with channels"""
-        actor = mint.fresh_uri(Namespace(f"{self.base_url}/"))
-        logger.info("registering actor", actor=actor)
-        sender, receiver = trio.open_memory_channel(10)
-        self.actors[actor] = sender
-        return actor, receiver
-
-    def unregister_actor(self, actor: URIRef) -> None:
-        """Helper method to remove an actor from the town"""
-        logger.info("unregistering actor", actor=actor)
-        del self.actors[actor]
-
-    async def send(self, target: URIRef, message: Message):
-        """Helper method to send messages between actors"""
-        if target in self.actors:
-            await self.actors[target].send(message)
-        else:
-            logger.warning(
-                "attempted to send message to non-existent actor",
-                target=target,
-            )
-
-    async def run_actor[Param](
-        self,
-        actor_type: type["Actor[Param]"],
-        param: Param,
-    ):
-        app = actor_type(self, param)
-        await app()
+    async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
+        raise NotImplementedError
 
 
-async def serve_app(app: Starlette, config: hypercorn.Config) -> None:
-    """
-    Serve the given Starlette application using Hypercorn in Trio's async environment.
-    """
-    await hypercorn.trio.serve(app, config, mode="asgi")  # type: ignore
+async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
+    if payload is None:
+        payload = vars.graph.get()
 
+    send_chan, recv_chan = trio.open_memory_channel[Graph](1)
 
-async def verify_base_url(
-    base_url: str, cert_path: str, key_path: str
-) -> None:
-    """
-    Verify control over the given base_url by requesting its DID document endpoint over HTTPS.
-    Uses a self-signed SSL certificate for local testing.
-    """
-    verification_url = f"{base_url}/.well-known/did.json"
-    logger.info("verifying control over base URL", url=verification_url)
-
-    ssl_context = create_ssl_context(cert_path, key_path)
-    async with httpx.AsyncClient(verify=ssl_context) as client:
-        response = await client.get(verification_url)
-        response.raise_for_status()
-
-    logger.info("successfully verified control over base URL")
-
-    # You could also include offset/length for partial reads, etc.
-
-
-async def get_request_body(receive: Receive) -> bytes:
-    """
-    Read the entire request body from the ASGI receive channel.
-    """
-    body = b""
-    more_body = True
-    while more_body:
-        message = await receive()
-        if message["type"] == "http.request":
-            body += message.get("body", b"")
-            more_body = message.get("more_body", False)
-        elif message["type"] == "http.disconnect":
-            break
-    return body
-
-
-@dataclass
-class HTTPRequestContext:
-    scope: Scope
-    receive: Receive
-    send: Send
-    target: URIRef
-
-
-async def read_http_request(
-    scope: Scope, receive: Receive, path: str
-) -> HttpRequestData:
-    method = scope["method"]
-    raw_headers = scope.get("headers", [])
-    headers = {
-        k.decode("latin-1"): v.decode("latin-1") for k, v in raw_headers
-    }
-    query_string = scope.get("query_string", b"")
-    query_params = dict(parse_qsl(query_string.decode("latin-1")))
-
-    body = await get_request_body(receive)
-
-    request_data = HttpRequestData(
-        method=method,
-        headers=headers,
-        path=path,
-        query_params=query_params,
-        body=body,
+    tmp = mint.fresh_uri(get_site())
+    current_actor_system.get().actors[tmp] = ActorContext(
+        parent=this(), uri=tmp, chan_send=send_chan, chan_recv=recv_chan
     )
 
-    return request_data
+    payload.add((payload.identifier, NT.replyTo, tmp))
+
+    logger.info(
+        "sending request",
+        actor=actor,
+        graph=payload,
+    )
+
+    await send(actor, payload)
+
+    return await recv_chan.receive()
 
 
-class RequestHandlingActor(Actor[HTTPRequestContext]):
-    async def run(self, context: ActorContext):
-        request = await read_http_request(
-            self.param.scope, self.param.receive, self.param.target
-        )
+def create_graph(
+    suffix: Optional[str] = None, *, base: Optional[str] = None
+) -> Graph:
+    """Create a new graph with standard bindings and optional suffix-based identifier.
 
-        request_model = ActorHttpRequest(
-            request=request,
-            response=context.actor,
-        )
-
-        await context.send_model(self.param.target, request_model)
-        try:
-            response = await context.receive_model(HttpResponseData)
-        except Exception:
-            response = HttpResponseData(
-                status=500,
-                headers={},
-                body=b"Invalid response from actor",
-            )
-
-        await response.send(
-            self.param.scope, self.param.receive, self.param.send
-        )
-
-
-class MessageForActor(BaseModel):
+    Args:
+        suffix: Optional path suffix for the graph ID. If None, a fresh URI is minted.
+        base: Optional base URI. If None, uses the current site.
     """
-    A message format for sending messages to actors.
-    """
+    site = get_site()
+    base = base or str(site)
 
-    target: str
-    message: dict
+    if suffix is None:
+        id = mint.fresh_uri(site)
+    else:
+        id = site[suffix]
+
+    g = Graph(base=base, identifier=id)
+    g.bind("nt", NT)
+    g.bind("deepgram", DEEPGRAM)
+    g.bind("site", site)
+    return g
 
 
-@dataclass
-class ASGIContext:
-    scope: Scope
-    receive: Receive
-    send: Send
+@contextmanager
+def with_new_transaction(graph: Optional[Graph] = None):
+    """Create a new transaction with a fresh graph that will be persisted."""
+    g = create_graph()
+    if graph is not None:
+        g += graph
+
+    with vars.graph.bind(g):
+        yield g
+    logger.info("persisting transaction", graph=g)
+    persist(g)
 
 
-class RootActor(Actor[ASGIContext]):
-    """
-    The root actor that handles messages from the websocket or HTTP requests.
-    """
+@contextmanager
+def with_transient_graph(
+    suffix: Optional[str] = None,
+) -> Generator[URIRef, None, None]:
+    """Create a temporary graph that won't be persisted."""
+    g = create_graph(suffix)
+    with vars.graph.bind(g):
+        assert isinstance(g.identifier, URIRef)
+        yield g.identifier
 
-    async def run(self, context: ActorContext):
-        #        await context.spawn(FilesystemActor, trio.Path("vocab"))
-        while True:
-            try:
-                message = await context.receive()
-                await self.handle_message(message, context)
-            except trio.Cancelled:
-                return
 
-    async def handle_message(self, message: Message, context: ActorContext):
-        if message["type"] == "http.request":
-            request = ActorHttpRequest.model_validate(message)
-            await self.handle_http_request(request, context)
-
-    async def handle_http_request(
+class LinkedDataResponse(HypermediaResponse):
+    def __init__(
         self,
-        request: ActorHttpRequest,
-        context: ActorContext,
+        graph: Optional[Graph] = None,
+        *,
+        vocab: Optional[Namespace] = None,
+        context: Optional[Dict] = None,
+        status_code: int = 200,
+        headers: Optional[Dict[str, str]] = None,
     ):
-        response = HttpResponseData(
-            status=200,
-            headers={"Content-Type": "text/plain"},
-            body=b"Hello from the root actor!",
+        if graph is None:
+            graph = vars.graph.get()
+
+        if headers is None:
+            headers = {}
+
+        headers["Link"] = f'<{str(graph.identifier)}>; rel="self"'
+
+        with base_html("Bubble"):
+            rdf_resource(graph.identifier)
+
+        super().__init__(
+            status_code=status_code,
+            headers=headers,
         )
-        await context.send(request.response, response.model_dump())
 
 
-class LifespanActor(Actor[ASGIContext]):
-    """
-    An actor that handles the lifespan of the application.
-    """
+class JSONLinkedDataResponse(JSONResponse):
+    def __init__(
+        self,
+        graph: Optional[Graph] = None,
+        *,
+        vocab: Optional[Namespace] = None,
+        context: Optional[Dict] = None,
+        status_code: int = 200,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        if graph is None:
+            graph = vars.graph.get()
 
-    async def run(self, context: ActorContext):
-        try:
-            await context.spawn(RootActor, self.param)
-            while True:
-                message = await self.param.receive()
-                logger.info("lifespan message", message=message)
-                if message["type"] == "lifespan.shutdown":
-                    await self.param.send(
-                        {"type": "lifespan.shutdown.complete"}
-                    )
-                    return
-                elif message["type"] == "lifespan.startup":
-                    await self.param.send(
-                        {"type": "lifespan.startup.complete"}
-                    )
-        except* Exception as e:
-            logger.error("lifespan failed", error=str(e))
-            raise
-        finally:
-            logger.info("lifespan actor completed")
-
-
-class DIDDocumentMiddleware:
-    """
-    Middleware that handles DID document requests.
-    """
-
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send):
-        if (
-            scope["type"] == "http"
-            and scope["path"] == "/.well-known/did.json"
-        ):
-            host = dict(scope["headers"]).get(b"host", b"").decode("utf-8")
-            host = host.removeprefix("https://").removesuffix("/")
-            did = f"did:web:{host}"
-            document = {
-                "@context": ["https://www.w3.org/ns/did/v1"],
-                "id": did,
-                "verificationMethod": [],
+        if context is None:
+            context = {
+                "nt": str(NT),
+                "w3": "https://www.w3.org/ns/",
+                "@base": str(graph.base),
             }
-            logger.info(
-                "responding to DID document request", document=document
+
+        if vocab is not None:
+            context["@vocab"] = str(vocab)
+
+        jsonld = json.loads(graph.serialize(format="json-ld"))
+        compacted = pyld.jsonld.compact(
+            jsonld, context, {"base": str(graph.base)}
+        )
+
+        if headers is None:
+            headers = {}
+
+        headers["Content-Type"] = "application/ld+json"
+        headers["Link"] = f'<{str(graph.identifier)}>; rel="self"'
+
+        super().__init__(
+            content=compacted,
+            status_code=status_code,
+            headers=headers,
+            media_type="application/ld+json",
+        )
+
+
+def persist(graph: Graph):
+    """Persist a graph to the current bubble."""
+    current_bubble.get().graph += graph
+
+
+def get_site() -> Namespace:
+    """Get the site namespace from the current actor system."""
+    return current_actor_system.get().site
+
+
+def record_message(type: str, actor: URIRef, g: Graph):
+    """Record a message in the graph."""
+    new(
+        URIRef(type),
+        {
+            NT.created: Literal(
+                datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+            ),
+            NT.target: actor,
+        },
+        g.identifier,
+    )
+
+
+def generate_health_status(id: S):
+    """Generate health status information."""
+    new(
+        NT.HealthCheck,
+        {
+            NT.status: Literal("ok"),
+            NT.actorSystem: this(),
+        },
+        subject=id,
+    )
+
+
+def build_did_document(did_uri: URIRef, doc_uri: S):
+    """Build a DID document."""
+    new(
+        DID.DIDDocument,
+        {
+            DID.id: did_uri,
+            DID.controller: did_uri,
+            DID.created: Literal(
+                datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+            ),
+            DID.verificationMethod: [
+                new(
+                    DID.Ed25519VerificationKey2020,
+                    {DID.controller: did_uri},
+                )
+            ],
+        },
+        subject=doc_uri,
+    )
+
+
+class TownApp:
+    def __init__(
+        self,
+        base_url: str,
+        bind: str,
+        repo: BubbleRepo,
+    ):
+        self.base_url = base_url
+        self.base = URIRef(base_url)
+        self.bind = bind
+        self.repo = repo
+        self.site = Namespace(base_url + "/")
+        self.logger = structlog.get_logger(__name__).bind(bind=bind)
+        self.app = FastAPI()
+        self._setup_error_handlers()
+        self._setup_middleware()
+        self._setup_routes()
+
+        self.system = ActorSystem(str(self.site), self.logger)
+        current_actor_system.set(self.system)
+
+    def _setup_error_handlers(self):
+        """Setup comprehensive error handling for the web layer."""
+
+        @self.app.exception_handler(Exception)
+        async def handle_generic_error(request: Request, exc: Exception):
+            logger.error(
+                "unhandled web error", error=exc, path=request.url.path
             )
-            response = JSONResponse(document)
-            await response(scope, receive, send)
-            return
-        await self.app(scope, receive, send)
-
-
-async def main_app(
-    scope: Scope,
-    receive: Receive,
-    send: Send,
-    town: Town,
-):
-    """
-    The main application callable (ASGI) handling lifespan, DID document requests,
-    actor websockets, and HTTP requests destined for actors.
-    """
-
-    context = ASGIContext(scope, receive, send)
-
-    if scope["type"] == "lifespan":
-        try:
-            await town.run_actor(LifespanActor, context)
-        except BaseExceptionGroup as e:
-            logger.info("lifespan failed", error=e)
-
-        finally:
-            logger.info("lifespan completed")
-
-    elif scope["type"] == "http":
-        path = scope["path"]
-        target = URIRef(f"{town.base_url}{path}")
-        if target in town.actors:
-            await town.run_actor(
-                RequestHandlingActor,
-                HTTPRequestContext(scope, receive, send, target),
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Internal Server Error",
+                    "details": str(exc),
+                },
             )
-        else:
-            logger.warning("target actor not found", target=target)
-            response = PlainTextResponse("Not found", status_code=404)
-            await response(scope, receive, send)
 
-    elif scope["type"] == "websocket":
-        websocket = WebSocket(scope, receive=receive, send=send)
-        await websocket.accept()
-        logger.info("accepted WebSocket client", scope=scope)
+    def _setup_middleware(self):
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        self.app.middleware("http")(self.bind_document)
+        self.app.middleware("http")(self.bind_actor_system)
+        self.app.middleware("http")(self.bind_bubble)
 
+    def _setup_routes(self):
+        self.app.include_router(rdfa.router)
+        self.app.mount(
+            "/static",
+            StaticFiles(
+                directory=str(
+                    pathlib.Path(__file__).parent.parent / "static"
+                )
+            ),
+        )
+
+        # Setup route handlers
+        self.app.get("/favicon.ico")(self.favicon)
+        self.app.get("/health")(self.health_check)
+        self.app.get("/.well-known/did.json")(self.get_did_document)
+        self.app.post("/{id}")(self.actor_post)
+        self.app.post("/{id}/message")(self.actor_message)
+        self.app.put("/{id}")(self.actor_put)
+        self.app.websocket("/{id}/upload")(self.ws_upload)
+        self.app.get("/{id}")(self.actor_get)
+        self.app.get("/")(self.root)
+
+    async def health_check(self):
+        with with_transient_graph("health") as id:
+            generate_health_status(id)
+            return LinkedDataResponse()
+
+    async def get_did_document(self):
+        did_uri = URIRef(
+            str(self.site).replace("https://", "did:web:").rstrip("/")
+        )
+
+        with with_transient_graph(".well-known/did.json") as id:
+            build_did_document(did_uri, id)
+            return LinkedDataResponse(vocab=DID)
+
+    async def actor_message(self, id: str, type: str = Form(...)):
+        actor = self.site[id]
+        with with_new_transaction() as g:
+            record_message(type, actor, g)
+            result = await call(actor, g)
+            return LinkedDataResponse(result)
+
+    # Middleware
+    async def bind_document(self, request, call_next):
+        with document():
+            return await call_next(request)
+
+    async def bind_actor_system(self, request, call_next):
+        with current_actor_system.bind(self.system):
+            return await call_next(request)
+
+    async def bind_bubble(self, request, call_next):
+        with using_bubble(self.repo):
+            self.repo.dataset.bind("site", self.site)
+            return await call_next(request)
+
+    # Route handlers
+    async def all_exception_handler(self, request: Request, exc: Exception):
+        self.logger.error("Unhandled exception", error=exc)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "details": str(exc)},
+        )
+
+    async def favicon(self):
+        return Response(status_code=204)
+
+    async def actor_post(self, id: str, body: dict = Body(...)):
+        actor = self.site[id]
+        with with_new_transaction() as g:
+            body["@id"] = str(g.identifier)
+            g.parse(data=json.dumps(body), format="json-ld")
+            result = await call(actor, g)
+            return LinkedDataResponse(result)
+
+    async def actor_put(self, id: str, request: Request):
+        actor = self.site[id]
+
+        async def request_stream():
+            async for chunk in request.stream():
+                yield chunk
+
+        result = await self._handle_upload_stream(actor, request_stream())
+        return LinkedDataResponse(result)
+
+    async def ws_upload(self, websocket: WebSocket, id: str):
+        """WebSocket handler with proper error handling."""
         try:
-            while True:
-                json_data = await websocket.receive_text()
-                message = MessageForActor.model_validate_json(json_data)
+            await websocket.accept()
+            actor = self.site[id]
+            logger.info("starting websocket upload", actor=actor)
 
-                target = URIRef(message.target)
-                if target in town.actors:
-                    await town.send(target, message.message)
-                else:
-                    logger.warning(
-                        "no matching actor for request", target=target
-                    )
-                    await websocket.close(code=4004, reason="Invalid actor")
-                    return
+            async def receive_messages():
+                while True:
+                    try:
+                        message = await websocket.receive_bytes()
+                        yield message
+                    except Exception as e:
+                        logger.error("websocket receive error", error=e)
+                        break
+
+            with self.install_context():
+                result = await self._handle_upload_stream(
+                    actor, receive_messages()
+                )
+
+            await websocket.send_json(result.serialize(format="json-ld"))
 
         except Exception as e:
-            logger.info("peer disconnected", error=str(e))
+            logger.error("websocket handler error", error=e)
+            try:
+                await websocket.close(code=1011, reason=str(e))
+            except Exception:
+                pass  # Connection might already be closed
+            raise
+        finally:
             await websocket.close()
 
-    else:
-        # Any other request type is not supported
-        logger.warning("invalid request type", type=scope["type"])
-        response = PlainTextResponse("Not found", status_code=404)
-        await response(scope, receive, send)
+    async def actor_get(self, id: str):
+        actor = current_actor_system.get().actors[self.site[id]]
 
+        async def stream_messages():
+            try:
+                while True:
+                    try:
+                        graph: Graph = await actor.chan_recv.receive()
+                        jsonld = graph.serialize(format="json-ld")
+                        yield f"event: message\ndata: {jsonld}\n\n"
+                    except (
+                        trio.BrokenResourceError,
+                        trio.ClosedResourceError,
+                    ):
+                        break
+            except Exception as e:
+                logger.error("Error in message stream", error=e)
+                return
 
-async def new_town(base_url: str, bind: str):
-    """
-    Create a new town application that:
-    - Verifies HTTPS control via a temporary bootstrap app and DID document.
-    - Uses self-signed certificates if none are provided.
-    - Returns the main ASGI application once verification is complete.
-    """
-    if not base_url.startswith("https://"):
-        logger.error(
-            "base URL must start with https:// to enable TLS", base=base_url
+        return StreamingResponse(
+            stream_messages(), media_type="text/event-stream"
         )
-        raise ValueError("base_url must use HTTPS")
 
-    hostname = base_url.replace("https://", "").rstrip("/")
-    cert_path, key_path = generate_self_signed_cert(hostname)
+    async def root(self):
+        with base_html("Bubble"):
+            rdf_resource(self.base)
+        return HypermediaResponse()
 
-    config = create_http_server_config(bind, cert_path, key_path)
+    @contextmanager
+    def install_context(self):
+        """Install the actor system and bubble context for request handling."""
+        with current_actor_system.bind(self.system):
+            with using_bubble(self.repo):
+                yield
 
-    async with trio.open_nursery() as nursery:
-        verification_app = Starlette(debug=True)
-        verification_app.add_middleware(DIDDocumentMiddleware)
-        nursery.start_soon(serve_app, verification_app, config)
-
+    async def _handle_upload_stream(
+        self, actor: URIRef, stream: AsyncGenerator[bytes, None]
+    ) -> Graph:
+        """Handle upload stream with proper error handling."""
         try:
-            await verify_base_url(base_url, cert_path, key_path)
+            async for chunk in stream:
+                try:
+                    await self._send_chunk_to_actor(actor, chunk)
+                except Exception as e:
+                    logger.error("chunk processing error", error=e)
+                    raise RuntimeError(
+                        f"Failed to process chunk: {str(e)}"
+                    ) from e
+
+            # Send end marker
+            with with_new_transaction() as g:
+                new(NT.End, {}, g.identifier)
+                await send(actor)
+
+            # Return completion message
+            g = create_graph()
+            g.add((g.identifier, RDF.type, NT.Done))
+            return g
+
         except Exception as e:
-            logger.error(
-                "failed to verify control over base URL", error=str(e)
+            logger.error("upload stream error", error=e)
+            g = create_graph()
+            g.add((g.identifier, RDF.type, NT.Error))
+            g.add((g.identifier, NT.message, Literal(str(e))))
+            return g
+
+    async def _send_chunk_to_actor(
+        self, actor: URIRef, message: bytes
+    ) -> URIRef:
+        with with_transient_graph() as id:
+            new(
+                NT.Chunk,
+                {
+                    NT.bytes: Literal(
+                        b64encode(message),
+                        datatype=XSD.base64Binary,
+                    )
+                },
+                id,
             )
-            raise RuntimeError(f"Failed to verify base URL {base_url}: {e}")
-        finally:
-            nursery.cancel_scope.cancel()
+            await send(actor)
+        return id
 
-    town = Town(base_url)
-
-    async def app(scope: Scope, receive: Receive, send: Send):
-        try:
-            return await main_app(scope, receive, send, town)
-        except* Exception as e:
-            logger.info("main app failed", error=str(e))
-            raise
-
-    # Wrap the main app with the DID document middleware
-    return DIDDocumentMiddleware(app)
+    def get_fastapi_app(self) -> FastAPI:
+        return self.app
 
 
-def create_http_server_config(bind, cert_path, key_path):
-    config = hypercorn.Config()
-    config.bind = [bind]
-    config.certfile = cert_path
-    config.keyfile = key_path
-    config.log.error_logger = logger.bind(name="hypercorn.error")
-    return config
+@contextmanager
+def in_request_graph(g: Graph):
+    with vars.graph.bind(g):
+        yield g.identifier

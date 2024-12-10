@@ -1,27 +1,32 @@
+import os
+
 from datetime import UTC, datetime
-from rdflib import XSD, BNode, Graph, Literal, Namespace, URIRef
+
+from swash import mint
+import trio
+
+from rdflib import XSD, Graph, URIRef, Literal, Namespace
+from trio_websocket import WebSocketConnection
 
 from swash.prfx import NT
 from swash.util import S, add, new, is_a, get_single_object
-import trio
-from bubble import repo
 from bubble.talk import (
     DeepgramParams,
     DeepgramMessage,
     using_deepgram_live_session,
 )
-from bubble.town.town2 import (
+from bubble.town.town import (
     ServerActor,
+    get_site,
     send,
     spawn,
     logger,
     receive,
+    in_request_graph,
+    this,
     with_new_transaction,
     with_transient_graph,
-    in_request_graph,
 )
-
-from trio_websocket import WebSocketConnection
 
 Deepgram = Namespace("https://node.town/2024/deepgram/#")
 
@@ -65,22 +70,30 @@ async def deepgram_session(results: URIRef):
     with in_request_graph(await receive()) as msg:
         first_chunk = chunk_data(msg)
         async with using_deepgram_live_session(DeepgramParams()) as client:
-            spawn(receive_results, client, results)
-            await client.send_message(first_chunk)
-            while True:
-                with in_request_graph(await receive()) as msg:
-                    chunk = chunk_data(msg)
-                    await client.send_message(chunk)
+            async with trio.open_nursery() as nursery:
+                await spawn(nursery, receive_results, client, results)
+                await client.send_message(first_chunk)
+                while True:
+                    with in_request_graph(await receive()) as msg:
+                        chunk = chunk_data(msg)
+                        await client.send_message(chunk)
 
 
 class DeepgramClientActor(ServerActor[str]):
-    async def handle(self, graph: Graph) -> Graph:
+    def __init__(self, name: str):
+        super().__init__(os.environ["DEEPGRAM_API_KEY"], name=name)
+
+    async def init(self):
+        await super().init()
+        create_affordance_button(this())
+
+    async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         request_id = graph.identifier
         with with_new_transaction(graph) as result:
             add(result.identifier, {NT.isResponseTo: request_id})
             if is_a(request_id, Deepgram.Start):
-                results = spawn(deepgram_results_actor)
-                session = spawn(deepgram_session, results)
+                results = await spawn(nursery, deepgram_results_actor)
+                session = await spawn(nursery, deepgram_session, results)
 
                 new(
                     Deepgram.Session,
@@ -116,3 +129,26 @@ class DeepgramClientActor(ServerActor[str]):
                 )
 
             return result
+
+
+def create_affordance_button(deepgram_client: URIRef):
+    with with_new_transaction():
+        new(
+            URIRef("https://node.town/2024/deepgram/#Client"),
+            {
+                NT.affordance: [
+                    new(
+                        NT.Button,
+                        {
+                            NT.label: Literal("Start", "en"),
+                            NT.message: URIRef(
+                                "https://node.town/2024/deepgram/#Start"
+                            ),
+                            NT.target: deepgram_client,
+                        },
+                        mint.fresh_uri(get_site()),
+                    )
+                ]
+            },
+            deepgram_client,
+        )

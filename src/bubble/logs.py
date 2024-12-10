@@ -1,24 +1,26 @@
 import logging
+
 from typing import Any, Optional
 
-from rdflib import Graph
-from rich.console import Console, RenderableType
-from rich.panel import Panel
+import trio
+import outcome
+import rich.box
+import hypercorn
+import starlette
+import structlog
 import rich.pretty
+import hypercorn.trio
+import rich.traceback
+
+from rdflib import Graph
+from rich.text import Text
+from rich.panel import Panel
 from rich.table import Table
 from rich.theme import Theme
+from rich.console import Console, RenderableType
 from rich.padding import Padding
-from rich.columns import Columns
-from rich.text import Text
 from rich.containers import Renderables
-import rich.traceback
-import rich.box
-import trio
-import hypercorn
-import hypercorn.trio
-import outcome
-import structlog
-import starlette
+
 from swash.util import graph_string
 
 # Custom theme for our logs
@@ -188,6 +190,8 @@ class RichConsoleRenderer:
                             outcome,
                             starlette,
                         ],
+                        locals_max_length=3,
+                        locals_max_string=50,
                     ),
                 )
             else:

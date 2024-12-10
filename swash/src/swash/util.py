@@ -6,9 +6,7 @@ from typing import Any, Optional, overload
 
 from rdflib import (
     RDF,
-    BNode,
     Graph,
-    URIRef,
     Literal,
     Namespace,
     IdentifiedNode,

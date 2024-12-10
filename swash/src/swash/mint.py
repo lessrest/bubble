@@ -5,7 +5,6 @@ import secrets
 from xid import XID
 from rdflib import Graph, URIRef, Namespace
 
-from swash.prfx import SWA
 import swash.vars as vars
 
 
