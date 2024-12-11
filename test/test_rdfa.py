@@ -22,16 +22,7 @@ def test_rdfa_roundtrip():
         # Render the graph to HTML with RDFa
         with document():
             with autoexpanding(4):
-                rdf_resource(
-                    subject.node,
-                    {
-                        "type": EX.TestType,
-                        "predicates": [
-                            (RDFS.label, Literal("Test Label")),
-                            (EX.property, Literal("Test Value")),
-                        ],
-                    },
-                )
+                rdf_resource(subject.node)
 
             # Get the rendered HTML
             doc = root.get()
