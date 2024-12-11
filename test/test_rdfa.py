@@ -50,20 +50,17 @@ def test_rdfa_roundtrip():
                     f'''
                     const fs = require('fs');
                     const RdfaParser = require('rdfa-streaming-parser').RdfaParser;
+                    const N3 = require('n3');
                     
                     const parser = new RdfaParser({{
                         baseIRI: 'http://example.org/',
                         contentType: 'text/html'
                     }});
 
-                    const quads = [];
+                    const writer = new N3.Writer({{format: 'N-Quads'}});
+                    
                     parser.on('data', quad => {{
-                        quads.push({{
-                            subject: quad.subject.value,
-                            predicate: quad.predicate.value,
-                            object: quad.object.value,
-                            graph: quad.graph.value
-                        }});
+                        writer.addQuad(quad);
                     }});
 
                     parser.on('error', console.error);
@@ -72,7 +69,10 @@ def test_rdfa_roundtrip():
                     parser.write(html);
                     parser.end();
 
-                    console.log(JSON.stringify(quads));
+                    writer.end((error, result) => {{
+                        if (error) throw error;
+                        console.log(result);
+                    }});
                     '''
                 ], capture_output=True, text=True, check=True)
 
