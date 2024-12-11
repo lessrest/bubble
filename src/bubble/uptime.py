@@ -4,7 +4,7 @@ from rdflib import RDF, Graph, Literal
 
 from swash.prfx import NT
 from swash.util import new
-from bubble.town.town import (
+from bubble.town import (
     ServerActor,
     this,
     with_new_transaction,

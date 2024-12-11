@@ -1,4 +1,3 @@
-import os
 import pathlib
 
 from urllib.parse import urlparse
@@ -6,7 +5,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI
 from rdflib import URIRef
 from swash.prfx import NT
-from swash.util import add, new
+from swash.util import add
 import trio
 import typer
 import hypercorn
@@ -22,10 +21,10 @@ from bubble.cred import get_anthropic_credential
 from bubble.logs import configure_logging
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
-from bubble.town.cert import generate_self_signed_cert
-from bubble.town.Deepgram import DeepgramClientActor
-from bubble.town.town import SimpleSupervisor, TownApp, spawn
-from bubble.town.uptime import UptimeActor
+from bubble.cert import generate_self_signed_cert
+from bubble.talk import DeepgramClientActor
+from bubble.town import SimpleSupervisor, TownApp, spawn
+from bubble.uptime import UptimeActor
 from datetime import datetime, UTC
 
 console = Console(width=80)

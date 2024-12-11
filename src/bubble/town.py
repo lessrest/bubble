@@ -34,9 +34,9 @@ from swash.prfx import NT, DID, DEEPGRAM
 from swash.rdfa import rdf_resource
 from swash.util import S, add, new, get_single_subject
 from swash.json import pyld
+from bubble.icon import favicon
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
-from PIL import Image
 from io import BytesIO
 
 
@@ -262,13 +262,14 @@ class ServerActor[State]:
     def __init__(self, state: State, name: Optional[str] = None):
         self.state = state
         self.name = name or self.__class__.__name__
+        self.stop = False
 
     async def __call__(self):
         """Main actor message processing loop with error handling."""
         async with trio.open_nursery() as nursery:
             try:
                 await self.init()
-                while True:
+                while not self.stop:
                     msg = await receive()
                     logger.info("received message", graph=msg)
                     response = await self.handle(nursery, msg)
@@ -575,9 +576,7 @@ class TownApp:
         self.app.mount(
             "/static",
             StaticFiles(
-                directory=str(
-                    pathlib.Path(__file__).parent.parent / "static"
-                )
+                directory=str(pathlib.Path(__file__).parent / "static")
             ),
         )
 
@@ -596,7 +595,7 @@ class TownApp:
     async def health_check(self):
         with with_transient_graph("health") as id:
             generate_health_status(id)
-            return LinkedDataResponse()
+            return JSONLinkedDataResponse()
 
     async def get_did_document(self):
         did_uri = URIRef(
@@ -605,7 +604,7 @@ class TownApp:
 
         with with_transient_graph(".well-known/did.json") as id:
             build_did_document(did_uri, id)
-            return LinkedDataResponse(vocab=DID)
+            return JSONLinkedDataResponse(vocab=DID)
 
     async def actor_message(self, id: str, type: str = Form(...)):
         actor = self.site[id]
@@ -637,47 +636,7 @@ class TownApp:
         )
 
     async def favicon(self):
-        """Generate a detailed favicon with color gradation from ASCII art."""
-
-        ascii_art = [
-            "    ********    ",
-            "  **@@####@@**  ",
-            " *@#$$$$$$##@* ",
-            "*@#$$&&&&$$##@*",
-            "*#$&&&**&&&$#@*",
-            "@#$&******&$#@*",
-            "@#$&******&$#@*",
-            "@#$&******&$#@*",
-            "@#$&******&$#@*",
-            "*#$&&&**&&&$#*",
-            "*@#$$&&&&$$#@*",
-            " *@#$$$$$$#@* ",
-            "  **@@##@@**  ",
-            "    ********    ",
-            "              ",
-            "              ",
-        ]
-
-        img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-        pixels = img.load()
-        assert pixels is not None
-
-        colors = {
-            "*": (100, 149, 237, 255),  # Base color (Cornflower blue)
-            "@": (130, 169, 247, 255),  # Lighter shade
-            "#": (80, 129, 217, 255),  # Darker shade
-            "$": (150, 189, 255, 255),  # Highlight
-            "&": (180, 209, 255, 255),  # Brightest highlight
-            " ": (0, 0, 0, 0),  # Transparent
-        }
-
-        for y, row in enumerate(ascii_art):
-            for x, char in enumerate(row):
-                if char != " ":
-                    pixels[x, y] = colors[char]
-
-        img = img.resize((32, 32), Image.Resampling.NEAREST)
-
+        img = await favicon()
         ico_buffer = BytesIO()
         img.save(ico_buffer, format="ICO")
         ico_data = ico_buffer.getvalue()
@@ -878,5 +837,13 @@ class TownApp:
 
 @contextmanager
 def in_request_graph(g: Graph):
-    with vars.graph.bind(g):
-        yield g.identifier
+    with vars.using_graph(g):
+        yield
+
+
+def town_app(
+    base_url: str, bind: str, repo: BubbleRepo, root_actor=None
+) -> FastAPI:
+    """Create and return a FastAPI app for the town."""
+    app = TownApp(base_url, bind, repo)
+    return app.get_fastapi_app()

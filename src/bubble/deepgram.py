@@ -15,7 +15,7 @@ from bubble.talk import (
     DeepgramMessage,
     using_deepgram_live_session,
 )
-from bubble.town.town import (
+from bubble.town import (
     ServerActor,
     get_site,
     send,
