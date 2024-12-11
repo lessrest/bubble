@@ -383,7 +383,8 @@ def render_property(predicate, obj):
         if isinstance(obj, Literal):
             attr("content", str(obj))
             if obj.language:
-                attr("xml:lang", obj.language)
+                attr("lang", obj.language)  # Changed from xml:lang to lang
+                attr("xml:lang", obj.language)  # Keep xml:lang for compatibility
             if obj.datatype:
                 attr("datatype", str(obj.datatype))
         render_subresource(obj, predicate)
