@@ -613,7 +613,19 @@ def generate_health_status(id: S):
 
 
 def build_did_document(did_uri: URIRef, doc_uri: S):
-    """Build a DID document."""
+    """Build a DID document using the town's current keypair."""
+    town = hub.get()
+    verification_key = new(
+        DID.Ed25519VerificationKey2020,
+        {
+            DID.controller: did_uri,
+            DID.publicKeyBase64: Literal(
+                b64encode(town.get_public_key_bytes()).decode()
+            ),
+        },
+        town.get_identity_uri(),
+    )
+
     new(
         DID.DIDDocument,
         {
@@ -622,12 +634,9 @@ def build_did_document(did_uri: URIRef, doc_uri: S):
             DID.created: Literal(
                 datetime.now(UTC).isoformat(), datatype=XSD.dateTime
             ),
-            DID.verificationMethod: [
-                new(
-                    DID.Ed25519VerificationKey2020,
-                    {DID.controller: did_uri},
-                )
-            ],
+            DID.verificationMethod: [verification_key],
+            DID.authentication: [verification_key],
+            DID.assertionMethod: [verification_key],
         },
         subject=doc_uri,
     )
@@ -700,6 +709,7 @@ class TownApp:
         self.app.get("/favicon.ico")(self.favicon)
         self.app.get("/health")(self.health_check)
         self.app.get("/.well-known/did.json")(self.get_did_document)
+        self.app.get("/.well-known/did.html")(self.get_did_document_html)
         self.app.get("/graphs")(graphs_view)
         self.app.get("/graph")(graph_view)
         self.app.get("/")(self.root)
@@ -726,6 +736,21 @@ class TownApp:
         with with_transient_graph(".well-known/did.json") as id:
             build_did_document(did_uri, id)
             return JSONLinkedDataResponse(vocab=DID)
+
+    async def get_did_document_html(self):
+        """Serve the DID document as an HTML page."""
+        did_uri = URIRef(
+            str(self.site).replace("https://", "did:web:").rstrip("/")
+        )
+
+        with with_transient_graph(".well-known/did.html") as id:
+            build_did_document(did_uri, id)
+            with base_shell("DID Document"):
+                with tag("div", classes="p-4"):
+                    with tag("h1", classes="text-2xl font-bold mb-4"):
+                        text("DID Document")
+                    render_graph_view(vars.graph.get())
+        return HypermediaResponse()
 
     async def actor_message(self, id: str, type: str = Form(...)):
         actor = self.site[id]
@@ -1113,7 +1138,9 @@ def get_node_classes(graph: Graph, node: S) -> str:
 def render_node(graph: Graph, node: S) -> None:
     """Render a single node with appropriate styling."""
     with tag("div", classes=get_node_classes(graph, node)):
-        data = get_subject_data(graph, node, context=graph)
+        dataset = current_bubble.get().dataset
+        dataset.add_graph(graph)
+        data = get_subject_data(dataset, node, context=graph)
         rdf_resource(node, data)
 
 

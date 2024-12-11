@@ -3,6 +3,7 @@
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix deepgram: <https://node.town/2024/deepgram/#> .
+@prefix did: <https://www.w3.org/ns/did#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix iaodev: <http://purl.obolibrary.org/obo/iao/dev/> .
 @prefix nt: <https://node.town/2024/> .
@@ -19,6 +20,16 @@
 <https://node.town/2024/> rdf:type owl:Ontology ;
    owl:imports iaodev:iao-edit.owl , iaodev:import_OBI.owl , iaodev:import_PATO.owl , iaodev:import_UO.owl ;
    rdfs:label "Node.Town Ontology of Computer Systems"@en .
+did:Ed25519VerificationKey2020 rdf:type did:VerificationMethod ;
+   rdfs:label "Ed25519 Verification Key 2020"@en .
+did:publicKeyBase64 rdf:type did:VerificationMethod ;
+   rdfs:label "base64 encoded public key"@en .
+
+# did:created rdfs:label "creation date"@en .
+did:assertionMethod rdfs:label "decentralized identity assertion method"@en .
+did:authentication rdfs:label "decentralized identity authentication method"@en .
+did:controller rdfs:label "decentralized identity controller"@en .
+did:id rdfs:label "decentralized identifier"@en .
 
 #################################################################
 #    Annotation properties
