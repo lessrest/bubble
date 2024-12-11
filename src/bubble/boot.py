@@ -19,7 +19,7 @@ from swash.util import new
 from bubble.stat.stat import gather_system_info
 
 
-from rdflib import OWL, RDFS, Graph, Literal
+from rdflib import OWL, RDFS, Graph, Literal, URIRef
 from trio import Path
 
 
@@ -35,12 +35,14 @@ async def describe_new_bubble(path: Path) -> Graph:
 
 async def construct_bubble_graph(path, info):
     bubble = fresh_iri()
-    with vars.graph.bind(Graph(identifier=bubble)) as g:
+    with vars.graph.bind(
+        Graph(identifier=bubble, base=URIRef(str(path)))
+    ) as g:
         surface = fresh_iri()
         step = fresh_iri()
         head = fresh_iri()
 
-        vars.bind_prefixes()
+        vars.bind_prefixes(g)
 
         machine = SWA[info["machine_id"]]
 
@@ -53,7 +55,7 @@ async def construct_bubble_graph(path, info):
         describe_repository(path, filesystem, home_dir, bubble)
         describe_machine(info, machine, filesystem, user)
         describe_creation_event(user, bubble, path, info)
-        describe_steps(bubble, step, head, path)
+        #        describe_steps(bubble, step, head, path)
         describe_surface_addition(user, bubble, surface, path)
 
         return g

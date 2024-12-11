@@ -23,7 +23,12 @@ from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.cert import generate_self_signed_cert
 from bubble.talk import DeepgramClientActor
-from bubble.town import SimpleSupervisor, TownApp, spawn
+from bubble.town import (
+    SimpleSupervisor,
+    TownApp,
+    spawn,
+    with_new_transaction,
+)
 from bubble.uptime import UptimeActor
 from datetime import datetime, UTC
 
@@ -118,6 +123,10 @@ def town(
             async with loading_bubble_from(trio.Path(bubble_path)) as repo:
                 town = TownApp(base_url, bind, repo)
                 with town.install_context():
+                    # Create and persist the town's identity
+                    async with with_new_transaction():
+                        town.system.create_identity_graph()
+
                     supervisor = await spawn(
                         nursery,
                         SimpleSupervisor(
@@ -125,11 +134,19 @@ def town(
                         ),
                     )
 
+                    # Link supervisor to the town's identity
+                    async with with_new_transaction():
+                        town.system.link_actor_to_identity(supervisor)
+
                     uptime = await spawn(
                         nursery,
                         UptimeActor(datetime.now(UTC)),
                         name="uptime",
                     )
+
+                    # Link uptime actor to the town's identity
+                    async with with_new_transaction():
+                        town.system.link_actor_to_identity(uptime)
 
                     add(URIRef(base_url), {NT.environs: supervisor})
                     add(URIRef(base_url), {NT.environs: uptime})

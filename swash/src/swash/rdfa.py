@@ -450,6 +450,9 @@ def render_value(obj: S, predicate: Optional[P] = None) -> None:
         _render_value_inner(obj)
 
 
+from rdflib.graph import QuotedGraph
+
+
 def _render_value_inner(obj: S, label: bool = False) -> None:
     if isinstance(obj, URIRef):
         _render_uri(obj)
@@ -459,8 +462,18 @@ def _render_value_inner(obj: S, label: bool = False) -> None:
         _render_literal(obj)
     elif isinstance(obj, Variable):
         _render_variable(obj)
+    elif isinstance(obj, QuotedGraph):
+        _render_quoted_graph(obj)
     else:
         raise ValueError(f"Unsupported node type: {obj}")
+
+
+@html.div(
+    "flex flex-col gap-4 p-4 border border-gray-300 dark:border-gray-700 bg-gray-100/50 dark:bg-gray-800/30 rounded-lg"
+)
+def _render_quoted_graph(obj: QuotedGraph) -> None:
+    # TODO: render the quoted graph
+    pass
 
 
 @html.a(

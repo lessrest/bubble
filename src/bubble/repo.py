@@ -69,7 +69,7 @@ class BubbleRepo:
         self.bubble = base
 
         self.dataset = dataset
-        self.graph = self.dataset.graph(NT.bubble)
+        self.graph = self.dataset.graph(NT.bubble, base=base)
         self.vocab = self.dataset.graph(NT.vocabulary)
         self.transient = self.dataset.graph(NT.transient)
         self.pending = self.dataset.graph(NT.pending)
@@ -167,7 +167,9 @@ class BubbleRepo:
 
         logger.info("parsing root.n3", path=str(path / "root.n3"))
         with vars.graph.bind(
-            Graph().parse(path / "root.n3", format="n3")
+            Graph(base=URIRef(str(path))).parse(
+                path / "root.n3", format="n3"
+            )
         ) as graph:
             bubble = get_single_subject(RDF.type, NT.Bubble)
             bubble_graph = dataset.graph(NT.bubble)
@@ -252,6 +254,7 @@ def using_bubble(bubble: BubbleRepo):
     with current_bubble.bind(bubble):
         with vars.graph.bind(bubble.graph):
             with vars.dataset.bind(bubble.dataset):
+                vars.bind_prefixes(bubble.graph)
                 yield bubble
 
 

@@ -22,11 +22,13 @@ from contextlib import asynccontextmanager, contextmanager
 from collections import defaultdict
 from dataclasses import dataclass
 
+from swash.desc import resource, property
 import trio
 import tenacity
 import structlog
 
 from rdflib import (
+    PROV,
     RDF,
     XSD,
     Graph,
@@ -56,9 +58,12 @@ from swash.json import pyld
 from swash.prfx import NT, DID, DEEPGRAM
 from swash.rdfa import rdf_resource, get_subject_data
 from swash.util import S, add, new, get_single_subject
+
 from bubble.icon import favicon
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import serialization
 
 logger = structlog.get_logger(__name__)
 
@@ -97,6 +102,8 @@ class Town:
     curr: Parameter[ActorContext]
     deck: MutableMapping[URIRef, ActorContext]
     yell: structlog.stdlib.BoundLogger
+    private_key: ed25519.Ed25519PrivateKey
+    public_key: ed25519.Ed25519PublicKey
 
     def __init__(
         self,
@@ -106,9 +113,44 @@ class Town:
         self.site = Namespace(site)
         self.yell = yell.bind(site=site)
 
+        # Generate Ed25519 keypair
+        self.private_key = ed25519.Ed25519PrivateKey.generate()
+        self.public_key = self.private_key.public_key()
+        self.identity_uri = self.generate_identity_uri()
+        self.yell.info("generated Ed25519 keypair")
+
         root = root_context(self.site)
         self.curr = Parameter("current_actor", root)
         self.deck = {root.addr: root}
+
+    def generate_identity_uri(self):
+        return URIRef(f"did:key:{self.get_public_key_hex()}")
+
+    def get_public_key_hex(self):
+        return self.public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ).hex()
+
+    def create_identity_graph(self):
+        """Create a graph representing this town's cryptographic identity."""
+        new(
+            DID.Ed25519VerificationKey2020,
+            {
+                DID.publicKeyBase64: Literal(
+                    b64encode(self.get_public_key_bytes()).decode()
+                ),
+                NT.created: Literal(
+                    datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+                ),
+            },
+            self.identity_uri,
+        )
+
+    def link_actor_to_identity(self, actor: URIRef):
+        """Create a graph linking an actor to this town's identity."""
+        with resource(self.identity_uri):
+            property(PROV.started, actor)
 
     def this(self) -> URIRef:
         return self.curr.get().addr
@@ -246,6 +288,29 @@ class Town:
         )
         tree = self.format_actor_tree(root)
         self.yell.info("Actor hierarchy:\n" + tree)
+
+    def sign_data(self, data: bytes) -> bytes:
+        """Sign data using the town's Ed25519 private key."""
+        return self.private_key.sign(data)
+
+    def verify_signature(self, data: bytes, signature: bytes) -> bool:
+        """Verify a signature using the town's Ed25519 public key."""
+        try:
+            self.public_key.verify(signature, data)
+            return True
+        except Exception:
+            return False
+
+    def get_public_key_bytes(self) -> bytes:
+        """Get the raw bytes of the public key."""
+        return self.public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+
+    def get_identity_uri(self) -> URIRef:
+        """Get the URI of this town's cryptographic identity."""
+        return self.identity_uri
 
 
 hub = Parameter[Town]("hub")
@@ -386,6 +451,9 @@ def create_graph(
     g.bind("nt", NT)
     g.bind("deepgram", DEEPGRAM)
     g.bind("site", site)
+    g.bind("did", DID)
+    g.bind("did:key", "did:key:")
+    g.bind("prov", PROV)
     return g
 
 
@@ -772,17 +840,9 @@ class TownApp:
 
     # Add uptime actor URI to the HTML template
     async def root(self):
-        session_id = self._generate_session_id()
-
-        with base_html("Bubble"):
-            # with tag("jsonld-socket"):
-            #     attr(
-            #         "endpoint",
-            #         f"{self.get_websocket_base()}{session_id}/jsonld",
-            #     )
-            #     attr("uptime-target", str(uptime_actor))
+        with base_shell("Bubble"):
             with tag("main", classes="flex flex-col gap-4 p-4"):
-                rdf_resource(self.base)
+                render_graph_view(vars.graph.get())
         return HypermediaResponse()
 
     def get_websocket_base(self):
@@ -977,56 +1037,106 @@ def count_outbound_links(graph: Graph, node: S) -> int:
     return len([p for p in graph.predicates(node) if p != RDF.type])
 
 
+def count_inbound_links(graph: Graph, node: S) -> int:
+    """Count inbound links to a node."""
+    return len(list(graph.subjects(None, node)))
+
+
 def get_traversal_order(graph: Graph) -> List[S]:
-    """Get nodes in traversal order - prioritizing named resources with fewer outbound links."""
-    # Count outbound links for each subject
-    link_counts = {
-        subject: count_outbound_links(graph, subject)
-        for subject in graph.subjects()
-    }
+    """Get nodes in traversal order - prioritizing resources with fewer inbound links and more outbound links."""
+    # Count inbound and outbound links for each subject
+    link_scores = {}
+    for subject in graph.subjects():
+        inbound = count_inbound_links(graph, subject)
+        outbound = count_outbound_links(graph, subject)
+        # Score = outbound - inbound to prioritize high outbound, low inbound
+        link_scores[subject] = outbound - inbound
 
     # Group nodes by type (URIRef vs BNode)
     typed_nodes = defaultdict(list)
-    for node in link_counts:
+    for node in link_scores:
         if isinstance(node, URIRef):
             typed_nodes["uri"].append(node)
         else:
             typed_nodes["bnode"].append(node)
 
-    # Sort each group by number of outbound links
+    # Sort each group by score (descending)
     sorted_nodes = []
 
-    # URIRefs first, sorted by link count
+    # URIRefs first, sorted by score
     sorted_nodes.extend(
-        sorted(typed_nodes["uri"], key=lambda x: link_counts[x])
+        sorted(
+            typed_nodes["uri"], key=lambda x: link_scores[x], reverse=True
+        )
     )
 
-    # Then BNodes, sorted by link count
+    # Then BNodes, sorted by score
     sorted_nodes.extend(
-        sorted(typed_nodes["bnode"], key=lambda x: link_counts[x])
+        sorted(
+            typed_nodes["bnode"], key=lambda x: link_scores[x], reverse=True
+        )
     )
 
     return sorted_nodes
 
 
+def is_did_key(graph: Graph, node: S) -> bool:
+    """Check if a node is a DID key."""
+    return node in Namespace("did:")
+
+
+def is_current_identity(node: S) -> bool:
+    """Check if a node is the current town's identity."""
+    try:
+        return node == hub.get().get_identity_uri()
+    except Exception:
+        return False
+
+
+def get_node_classes(graph: Graph, node: S) -> str:
+    """Get the CSS classes for a node based on its type and identity status."""
+    is_key = is_did_key(graph, node)
+    is_current = is_current_identity(node)
+
+    classes = "border-l-4 pl-2 "
+    if is_key:
+        if is_current:
+            classes += "border-blue-500"
+        else:
+            classes += "border-gray-300 opacity-50"
+    else:
+        classes += "border-blue-500"
+
+    return classes
+
+
+def render_node(graph: Graph, node: S) -> None:
+    """Render a single node with appropriate styling."""
+    with tag("div", classes=get_node_classes(graph, node)):
+        data = get_subject_data(graph, node, context=graph)
+        rdf_resource(node, data)
+
+
 def render_graph_view(graph: Graph) -> None:
     """Render a complete view of a graph with smart traversal ordering."""
     nodes = get_traversal_order(graph)
+    typed_nodes = []
+    untyped_nodes = []
+
+    # Sort nodes into typed and untyped
+    for node in nodes:
+        if list(graph.objects(node, RDF.type)):
+            typed_nodes.append(node)
+        else:
+            untyped_nodes.append(node)
 
     with tag("div", classes="flex flex-col gap-4"):
-        # First pass - render all nodes that have an rdf:type
-        for node in nodes:
-            types = list(graph.objects(node, RDF.type))
-            if types:
-                with tag("div", classes="border-l-4 border-blue-500 pl-2"):
-                    data = get_subject_data(graph, node, context=graph)
-                    rdf_resource(node, data)
+        # First pass - render typed nodes
+        for node in typed_nodes:
+            render_node(graph, node)
 
-        # Second pass - render remaining nodes
-        remaining = [
-            n for n in nodes if not list(graph.objects(n, RDF.type))
-        ]
-        if remaining:
+        # Second pass - render untyped nodes
+        if untyped_nodes:
             with tag(
                 "div",
                 classes="mt-4 border-t border-gray-300 dark:border-gray-700 pt-4",
@@ -1036,12 +1146,8 @@ def render_graph_view(graph: Graph) -> None:
                     classes="text-lg font-semibold mb-2 text-gray-600 dark:text-gray-400",
                 ):
                     text("Additional Resources")
-                for node in remaining:
-                    with tag(
-                        "div", classes="border-l-4 border-gray-500 pl-2"
-                    ):
-                        data = get_subject_data(graph, node, context=graph)
-                        rdf_resource(node, data)
+                for node in untyped_nodes:
+                    render_node(graph, node)
 
 
 def render_graphs_overview(dataset: Dataset) -> None:
@@ -1119,11 +1225,38 @@ def render_graph_summary(graph: Graph) -> None:
                             )
 
 
+@contextmanager
+def base_shell(title: str):
+    """Base shell layout with status bar showing town info like public key."""
+    with base_html(title):
+        with tag("div", classes="min-h-screen flex flex-col"):
+            # Status bar
+            with tag(
+                "div",
+                classes="bg-gray-900 text-white px-4 py-2 flex items-center justify-between",
+            ):
+                with tag("div", classes="flex items-center space-x-4"):
+                    with tag("div", classes="font-mono text-sm"):
+                        text("Identity: ")
+                        identity_uri = hub.get().get_identity_uri()
+                        with tag(
+                            "a",
+                            href=str(identity_uri),
+                            classes="font-medium text-emerald-400 hover:text-emerald-300",
+                        ):
+                            pubkey = hub.get().get_public_key_bytes()
+                            text(b64encode(pubkey).decode()[:12] + "...")
+
+            # Main content area
+            with tag("div", classes="flex-1"):
+                yield
+
+
 @html.div("min-h-screen bg-gray-50 dark:bg-gray-900")
 def graphs_view(request: Request):
     """Handler for viewing all graphs in the bubble."""
     bubble = current_bubble.get()
-    with base_html("Graphs"):
+    with base_shell("Graphs"):
         render_graphs_overview(bubble.dataset)
         return HypermediaResponse()
 
@@ -1147,6 +1280,6 @@ def graph_view(request: Request):
     if not graph:
         raise HTTPException(status_code=404, detail="Graph not found")
 
-    with base_html("Graph"):
+    with base_shell("Graph"):
         render_graph_view(graph)
         return HypermediaResponse()

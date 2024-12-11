@@ -5,11 +5,11 @@ from typing import Any, Generic, TypeVar, Optional, Sequence, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rdflib import Graph, Literal
+from rdflib import PROV, Graph, Literal
 from rdflib.graph import QuotedGraph, _TripleType
 
 from swash.mint import fresh_iri
-from swash.prfx import AS, NT, SWA
+from swash.prfx import AS, DID, NT, SWA
 
 T = TypeVar("T")
 
@@ -66,8 +66,11 @@ def langstr(s: str) -> Literal:
     return Literal(s, lang="en")
 
 
-def bind_prefixes():
-    g = graph.get()
+def bind_prefixes(g: Graph):
     g.bind("swa", SWA)
     g.bind("nt", NT)
+    g.bind("as", AS)
+    g.bind("prov", PROV)
+    g.bind("did", DID)
+    g.bind("did:key", "did:key:")
     g.bind("as", AS)
