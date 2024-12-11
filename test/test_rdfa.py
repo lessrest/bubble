@@ -79,16 +79,27 @@ def test_rdfa_roundtrip():
                 # Parse the output quads
                 parsed = Graph()
                 for quad in json.loads(result.stdout):
-                    parsed.add((
-                        EX[quad['subject'].split('/')[-1]],
-                        EX[quad['predicate'].split('/')[-1]] if 'example.org' in quad['predicate'] else
-                        RDFS.label if 'label' in quad['predicate'] else
-                        RDF.type,
-                        Literal(quad['object'])
-                    ))
+                    subject = EX[quad['subject'].split('/')[-1]]
+                    predicate = (
+                        EX[quad['predicate'].split('/')[-1]] if 'example.org' in quad['predicate']
+                        else RDF.type if 'type' in quad['predicate']
+                        else RDFS.label if 'label' in quad['predicate']
+                        else None
+                    )
+                    if predicate:
+                        parsed.add((
+                            subject,
+                            predicate,
+                            Literal(quad['object'])
+                        ))
+
+                # Get default graph from dataset for comparison
+                default_graph = Graph()
+                for s, p, o in g.default_context:
+                    default_graph.add((s, p, o))
 
                 # Check for isomorphism
-                assert g.isomorphic(parsed), "Parsed RDFa should match original graph"
+                assert default_graph.isomorphic(parsed), "Parsed RDFa should match original graph"
 
             finally:
                 html_path.unlink()
