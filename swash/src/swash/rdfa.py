@@ -32,7 +32,6 @@ from swash.html import (
 )
 from swash.prfx import NT
 from swash.util import P, S
-from bubble.repo import current_bubble
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 
@@ -119,9 +118,7 @@ def has_doxxing_risk(predicate: Optional[P]) -> bool:
     if predicate is None:
         return False
     return any(
-        current_bubble.get().dataset.triples(
-            (predicate, NT.hasRisk, NT.DoxxingRisk)
-        )
+        vars.dataset.get().triples((predicate, NT.hasRisk, NT.DoxxingRisk))
     )
 
 
@@ -151,7 +148,7 @@ def group_triples(
 
 
 def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
-    dataset = current_bubble.get().dataset
+    dataset = vars.dataset.get()
     if isinstance(subject, BNode):
         if RDF.List in dataset.objects(subject, RDF.type):
             render_list(dataset.collection(subject), predicate)
@@ -192,7 +189,7 @@ def get_rdf_resource(subject: str) -> None:
 
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
-        data = get_subject_data(current_bubble.get().dataset, subject)
+        data = get_subject_data(vars.dataset.get(), subject)
 
     if data["type"] == NT.Image:
         render_image_resource(subject, data)
@@ -390,7 +387,7 @@ inside_property_label = vars.Parameter("inside_property_label", False)
 
 
 def render_property_label(predicate):
-    dataset = current_bubble.get().dataset
+    dataset = vars.dataset.get()
     label = get_label(dataset, predicate)
     with inside_property_label.bind(True):
         render_value(label or predicate)
@@ -404,7 +401,7 @@ def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
         with tag("span"):
-            dataset = current_bubble.get().dataset
+            dataset = vars.dataset.get()
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):
                 render_value(type_label or data["type"])
@@ -453,7 +450,7 @@ def _render_uri(obj: URIRef) -> None:
     attr("resource", str(obj))
 
     # Try to get a label first
-    dataset = current_bubble.get().dataset
+    dataset = vars.dataset.get()
     label = get_label(dataset, obj)
 
     if label:
@@ -539,7 +536,7 @@ def _render_json_literal(obj: Literal) -> None:
 
 @router.get("/json/{json_hash}")
 def get_json(json_hash: str):
-    dataset = current_bubble.get().dataset
+    dataset = vars.dataset.get()
     for s, p, o in dataset.triples((None, NT.payload, None)):
         literal = o
         dictionary = json.loads(literal)
