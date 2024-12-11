@@ -85,10 +85,13 @@ def test_rdfa_roundtrip():
                 print("\nParsed RDFa graph:")
                 print(parsed.serialize(format="turtle"))
 
-                # Check for isomorphism
-                assert g.isomorphic(
-                    parsed
-                ), "Parsed RDFa should match original graph"
+                # Check for isomorphism using rdflib.compare
+                from rdflib.compare import isomorphic
+                # Get default graph from dataset
+                default_graph = Graph()
+                for s, p, o in g.default_context:
+                    default_graph.add((s, p, o))
+                assert isomorphic(default_graph, parsed), "Parsed RDFa should match original graph"
 
             finally:
                 html_path.unlink()

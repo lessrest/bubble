@@ -502,7 +502,7 @@ def render_curie_prefix(prefix):
 def _render_bnode(obj: BNode) -> None:
     attr("href", resource_path(obj))
     attr("hx-get", resource_path(obj))
-    text(f"⌗{obj}")
+    text("_:b1")  # Use a consistent label for blank nodes
 
 
 def _render_literal(obj: Literal) -> None:
