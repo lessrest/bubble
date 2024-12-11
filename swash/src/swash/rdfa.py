@@ -378,9 +378,15 @@ def render_property_with_multiple_literals(predicate, literals):
 
 @html.div("flex flex-col")
 def render_property(predicate, obj):
-    attr("property", str(predicate))
-    render_property_label(predicate)
-    render_subresource(obj, predicate)
+    with tag("div"):
+        attr("property", str(predicate))
+        if isinstance(obj, Literal):
+            attr("content", str(obj))
+            if obj.language:
+                attr("xml:lang", obj.language)
+            if obj.datatype:
+                attr("datatype", str(obj.datatype))
+        render_subresource(obj, predicate)
 
 
 inside_property_label = vars.Parameter("inside_property_label", False)
