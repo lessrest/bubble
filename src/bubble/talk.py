@@ -11,7 +11,7 @@ from pydantic import Field, BaseModel
 from trio_websocket import WebSocketConnection, open_websocket_url
 
 from swash.prfx import NT
-from swash.rdf import a, resource, property
+from swash.desc import a, resource, property
 from swash.util import get_single_object, is_a
 from bubble.town import (
     ServerActor,
