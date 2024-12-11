@@ -6,7 +6,7 @@ Provides a declarative way to construct RDF graphs with a syntax similar to Turt
 from contextlib import _GeneratorContextManager, contextmanager
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import Any, Generator, Optional
 
 from rdflib import (
     SKOS,
@@ -16,12 +16,12 @@ from rdflib import (
     URIRef,
 )
 from rdflib.namespace import RDF, RDFS
-from swash.util import O
+from swash.util import O, S
 
 from . import vars
 
 # Context variable to track current subject
-current_subject: ContextVar[Optional[Union[URIRef, BNode]]] = ContextVar(
+current_subject: ContextVar[Optional[S]] = ContextVar(
     "current_subject", default=None
 )
 
@@ -33,34 +33,10 @@ def graph():
         yield g
 
 
-def resource(type_uri: Optional[Union[URIRef, str]] = None):
-    """
-    Creates a new subject node in the graph.
-    If type_uri is provided, adds an rdf:type triple.
-    """
-    subj = Subject(BNode())
-    token = current_subject.set(subj.node)
-
-    if type_uri:
-        if isinstance(type_uri, str):
-            type_uri = URIRef(type_uri)
-        g = vars.graph.get()
-        g.add((subj.node, RDF.type, type_uri))
-
-    @contextmanager
-    def f():
-        try:
-            yield subj
-        finally:
-            current_subject.reset(token)
-
-    return f()
-
-
 class Subject:
     """Wrapper for a subject node that supports predicates"""
 
-    def __init__(self, node: Union[URIRef, BNode]):
+    def __init__(self, node: S):
         self.node = node
 
     @contextmanager
@@ -72,23 +48,46 @@ class Subject:
         finally:
             current_subject.reset(token)
 
-    def add(self, pred: Union[str, URIRef], obj: Any):
+    def add(self, pred: URIRef, obj: Any):
         """Add a predicate-object pair to this subject"""
         with self._as_current():
             property(pred, obj)
 
 
+def resource(
+    a: Optional[URIRef] = None,
+) -> _GeneratorContextManager[Subject]:
+    """
+    Creates a new subject node in the graph.
+    If 'a' is provided, adds an rdf:type triple.
+    """
+    s = Subject(BNode())
+    token = current_subject.set(s.node)
+
+    if a:
+        g = vars.graph.get()
+        g.add((s.node, RDF.type, a))
+
+    @contextmanager
+    def f() -> Generator[Subject, Any, None]:
+        try:
+            yield s
+        finally:
+            current_subject.reset(token)
+
+    return f()
+
+
 def property(
-    pred: Union[str, URIRef], obj: Optional[Any] = None
+    pred: URIRef, obj: Optional[Any] = None
 ) -> _GeneratorContextManager[Subject]:
     """
     Start describing a new subject that will be connected via pred.
     Usage:
-        with add(pred) as obj:
+        with property(pred):
             a(type_uri)
-            add(prop, value)
+            property(prop, value)
     """
-    pred = pred if isinstance(pred, URIRef) else URIRef(pred)
     parent = current_subject.get()
     if parent is None:
         raise RuntimeError("No active subject context")
