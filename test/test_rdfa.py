@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from rdflib import Graph, Literal, Namespace
+from rdflib import Graph, Literal, Namespace, RDF
 from rdflib.namespace import RDFS
 from swash.desc import new_dataset, resource, property, label
 from swash.rdfa import autoexpanding, rdf_resource
@@ -81,7 +81,9 @@ def test_rdfa_roundtrip():
                 for quad in json.loads(result.stdout):
                     parsed.add((
                         EX[quad['subject'].split('/')[-1]],
-                        RDFS[quad['predicate'].split('/')[-1]],
+                        EX[quad['predicate'].split('/')[-1]] if 'example.org' in quad['predicate'] else
+                        RDFS.label if 'label' in quad['predicate'] else
+                        RDF.type,
                         Literal(quad['object'])
                     ))
 
