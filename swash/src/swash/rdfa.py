@@ -210,6 +210,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
 
 @html.div("flex flex-col items-start gap-1")
 def render_upload_capability_resource(subject: S, data: Dict):
+    attr("vocab", "http://www.w3.org/ns/rdfa#")
+    attr("prefix", "rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#")
     render_resource_header(subject, data)
     url = next(
         (obj for pred, obj in data["predicates"] if pred == NT.url), None
@@ -235,6 +237,9 @@ def render_upload_capability_resource(subject: S, data: Dict):
 )
 @html.div("flex", "flex-col", "gap-1")
 def render_default_resource(subject: S, data: Optional[Dict] = None):
+    attr("resource", str(subject))
+    if data and data["type"]:
+        attr("typeof", str(data["type"]))
     render_resource_header(subject, data)
     render_properties(data)
 
@@ -376,6 +381,7 @@ def render_property_with_multiple_literals(predicate, literals):
 
 @html.div("flex flex-col")
 def render_property(predicate, obj):
+    attr("property", str(predicate))
     render_property_label(predicate)
     render_subresource(obj, predicate)
 
@@ -444,6 +450,7 @@ def _render_value_inner(obj: S, label: bool = False) -> None:
 )
 def _render_uri(obj: URIRef) -> None:
     attr("hx-get", resource_path(obj))
+    attr("resource", str(obj))
 
     # Try to get a label first
     dataset = current_bubble.get().dataset
@@ -560,6 +567,10 @@ def _render_string_literal(obj: Literal) -> None:
 def render_other_string(obj):
     if rendering_sensitive_data.get():
         classes("blur-sm hover:blur-none transition-all duration-300")
+    if obj.language:
+        attr("xml:lang", obj.language)
+    if obj.datatype:
+        attr("datatype", str(obj.datatype))
     text(obj.value)
 
 
