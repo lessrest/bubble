@@ -94,7 +94,7 @@ async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
 def town(
     bind: str = Option("127.0.0.1:2026", "--bind", help="Bind address"),
     base_url: str = Option(
-        "https://localhost:2026", "--base-url", help="Public base URL"
+        "https://localhost:2026/", "--base-url", help="Public base URL"
     ),
     bubble_path: str = BubblePath,
     shell: bool = Option(False, "--shell", help="Start a bash subshell"),
@@ -131,8 +131,8 @@ def town(
                         name="uptime",
                     )
 
-                    add(URIRef(base_url), {NT.has: supervisor})
-                    add(URIRef(base_url), {NT.has: uptime})
+                    add(URIRef(base_url), {NT.environs: supervisor})
+                    add(URIRef(base_url), {NT.environs: uptime})
 
                     nursery.start_soon(
                         serve_fastapi_app, config, town.get_fastapi_app()

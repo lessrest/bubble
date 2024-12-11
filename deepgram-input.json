@@ -1,0 +1,60 @@
+{
+  "type": "Results",
+  "channel_index": [0, 1],
+  "duration": 2.0999985,
+  "start": 16.04,
+  "is_final": true,
+  "speech_final": true,
+  "channel": {
+    "alternatives": [
+      {
+        "transcript": "This is not bad.",
+        "confidence": 0.9970703,
+        "words": [
+          {
+            "word": "this",
+            "start": 16.6,
+            "end": 16.76,
+            "confidence": 0.4909668,
+            "speaker": 0,
+            "punctuated_word": "This"
+          },
+          {
+            "word": "is",
+            "start": 16.76,
+            "end": 17.0,
+            "confidence": 0.9970703,
+            "speaker": 0,
+            "punctuated_word": "is"
+          },
+          {
+            "word": "not",
+            "start": 17.0,
+            "end": 17.240002,
+            "confidence": 0.99902344,
+            "speaker": 0,
+            "punctuated_word": "not"
+          },
+          {
+            "word": "bad",
+            "start": 17.240002,
+            "end": 17.740002,
+            "confidence": 0.9909668,
+            "speaker": 0,
+            "punctuated_word": "bad."
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "request_id": "ed931fa8-da0a-46ae-8ed8-01f2de101f57",
+    "model_info": {
+      "name": "2-general-nova",
+      "version": "2024-01-11.36317",
+      "arch": "nova-2"
+    },
+    "model_uuid": "1dbdfb4d-85b2-4659-9831-16b3c76229aa"
+  },
+  "from_finalize": false
+}

@@ -35,6 +35,11 @@ vox:AudioEvidence a owl:Class ;
     rdfs:label "audio evidence"@en ;
     skos:definition "Recorded audio that evidences speech events"@en .
 
+vox:AudioSegment a owl:Class ;
+    rdfs:subClassOf vox:AudioEvidence ;
+    rdfs:label "audio segment"@en ;
+    skos:definition "A segment of audio"@en .
+
 vox:SpeechSignal a owl:Class ;
     rdfs:subClassOf vox:AudioEvidence ;
     rdfs:label "speech signal"@en ;

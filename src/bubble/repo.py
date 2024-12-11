@@ -251,7 +251,8 @@ current_bubble = vars.Parameter["BubbleRepo"]("bubble")
 def using_bubble(bubble: BubbleRepo):
     with current_bubble.bind(bubble):
         with vars.graph.bind(bubble.graph):
-            yield bubble
+            with vars.dataset.bind(bubble.dataset):
+                yield bubble
 
 
 @asynccontextmanager

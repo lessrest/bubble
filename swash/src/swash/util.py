@@ -24,7 +24,9 @@ P = _PredicateType
 O = _ObjectType  # noqa: E741
 
 
-def print_n3(graph: Optional[Graph] = None) -> None:
+def print_n3(
+    graph: Optional[Graph] = None, title: Optional[str] = None
+) -> None:
     """Print the current graph in N3 format"""
     from rich import print
     from rich.panel import Panel
@@ -38,6 +40,7 @@ def print_n3(graph: Optional[Graph] = None) -> None:
         print(
             Panel(
                 Syntax(n3, "turtle", theme="zenburn"),
+                title=title,
             )
         )
     else:
@@ -47,7 +50,9 @@ def print_n3(graph: Optional[Graph] = None) -> None:
 def graph_string(graph: Graph) -> str:
     """Serialize a graph to a string"""
     s = graph.serialize(format="trig").replace("    ", "  ").strip()
-    return f"[id={graph.identifier}]\n{s}"
+    return (
+        f"[id={graph.identifier}]\n[class={graph.__class__.__name__}]\n{s}"
+    )
 
 
 def get_single_subject(predicate, object, graph=None):

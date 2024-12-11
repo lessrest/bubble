@@ -46,6 +46,7 @@ class Parameter(Generic[T]):
 
 
 graph = Parameter("graph", Graph())
+dataset = Parameter("dataset", None)
 
 
 @contextmanager

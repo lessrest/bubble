@@ -190,6 +190,12 @@ def get_rdf_resource(subject: str) -> None:
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
         data = get_subject_data(vars.dataset.get(), subject)
+        logger.info(
+            "getting subject data",
+            subject=subject,
+            dataset=vars.dataset.get(),
+            data=data,
+        )
 
     if data["type"] == NT.Image:
         render_image_resource(subject, data)
@@ -325,10 +331,10 @@ def render_button_resource(subject, data):
     with tag("input", type="hidden", name="type", value=str(message_uri)):
         pass
 
-    with tag(
-        "button",
-        classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4",
-    ):
+    with tag("button"):
+        classes(
+            "bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1"
+        )
         text(label)
 
 
@@ -386,10 +392,14 @@ def render_property(predicate, obj):
         if isinstance(obj, Literal):
             attr("content", str(obj))
             if obj.language:
-                attr("lang", obj.language)  # Changed from xml:lang to lang
-                attr("xml:lang", obj.language)  # Keep xml:lang for compatibility
+                attr("lang", obj.language)
             if obj.datatype:
                 attr("datatype", str(obj.datatype))
+        elif isinstance(obj, URIRef):
+            attr("resource", str(obj))
+        elif isinstance(obj, BNode):
+            attr("resource", "_:" + str(obj))
+        render_property_label(predicate)
         render_subresource(obj, predicate)
 
 

@@ -11,6 +11,7 @@ from typing import Any, Generator, Optional
 from rdflib import (
     SKOS,
     BNode,
+    Dataset,
     Graph,
     Literal,
     URIRef,
@@ -31,6 +32,14 @@ def graph():
     """Creates a new graph context for building RDF content"""
     with vars.graph.bind(Graph()) as g:
         yield g
+
+
+@contextmanager
+def new_dataset():
+    """Creates a new dataset context for building RDF content"""
+    with vars.dataset.bind(Dataset()) as g:
+        with vars.graph.bind(g):
+            yield g
 
 
 class Subject:
@@ -55,13 +64,14 @@ class Subject:
 
 
 def resource(
+    id: Optional[URIRef] = None,
     a: Optional[URIRef] = None,
 ) -> _GeneratorContextManager[Subject]:
     """
     Creates a new subject node in the graph.
     If 'a' is provided, adds an rdf:type triple.
     """
-    s = Subject(BNode())
+    s = Subject(id or BNode())
     token = current_subject.set(s.node)
 
     if a:

@@ -23,7 +23,15 @@ import trio
 import structlog
 
 from rdflib import RDF, XSD, Graph, URIRef, Literal, Namespace
-from fastapi import Body, Form, FastAPI, Request, Response, WebSocket
+from fastapi import (
+    Body,
+    Form,
+    FastAPI,
+    Request,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -318,7 +326,7 @@ class SimpleSupervisor:
                 async with trio.open_nursery() as nursery:
                     logger.info("starting supervised actor tree")
                     child = await spawn(nursery, self.actor)
-                    add(this(), {NT.has: child})
+                    add(this(), {NT.supervises: child})
 
 
 async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
@@ -466,12 +474,33 @@ class JSONLinkedDataResponse(JSONResponse):
 
 def persist(graph: Graph):
     """Persist a graph to the current bubble."""
-    current_bubble.get().graph += graph
+    bubble = current_bubble.get()
+    before_count = len(bubble.graph)
+    bubble.graph += graph
+    after_count = len(bubble.graph)
+    logger.info(
+        "persisted graph",
+        before=before_count,
+        after=after_count,
+        added=after_count - before_count,
+        bubble_graph=bubble.graph,
+        graph=graph,
+    )
+
+
+#    print_n3(current_bubble.get().graph, "current_bubble.get().graph")
+#    print_n3(vars.graph.get(), "vars.graph.get()")
+#    print_n3(graph, "graph")
 
 
 def get_site() -> Namespace:
     """Get the site namespace from the current actor system."""
     return hub.get().site
+
+
+def get_base() -> URIRef:
+    """Get the base URI from the current actor system."""
+    return hub.get().site[""]
 
 
 def record_message(type: str, actor: URIRef, g: Graph):
@@ -532,7 +561,7 @@ class TownApp:
         self.base = URIRef(base_url)
         self.bind = bind
         self.repo = repo
-        self.site = Namespace(base_url + "/")
+        self.site = Namespace(base_url)
         self.yell = structlog.get_logger(__name__).bind(bind=bind)
         self.app = FastAPI()
 
@@ -724,7 +753,7 @@ class TownApp:
         with base_html("Bubble"):
             # Create uptime actor element with endpoint and target attributes
             with tag("jsonld-socket"):
-                attr("endpoint", f"{self.get_websocket_base()}/foo/jsonld")
+                attr("endpoint", f"{self.get_websocket_base()}foo/jsonld")
                 attr("uptime-target", str(uptime_actor))
 
             rdf_resource(self.base)
@@ -760,6 +789,10 @@ class TownApp:
                         await websocket.send_json(
                             {"error": "No target actor specified"}
                         )
+
+                except WebSocketDisconnect as e:
+                    logger.error("websocket disconnect", error=e)
+                    break
 
                 except Exception as e:
                     logger.error(
