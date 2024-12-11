@@ -1,5 +1,6 @@
 import json
 import pathlib
+import uuid
 
 from base64 import b64encode
 from typing import (
@@ -572,6 +573,11 @@ class TownApp:
         self.system = Town(str(self.site), self.yell)
         hub.set(self.system)
 
+        # Add session tracking
+        self.websocket_sessions: Dict[str, WebSocket] = {}
+        self.session_actors: Dict[str, URIRef] = {}
+        self.actor_sessions: Dict[URIRef, str] = {}
+
     def _setup_error_handlers(self):
         """Setup comprehensive error handling for the web layer."""
 
@@ -749,13 +755,15 @@ class TownApp:
     # Add uptime actor URI to the HTML template
     async def root(self):
         uptime_actor = get_single_subject(RDF.type, NT.UptimeActor)
+        session_id = self._generate_session_id()
 
         with base_html("Bubble"):
-            # Create uptime actor element with endpoint and target attributes
             with tag("jsonld-socket"):
-                attr("endpoint", f"{self.get_websocket_base()}foo/jsonld")
+                attr(
+                    "endpoint",
+                    f"{self.get_websocket_base()}/{session_id}/jsonld",
+                )
                 attr("uptime-target", str(uptime_actor))
-
             rdf_resource(self.base)
         return HypermediaResponse()
 
@@ -763,19 +771,38 @@ class TownApp:
         return self.base_url.replace("https://", "wss://")
 
     async def ws_jsonld(self, websocket: WebSocket, id: str):
-        """WebSocket handler for JSON-LD messages with actor system integration."""
+        """WebSocket handler for JSON-LD messages with session management."""
+        session_id = self._generate_session_id()
+
         try:
             await websocket.accept()
-            logger.info("starting jsonld websocket connection", id=id)
+            self.websocket_sessions[session_id] = websocket
+            logger.info(
+                "starting jsonld websocket connection",
+                session_id=session_id,
+            )
+
+            # Create an actor for this session
+            session_actor = mint.fresh_uri(self.site)
+            self.session_actors[session_id] = session_actor
+            self.actor_sessions[session_actor] = session_id
 
             while True:
                 try:
                     data = await websocket.receive_json()
-                    logger.info("received json-ld message", data=data)
+                    logger.info(
+                        "received json-ld message",
+                        data=data,
+                        session=session_id,
+                    )
 
                     # Create a graph from the JSON-LD message
                     g = Graph(identifier=data["@id"])
                     g.parse(data=json.dumps(data), format="json-ld")
+
+                    # Add session actor as source
+                    g.add((g.identifier, NT.source, session_actor))
+
                     logger.info("parsed json-ld message", graph=g)
 
                     # Find target actor and send message
@@ -796,17 +823,28 @@ class TownApp:
 
                 except Exception as e:
                     logger.error(
-                        "error processing websocket message", error=e
+                        "error processing websocket message",
+                        error=e,
+                        session=session_id,
                     )
                     await websocket.send_json({"error": str(e)})
 
         except Exception as e:
-            logger.error("websocket handler error", error=e)
+            logger.error(
+                "websocket handler error", error=e, session=session_id
+            )
             try:
                 await websocket.close(code=1011, reason=str(e))
             except Exception:
                 pass
         finally:
+            # Clean up session
+            if session_id in self.session_actors:
+                actor = self.session_actors[session_id]
+                del self.actor_sessions[actor]
+                del self.session_actors[session_id]
+            if session_id in self.websocket_sessions:
+                del self.websocket_sessions[session_id]
             await websocket.close()
 
     @contextmanager
@@ -866,6 +904,40 @@ class TownApp:
 
     def get_fastapi_app(self) -> FastAPI:
         return self.app
+
+    def _generate_session_id(self) -> str:
+        """Generate a random session ID for WebSocket connections."""
+        return str(uuid.uuid4())
+
+    async def send_to_client(
+        self, actor_uri: URIRef, message: Graph
+    ) -> bool:
+        """Send a message to a client if it's connected."""
+        session_id = self.actor_sessions.get(actor_uri)
+        if not session_id:
+            logger.warning("No session found for actor", actor=actor_uri)
+            return False
+
+        websocket = self.websocket_sessions.get(session_id)
+        if not websocket:
+            logger.warning(
+                "No websocket found for session", session=session_id
+            )
+            return False
+
+        try:
+            await websocket.send_json(
+                json.loads(message.serialize(format="json-ld"))
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                "Error sending message to client",
+                error=e,
+                session=session_id,
+                actor=actor_uri,
+            )
+            return False
 
 
 @contextmanager
