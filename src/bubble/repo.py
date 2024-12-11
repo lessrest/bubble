@@ -232,7 +232,7 @@ class BubbleRepo:
     async def save_graph(self) -> None:
         """Save the graph to the root file"""
         self.graph.serialize(destination=self.rootpath, format="n3")
-        await self.commit()
+        # await self.commit()
 
     @classmethod
     async def load(cls, path: Path) -> "BubbleRepo":

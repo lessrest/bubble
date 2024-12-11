@@ -172,28 +172,52 @@ class RichConsoleRenderer:
                 else:
                     table.add_row(key, Text(str(value), style="graph"))
             elif key == "error":
-                # show the error as a traceback
-                # using rich.traceback.Traceback
-                table.add_row(
-                    key,
-                    rich.traceback.Traceback.from_exception(
-                        exc_type=type(value),
-                        exc_value=value,
-                        traceback=value.__traceback__,
-                        show_locals=False,
-                        max_frames=1,
-                        suppress=[
-                            structlog,
-                            trio,
-                            hypercorn,
-                            hypercorn.trio,
-                            outcome,
-                            starlette,
-                        ],
-                        locals_max_length=3,
-                        locals_max_string=50,
-                    ),
-                )
+                if isinstance(value, BaseExceptionGroup):
+                    # Handle exception groups by showing each exception
+                    tracebacks = []
+                    for exc in value.exceptions:
+                        tracebacks.append(
+                            rich.traceback.Traceback.from_exception(
+                                exc_type=type(exc),
+                                exc_value=exc,
+                                traceback=exc.__traceback__,
+                                show_locals=False,
+                                max_frames=1,
+                                suppress=[
+                                    structlog,
+                                    trio,
+                                    hypercorn,
+                                    hypercorn.trio,
+                                    outcome,
+                                    starlette,
+                                ],
+                                locals_max_length=3,
+                                locals_max_string=50,
+                            )
+                        )
+                    table.add_row(key, Renderables(tracebacks))
+                else:
+                    # Handle single exception as before
+                    table.add_row(
+                        key,
+                        rich.traceback.Traceback.from_exception(
+                            exc_type=type(value),
+                            exc_value=value,
+                            traceback=value.__traceback__,
+                            show_locals=False,
+                            max_frames=1,
+                            suppress=[
+                                structlog,
+                                trio,
+                                hypercorn,
+                                hypercorn.trio,
+                                outcome,
+                                starlette,
+                            ],
+                            locals_max_length=3,
+                            locals_max_string=50,
+                        ),
+                    )
             else:
                 table.add_row(key, rich.pretty.Pretty(value))
 

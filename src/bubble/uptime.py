@@ -17,7 +17,7 @@ class UptimeActor(ServerActor[datetime]):
 
     async def init(self):
         self.state = datetime.now(UTC)
-        with with_new_transaction() as g:
+        async with with_new_transaction():
             new(NT.UptimeActor, {}, this())
 
     async def handle(self, nursery, graph: Graph) -> Graph:

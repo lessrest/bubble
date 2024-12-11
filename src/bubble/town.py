@@ -1,12 +1,14 @@
 import json
-import pathlib
 import uuid
+import pathlib
 
+from io import BytesIO
 from base64 import b64encode
 from typing import (
     Any,
     Set,
     Dict,
+    List,
     Callable,
     Optional,
     Awaitable,
@@ -15,15 +17,24 @@ from typing import (
     MutableMapping,
 )
 from datetime import UTC, datetime
-from contextlib import contextmanager
+from operator import itemgetter
+from contextlib import asynccontextmanager, contextmanager
 from collections import defaultdict
 from dataclasses import dataclass
 
-import tenacity
 import trio
+import tenacity
 import structlog
 
-from rdflib import RDF, XSD, Graph, URIRef, Literal, Namespace
+from rdflib import (
+    RDF,
+    XSD,
+    Graph,
+    URIRef,
+    Dataset,
+    Literal,
+    Namespace,
+)
 from fastapi import (
     Body,
     Form,
@@ -31,23 +42,23 @@ from fastapi import (
     Request,
     Response,
     WebSocket,
+    HTTPException,
     WebSocketDisconnect,
 )
+from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from swash import Parameter, mint, rdfa, vars
-from swash.html import HypermediaResponse, tag, attr, document
-from swash.prfx import NT, DID, DEEPGRAM
-from swash.rdfa import rdf_resource
-from swash.util import S, add, new, get_single_subject
+from swash.html import HypermediaResponse, tag, attr, html, text, document
 from swash.json import pyld
+from swash.prfx import NT, DID, DEEPGRAM
+from swash.rdfa import rdf_resource, get_subject_data
+from swash.util import S, add, new, get_single_subject
 from bubble.icon import favicon
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
-from io import BytesIO
-
 
 logger = structlog.get_logger(__name__)
 
@@ -305,7 +316,7 @@ class SimpleSupervisor:
         self.actor = actor
 
     async def __call__(self):
-        with with_new_transaction():
+        async with with_new_transaction():
             new(NT.Supervisor, {}, this())
 
         def retry_sleep(retry_state: tenacity.RetryCallState) -> Any:
@@ -378,8 +389,8 @@ def create_graph(
     return g
 
 
-@contextmanager
-def with_new_transaction(graph: Optional[Graph] = None):
+@asynccontextmanager
+async def with_new_transaction(graph: Optional[Graph] = None):
     """Create a new transaction with a fresh graph that will be persisted."""
     g = create_graph()
     if graph is not None:
@@ -390,7 +401,7 @@ def with_new_transaction(graph: Optional[Graph] = None):
 
     logger.info("persisting transaction", graph=g)
 
-    persist(g)
+    await persist(g)
 
 
 @contextmanager
@@ -473,12 +484,15 @@ class JSONLinkedDataResponse(JSONResponse):
         )
 
 
-def persist(graph: Graph):
+async def persist(graph: Graph):
     """Persist a graph to the current bubble."""
     bubble = current_bubble.get()
     before_count = len(bubble.graph)
     bubble.graph += graph
     after_count = len(bubble.graph)
+
+    await bubble.save_graph()
+
     logger.info(
         "persisted graph",
         before=before_count,
@@ -615,16 +629,20 @@ class TownApp:
             ),
         )
 
-        # Setup route handlers
         self.app.get("/favicon.ico")(self.favicon)
         self.app.get("/health")(self.health_check)
         self.app.get("/.well-known/did.json")(self.get_did_document)
-        self.app.post("/{id}")(self.actor_post)
-        self.app.post("/{id}/message")(self.actor_message)
-        self.app.put("/{id}")(self.actor_put)
-        self.app.websocket("/{id}/upload")(self.ws_upload)
-        self.app.get("/{id}")(self.actor_get)
+        self.app.get("/graphs")(graphs_view)
+        self.app.get("/graph")(graph_view)
         self.app.get("/")(self.root)
+
+        self.app.get("/{id}")(self.actor_get)
+
+        self.app.post("/{id}/message")(self.actor_message)
+        self.app.post("/{id}")(self.actor_post)
+        self.app.put("/{id}")(self.actor_put)
+
+        self.app.websocket("/{id}/upload")(self.ws_upload)
         self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
 
     async def health_check(self):
@@ -643,7 +661,7 @@ class TownApp:
 
     async def actor_message(self, id: str, type: str = Form(...)):
         actor = self.site[id]
-        with with_new_transaction() as g:
+        async with with_new_transaction() as g:
             record_message(type, actor, g)
             result = await call(actor, g)
             return LinkedDataResponse(result)
@@ -680,7 +698,7 @@ class TownApp:
 
     async def actor_post(self, id: str, body: dict = Body(...)):
         actor = self.site[id]
-        with with_new_transaction() as g:
+        async with with_new_transaction() as g:
             body["@id"] = str(g.identifier)
             g.parse(data=json.dumps(body), format="json-ld")
             result = await call(actor, g)
@@ -754,17 +772,17 @@ class TownApp:
 
     # Add uptime actor URI to the HTML template
     async def root(self):
-        uptime_actor = get_single_subject(RDF.type, NT.UptimeActor)
         session_id = self._generate_session_id()
 
         with base_html("Bubble"):
-            with tag("jsonld-socket"):
-                attr(
-                    "endpoint",
-                    f"{self.get_websocket_base()}/{session_id}/jsonld",
-                )
-                attr("uptime-target", str(uptime_actor))
-            rdf_resource(self.base)
+            # with tag("jsonld-socket"):
+            #     attr(
+            #         "endpoint",
+            #         f"{self.get_websocket_base()}{session_id}/jsonld",
+            #     )
+            #     attr("uptime-target", str(uptime_actor))
+            with tag("main", classes="flex flex-col gap-4 p-4"):
+                rdf_resource(self.base)
         return HypermediaResponse()
 
     def get_websocket_base(self):
@@ -869,7 +887,7 @@ class TownApp:
                     ) from e
 
             # Send end marker
-            with with_new_transaction() as g:
+            async with with_new_transaction() as g:
                 new(NT.End, {}, g.identifier)
                 await send(actor)
 
@@ -952,3 +970,183 @@ def town_app(
     """Create and return a FastAPI app for the town."""
     app = TownApp(base_url, bind, repo)
     return app.get_fastapi_app()
+
+
+def count_outbound_links(graph: Graph, node: S) -> int:
+    """Count outbound links from a node, excluding rdf:type."""
+    return len([p for p in graph.predicates(node) if p != RDF.type])
+
+
+def get_traversal_order(graph: Graph) -> List[S]:
+    """Get nodes in traversal order - prioritizing named resources with fewer outbound links."""
+    # Count outbound links for each subject
+    link_counts = {
+        subject: count_outbound_links(graph, subject)
+        for subject in graph.subjects()
+    }
+
+    # Group nodes by type (URIRef vs BNode)
+    typed_nodes = defaultdict(list)
+    for node in link_counts:
+        if isinstance(node, URIRef):
+            typed_nodes["uri"].append(node)
+        else:
+            typed_nodes["bnode"].append(node)
+
+    # Sort each group by number of outbound links
+    sorted_nodes = []
+
+    # URIRefs first, sorted by link count
+    sorted_nodes.extend(
+        sorted(typed_nodes["uri"], key=lambda x: link_counts[x])
+    )
+
+    # Then BNodes, sorted by link count
+    sorted_nodes.extend(
+        sorted(typed_nodes["bnode"], key=lambda x: link_counts[x])
+    )
+
+    return sorted_nodes
+
+
+def render_graph_view(graph: Graph) -> None:
+    """Render a complete view of a graph with smart traversal ordering."""
+    nodes = get_traversal_order(graph)
+
+    with tag("div", classes="flex flex-col gap-4"):
+        # First pass - render all nodes that have an rdf:type
+        for node in nodes:
+            types = list(graph.objects(node, RDF.type))
+            if types:
+                with tag("div", classes="border-l-4 border-blue-500 pl-2"):
+                    data = get_subject_data(graph, node, context=graph)
+                    rdf_resource(node, data)
+
+        # Second pass - render remaining nodes
+        remaining = [
+            n for n in nodes if not list(graph.objects(n, RDF.type))
+        ]
+        if remaining:
+            with tag(
+                "div",
+                classes="mt-4 border-t border-gray-300 dark:border-gray-700 pt-4",
+            ):
+                with tag(
+                    "h3",
+                    classes="text-lg font-semibold mb-2 text-gray-600 dark:text-gray-400",
+                ):
+                    text("Additional Resources")
+                for node in remaining:
+                    with tag(
+                        "div", classes="border-l-4 border-gray-500 pl-2"
+                    ):
+                        data = get_subject_data(graph, node, context=graph)
+                        rdf_resource(node, data)
+
+
+def render_graphs_overview(dataset: Dataset) -> None:
+    """Render an overview of all graphs in the dataset."""
+    with tag("div", classes="p-4 flex flex-col gap-6"):
+        with tag(
+            "h2",
+            classes="text-2xl font-bold text-gray-800 dark:text-gray-200",
+        ):
+            text("Available Graphs")
+
+        with tag("div", classes="grid gap-4"):
+            # Get all non-formula graphs and sort by triple count (largest first)
+            graphs = [
+                g
+                for g in dataset.graphs()
+                if not isinstance(g, QuotedGraph)
+            ]
+
+            for graph in sorted(graphs, key=len, reverse=True):
+                render_graph_summary(graph)
+
+
+def render_graph_summary(graph: Graph) -> None:
+    """Render a summary card for a single graph."""
+    subject_count = len(set(graph.subjects()))
+    triple_count = len(graph)
+
+    with tag(
+        "div",
+        classes="border rounded-lg p-4 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow",
+    ):
+        # Header with graph ID and stats
+        with tag("div", classes="flex justify-between items-start mb-4"):
+            # Graph ID as link
+            with tag(
+                "a",
+                href=f"/graph?graph={str(graph.identifier)}",
+                classes="text-lg font-medium text-blue-600 dark:text-blue-400 hover:underline",
+            ):
+                text(str(graph.identifier))
+
+            # Stats
+            with tag(
+                "div", classes="text-sm text-gray-500 dark:text-gray-400"
+            ):
+                text(f"{subject_count} subjects, {triple_count} triples")
+
+        # Preview of typed resources
+        typed_subjects = {s for s in graph.subjects(RDF.type, None)}
+        if typed_subjects:
+            with tag("div", classes="mt-2"):
+                with tag(
+                    "h4",
+                    classes="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2",
+                ):
+                    text("Resource Types")
+
+                type_counts = defaultdict(int)
+                for s in typed_subjects:
+                    for t in graph.objects(s, RDF.type):
+                        type_counts[t] += 1
+
+                with tag("div", classes="flex flex-wrap gap-2"):
+                    for rdf_type, count in sorted(
+                        type_counts.items(),
+                        key=lambda x: (-x[1], str(x[0])),
+                    ):
+                        with tag(
+                            "span",
+                            classes="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
+                        ):
+                            text(
+                                f"{str(rdf_type).split('#')[-1].split('/')[-1]} ({count})"
+                            )
+
+
+@html.div("min-h-screen bg-gray-50 dark:bg-gray-900")
+def graphs_view(request: Request):
+    """Handler for viewing all graphs in the bubble."""
+    bubble = current_bubble.get()
+    with base_html("Graphs"):
+        render_graphs_overview(bubble.dataset)
+        return HypermediaResponse()
+
+
+@html.div("p-4")
+def graph_view(request: Request):
+    """Handler for viewing complete graphs."""
+    graph_id = request.query_params.get("graph")
+    if not graph_id:
+        raise HTTPException(status_code=400, detail="No graph ID provided")
+
+    graph = None
+    bubble = current_bubble.get()
+
+    # Try to find the graph in the bubble's dataset
+    for g in bubble.dataset.graphs():
+        if str(g.identifier) == graph_id:
+            graph = g
+            break
+
+    if not graph:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    with base_html("Graph"):
+        render_graph_view(graph)
+        return HypermediaResponse()

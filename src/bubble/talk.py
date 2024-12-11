@@ -182,13 +182,13 @@ class DeepgramClientActor(ServerActor[str]):
 
     async def init(self):
         await super().init()
-        with with_new_transaction():
+        async with with_new_transaction():
             create_affordance_button(this())
 
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         logger.info("Deepgram client actor handling message", graph=graph)
         request_id = graph.identifier
-        with with_new_transaction(graph) as result:
+        async with with_new_transaction(graph) as result:
             result.add((result.identifier, NT.isResponseTo, request_id))
             if is_a(request_id, Deepgram.Start):
                 root = get_base()
@@ -273,7 +273,7 @@ class DeepgramTranscriptionReceiver(ServerActor[DeepgramActorState]):
             get_single_object(graph.identifier, NT.json, graph)
         )
 
-        with with_new_transaction(graph) as result:
+        async with with_new_transaction(graph) as result:
             result.add(
                 (result.identifier, NT.isResponseTo, graph.identifier)
             )

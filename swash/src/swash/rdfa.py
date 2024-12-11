@@ -18,6 +18,7 @@ from rdflib import (
     URIRef,
     Dataset,
     Literal,
+    Variable,
 )
 from fastapi import APIRouter, HTTPException
 
@@ -387,20 +388,19 @@ def render_property_with_multiple_literals(predicate, literals):
 
 @html.div("flex flex-col")
 def render_property(predicate, obj):
-    with tag("div"):
-        attr("property", str(predicate))
-        if isinstance(obj, Literal):
-            attr("content", str(obj))
-            if obj.language:
-                attr("lang", obj.language)
-            if obj.datatype:
-                attr("datatype", str(obj.datatype))
-        elif isinstance(obj, URIRef):
-            attr("resource", str(obj))
-        elif isinstance(obj, BNode):
-            attr("resource", "_:" + str(obj))
-        render_property_label(predicate)
-        render_subresource(obj, predicate)
+    attr("property", str(predicate))
+    if isinstance(obj, Literal):
+        attr("content", str(obj))
+        if obj.language:
+            attr("lang", obj.language)
+        if obj.datatype:
+            attr("datatype", str(obj.datatype))
+    elif isinstance(obj, URIRef):
+        attr("resource", str(obj))
+    elif isinstance(obj, BNode):
+        attr("resource", "_:" + str(obj))
+    render_property_label(predicate)
+    render_subresource(obj, predicate)
 
 
 inside_property_label = vars.Parameter("inside_property_label", False)
@@ -457,6 +457,8 @@ def _render_value_inner(obj: S, label: bool = False) -> None:
         _render_bnode(obj)
     elif isinstance(obj, Literal):
         _render_literal(obj)
+    elif isinstance(obj, Variable):
+        _render_variable(obj)
     else:
         raise ValueError(f"Unsupported node type: {obj}")
 
@@ -542,6 +544,11 @@ def _render_literal(obj: Literal) -> None:
             _render_default_literal(obj)
     else:
         _render_string_literal(obj)
+
+
+@html.span("text-gray-600 dark:text-gray-400 italic")
+def _render_variable(obj: Variable) -> None:
+    text(str(obj))
 
 
 @html.a("text-blue-400 cursor-pointer", hx_swap="outerHTML")
