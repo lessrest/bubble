@@ -1,7 +1,18 @@
-from rdflib import Namespace, Literal
+from datetime import UTC, datetime
+from rdflib import SKOS, Graph, Namespace, Literal, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
-from swash.rdf import graph, new, add, has, literal
+from swash.rdf import (
+    a,
+    definition,
+    example,
+    graph,
+    resource,
+    property,
+    literal,
+    note,
+    subclass,
+)
 from swash.util import print_n3
 
 # Test namespace
@@ -10,16 +21,18 @@ TEST = Namespace("http://example.org/test#")
 
 def test_simple_triple():
     with graph() as g:
-        with new() as subj:
-            subj.has(TEST.name, "Test")
+        with resource() as subj:
+            subj.add(TEST.name, "Test")
+
+        print_n3(g)
 
         assert (None, TEST.name, Literal("Test")) in g
 
 
 def test_typed_subject():
     with graph() as g:
-        with new(TEST.Person) as person:
-            person.has(TEST.name, "Alice")
+        with resource(TEST.Person) as person:
+            person.add(TEST.name, "Alice")
             subject = person.node
 
         assert (subject, RDF.type, TEST.Person) in g
@@ -28,13 +41,13 @@ def test_typed_subject():
 
 def test_nested_subjects():
     with graph() as g:
-        with new(TEST.Person) as person:
-            person.has(TEST.name, "Alice")
+        with resource(TEST.Person) as person:
+            person.add(TEST.name, "Alice")
             alice = person.node
 
-            with add(TEST.knows) as friend:
-                friend.has(RDF.type, TEST.Person)
-                friend.has(TEST.name, "Bob")
+            with property(TEST.knows) as friend:
+                a(TEST.Person)
+                property(TEST.name, "Bob")
                 bob = friend.node
 
         assert (alice, TEST.knows, bob) in g
@@ -42,17 +55,30 @@ def test_nested_subjects():
 
 def test_literal_with_datatype():
     with graph() as g:
-        with new() as subj:
-            subj.has(TEST.age, literal(42, datatype=XSD.integer))
+        with resource() as subj:
+            subj.add(TEST.age, literal(42, datatype=XSD.integer))
 
         assert (subj.node, TEST.age, Literal(42, datatype=XSD.integer)) in g
 
 
+def test_datetime_implict_datatype():
+    with graph() as g:
+        t = datetime.now(UTC)
+        with resource() as subj:
+            subj.add(TEST.created, t)
+
+        assert (
+            subj.node,
+            TEST.created,
+            Literal(t.isoformat(), datatype=XSD.dateTime),
+        ) in g
+
+
 def test_language_tagged_literal():
     with graph() as g:
-        with new() as subj:
-            subj.has(RDFS.label, literal("Hello", lang="en"))
-            subj.has(RDFS.label, literal("Bonjour", lang="fr"))
+        with resource() as subj:
+            subj.add(RDFS.label, literal("Hello", lang="en"))
+            subj.add(RDFS.label, literal("Bonjour", lang="fr"))
 
         assert (subj.node, RDFS.label, Literal("Hello", lang="en")) in g
         assert (subj.node, RDFS.label, Literal("Bonjour", lang="fr")) in g
@@ -61,51 +87,108 @@ def test_language_tagged_literal():
 def test_complex_structure():
     """Test a more complex data structure similar to describe_machine"""
     with graph() as g:
-        with new(TEST.Machine) as machine:
-            machine_node = machine.node
+        with resource(TEST.Machine):
+            with property(TEST.part):
+                a(TEST.CPU)
+                property(TEST.architecture, "x86_64")
 
-            # Add CPU
-            with add(TEST.part) as cpu:
-                has(RDF.type, TEST.CPU)
-                has(TEST.architecture, "x86_64")
-                cpu_node = cpu.node
+            with property(TEST.part):
+                a(TEST.RAM)
+                property(TEST.size, 16)
 
-            # Add RAM
-            with add(TEST.part) as ram:
-                has(RDF.type, TEST.RAM)
-                has(TEST.size, literal(16, datatype=XSD.integer))
-                ram_node = ram.node
+            with property(TEST.system):
+                a(TEST.OS)
+                property(TEST.name, "Linux")
+                property(TEST.version, "5.15.0")
 
-            # Add OS
-            with add(TEST.system) as os:
-                has(RDF.type, TEST.OS)
-                has(TEST.name, "Linux")
-                has(TEST.version, "5.15.0")
-                os_node = os.node
+        expected = """
+            @prefix test: <http://example.org/test#> .
+            @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+            @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-        # Verify machine type
-        assert (machine_node, RDF.type, TEST.Machine) in g
+            [] a test:Machine ;
+                test:part [ a test:CPU ;
+                           test:architecture "x86_64" ],
+                         [ a test:RAM ;
+                           test:size "16"^^xsd:integer ] ;
+                test:system [ a test:OS ;
+                            test:name "Linux" ;
+                            test:version "5.15.0" ] .
+        """
 
-        # Verify parts
-        parts = list(g.objects(machine_node, TEST.part))
-        assert len(parts) == 2
-        assert cpu_node in parts
-        assert ram_node in parts
+        assert g.isomorphic(Graph().parse(data=expected, format="turtle"))
 
-        # Verify CPU
-        print_n3(g)
-        assert (cpu_node, RDF.type, TEST.CPU) in g
-        assert (cpu_node, TEST.architecture, Literal("x86_64")) in g
 
-        # Verify RAM
-        assert (ram_node, RDF.type, TEST.RAM) in g
-        assert (
-            ram_node,
-            TEST.size,
-            Literal(16, datatype=XSD.integer),
-        ) in g
+def test_definition():
+    with graph() as g:
+        with resource() as subj:
+            definition("A test definition")
+            assert (
+                subj.node,
+                SKOS.definition,
+                Literal("A test definition", lang="en"),
+            ) in g
 
-        # Verify OS
-        assert (os_node, RDF.type, TEST.OS) in g
-        assert (os_node, TEST.name, Literal("Linux")) in g
-        assert (os_node, TEST.version, Literal("5.15.0")) in g
+            # Test with different language
+            definition("Une définition", lang="fr")
+            assert (
+                subj.node,
+                SKOS.definition,
+                Literal("Une définition", lang="fr"),
+            ) in g
+
+
+def test_note():
+    with graph() as g:
+        with resource() as subj:
+            note("A test note")
+            assert (
+                subj.node,
+                SKOS.note,
+                Literal("A test note", lang="en"),
+            ) in g
+
+            # Test with different language
+            note("Una nota", lang="es")
+            assert (
+                subj.node,
+                SKOS.note,
+                Literal("Una nota", lang="es"),
+            ) in g
+
+
+def test_example():
+    with graph() as g:
+        with resource() as subj:
+            example("A test example")
+            assert (
+                subj.node,
+                SKOS.example,
+                Literal("A test example", lang="en"),
+            ) in g
+
+            # Test with different language
+            example("Ett exempel", lang="sv")
+            assert (
+                subj.node,
+                SKOS.example,
+                Literal("Ett exempel", lang="sv"),
+            ) in g
+
+
+def test_rdf_type():
+    with graph() as g:
+        with resource() as subj:
+            test_type = URIRef("http://example.org/TestType")
+            a(test_type)
+            assert (subj.node, RDF.type, test_type) in g
+
+
+def test_subclass():
+    with graph() as g:
+        with resource() as subj:
+            # Test with URIRef
+            parent_class = URIRef("http://example.org/ParentClass")
+            subclass(parent_class)
+
+            assert (subj.node, RDFS.subClassOf, parent_class) in g

@@ -10,16 +10,15 @@ from rdflib import XSD, Graph, URIRef, Literal, Namespace
 from pydantic import Field, BaseModel
 from trio_websocket import WebSocketConnection, open_websocket_url
 
-from swash import mint
 from swash.prfx import NT
-from swash.util import S, add, new, is_a, get_single_object
+from swash.rdf import a, resource, property
+from swash.util import get_single_object, is_a
 from bubble.town import (
     ServerActor,
     send,
     this,
     spawn,
     receive,
-    get_site,
     in_request_graph,
     with_new_transaction,
     with_transient_graph,
@@ -126,21 +125,18 @@ async def receive_results(client: WebSocketConnection, results: URIRef):
                 "Deepgram message",
                 message=message,
             )
-            with with_transient_graph() as id:
-                new(
-                    Deepgram.Result,
-                    {
-                        Deepgram.transcript: message.channel.alternatives[
-                            0
-                        ].transcript
-                    },
-                    id,
-                )
+            with with_transient_graph():
+                with resource(Deepgram.Result):
+                    property(
+                        Deepgram.transcript,
+                        message.channel.alternatives[0].transcript,
+                    )
                 await send(results)
 
 
-def chunk_data(id: S) -> bytes:
-    chunk = get_single_object(id, NT.bytes)
+def chunk_data(graph: Graph) -> bytes:
+    """Extract audio chunk data from a message graph."""
+    chunk = get_single_object(graph.identifier, NT.bytes)
     data = chunk.toPython()
     assert isinstance(data, bytes)
     return data
@@ -148,15 +144,17 @@ def chunk_data(id: S) -> bytes:
 
 async def deepgram_session(results: URIRef):
     # Wait for first chunk before starting session
-    with in_request_graph(await receive()) as msg:
-        first_chunk = chunk_data(msg)
+    msg = await receive()
+    with in_request_graph(msg) as request_graph:
+        first_chunk = chunk_data(request_graph)
         async with using_deepgram_live_session(DeepgramParams()) as client:
             async with trio.open_nursery() as nursery:
                 await spawn(nursery, receive_results, client, results)
                 await client.send_message(first_chunk)
                 while True:
-                    with in_request_graph(await receive()) as msg:
-                        chunk = chunk_data(msg)
+                    msg = await receive()
+                    with in_request_graph(msg) as request_graph:
+                        chunk = chunk_data(request_graph)
                         await client.send_message(chunk)
 
 
@@ -171,62 +169,45 @@ class DeepgramClientActor(ServerActor[str]):
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         request_id = graph.identifier
         with with_new_transaction(graph) as result:
-            add(result.identifier, {NT.isResponseTo: request_id})
+            result.add((result.identifier, NT.isResponseTo, request_id))
             if is_a(request_id, Deepgram.Start):
                 results = await spawn(nursery, deepgram_results_actor)
                 session = await spawn(nursery, deepgram_session, results)
 
-                new(
-                    Deepgram.Session,
-                    {
-                        NT.created: Literal(
+                with resource(Deepgram.Session):
+                    property(
+                        NT.created,
+                        Literal(
                             datetime.now(UTC).isoformat(),
                             datatype=XSD.dateTime,
                         ),
-                        NT.has: [
-                            new(
-                                NT.UploadEndpoint,
-                                {
-                                    NT.method: NT.WebSocket,
-                                    NT.accepts: NT.AudioData,
-                                    NT.url: str(session).replace(
-                                        "https://", "wss://"
-                                    )
-                                    + "/upload",
-                                },
-                                session,
-                            ),
-                            new(
-                                NT.EventStream,
-                                {
-                                    NT.method: NT.GET,
-                                    NT.produces: Deepgram.TranscriptionHypothesis,
-                                },
-                                results,
-                            ),
-                        ],
-                    },
-                    result.identifier,
-                )
+                    )
+
+                    with property(NT.has):
+                        a(NT.UploadEndpoint)
+                        property(NT.method, NT.WebSocket)
+                        property(NT.accepts, NT.AudioData)
+                        property(
+                            NT.url,
+                            str(session).replace("https://", "wss://")
+                            + "/upload",
+                        )
+
+                    with property(NT.has):
+                        a(NT.EventStream)
+                        property(NT.method, NT.GET)
+                        property(
+                            NT.produces, Deepgram.TranscriptionHypothesis
+                        )
 
             return result
 
 
 def create_affordance_button(deepgram_client: URIRef):
-    return new(
-        Deepgram.Client,
-        {
-            NT.affordance: [
-                new(
-                    NT.Button,
-                    {
-                        NT.label: Literal("Start", "en"),
-                        NT.message: URIRef(Deepgram.Start),
-                        NT.target: deepgram_client,
-                    },
-                    mint.fresh_uri(get_site()),
-                )
-            ]
-        },
-        deepgram_client,
-    )
+    with resource(Deepgram.Client) as client:
+        with property(NT.affordance):
+            a(NT.Button)
+            property(NT.label, Literal("Start", "en"))
+            property(NT.message, URIRef(Deepgram.Start))
+            property(NT.target, deepgram_client)
+        return client.node

@@ -3,8 +3,9 @@ A module for building RDF graphs using Python context managers.
 Provides a declarative way to construct RDF graphs with a syntax similar to Turtle.
 """
 
-from contextlib import contextmanager
+from contextlib import _GeneratorContextManager, contextmanager
 from contextvars import ContextVar
+from datetime import datetime
 from typing import Any, Optional, Union
 
 from rdflib import (
@@ -32,8 +33,7 @@ def graph():
         yield g
 
 
-@contextmanager
-def new(type_uri: Optional[Union[URIRef, str]] = None):
+def resource(type_uri: Optional[Union[URIRef, str]] = None):
     """
     Creates a new subject node in the graph.
     If type_uri is provided, adds an rdf:type triple.
@@ -47,10 +47,14 @@ def new(type_uri: Optional[Union[URIRef, str]] = None):
         g = vars.graph.get()
         g.add((subj.node, RDF.type, type_uri))
 
-    try:
-        yield subj
-    finally:
-        current_subject.reset(token)
+    @contextmanager
+    def f():
+        try:
+            yield subj
+        finally:
+            current_subject.reset(token)
+
+    return f()
 
 
 class Subject:
@@ -68,85 +72,73 @@ class Subject:
         finally:
             current_subject.reset(token)
 
-    def has(self, pred: Union[str, URIRef], obj: Any):
+    def add(self, pred: Union[str, URIRef], obj: Any):
         """Add a predicate-object pair to this subject"""
         with self._as_current():
-            has(pred, obj)
+            property(pred, obj)
 
 
-@contextmanager
-def add(pred: Union[str, URIRef]):
+def property(
+    pred: Union[str, URIRef], obj: Optional[Any] = None
+) -> _GeneratorContextManager[Subject]:
     """
     Start describing a new subject that will be connected via pred.
     Usage:
         with add(pred) as obj:
             a(type_uri)
-            has(prop, value)
+            add(prop, value)
     """
     pred = pred if isinstance(pred, URIRef) else URIRef(pred)
     parent = current_subject.get()
     if parent is None:
         raise RuntimeError("No active subject context")
 
-    subj = Subject(BNode())
-    g = vars.graph.get()
-    if g is None:
-        raise RuntimeError("No active graph context")
-    g.add((parent, pred, subj.node))
-    with subj._as_current():
-        yield subj
-
-
-def has(pred: Union[str, URIRef], obj: Any):
-    """Add a triple with the current subject"""
-    graph = vars.graph.get()
-    if graph is None:
-        raise RuntimeError("No active graph context")
-
-    subj = current_subject.get()
-    if subj is None:
-        raise RuntimeError("No active subject context")
-
-    if isinstance(pred, str):
-        pred = URIRef(pred)
-
-    if isinstance(obj, URIRef):
-        pass
-    elif isinstance(obj, (str, int, float, bool)):
+    if obj is None:
+        obj = BNode()
+    elif isinstance(obj, URIRef):
+        obj = obj
+    elif isinstance(obj, (str, int, float, bool, datetime)):
         obj = Literal(obj)
-    elif isinstance(obj, str):
-        obj = URIRef(obj)
     elif isinstance(obj, Subject):
         obj = obj.node
 
-    graph.add((subj, pred, obj))
+    g = vars.graph.get()
+    if g is None:
+        raise RuntimeError("No active graph context")
+    g.add((parent, pred, obj))
+
+    @contextmanager
+    def f():
+        subj = Subject(obj)
+        with subj._as_current():
+            yield subj
+
+    return f()
 
 
 def label(text: str, lang: Optional[str] = "en"):
-    has(RDFS.label, Literal(text, lang=lang))
+    property(RDFS.label, Literal(text, lang=lang))
 
 
 def definition(text: str, lang: Optional[str] = "en"):
-    has(SKOS.definition, Literal(text, lang=lang))
+    property(SKOS.definition, Literal(text, lang=lang))
 
 
 def note(text: str, lang: Optional[str] = "en"):
-    has(SKOS.note, Literal(text, lang=lang))
+    property(SKOS.note, Literal(text, lang=lang))
 
 
 def example(text: str, lang: Optional[str] = "en"):
-    has(SKOS.example, Literal(text, lang=lang))
+    property(SKOS.example, Literal(text, lang=lang))
 
 
 def a(type_uri: O):
-    has(RDF.type, type_uri)
+    property(RDF.type, type_uri)
 
 
-def subclass(class_uri: Union[str, URIRef]):
+def subclass(class_uri: URIRef):
     """Add an RDFS subClassOf relation to the given class"""
-    if isinstance(class_uri, str):
-        class_uri = URIRef(class_uri)
-    has(RDFS.subClassOf, class_uri)
+    property(RDFS.subClassOf, class_uri)
 
 
 def literal(

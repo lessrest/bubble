@@ -837,8 +837,8 @@ class TownApp:
 
 @contextmanager
 def in_request_graph(g: Graph):
-    with vars.using_graph(g):
-        yield
+    with vars.graph.bind(g):
+        yield g
 
 
 def town_app(
