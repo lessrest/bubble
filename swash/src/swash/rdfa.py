@@ -234,7 +234,10 @@ def render_upload_capability_resource(subject: S, data: Dict):
 )
 @html.div("flex", "flex-col", "gap-1")
 def render_default_resource(subject: S, data: Optional[Dict] = None):
-    attr("resource", str(subject))
+    if isinstance(subject, BNode):
+        attr("resource", "_:" + str(subject))
+    else:
+        attr("resource", str(subject))
     if data and data["type"]:
         attr("typeof", str(data["type"]))
     render_resource_header(subject, data)
