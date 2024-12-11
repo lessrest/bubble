@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from rdflib import Graph, Literal, Namespace, RDF
+from rdflib.compare import isomorphic
 from rdflib.namespace import RDFS
 from swash.desc import new_dataset, resource, property, label
 from swash.rdfa import autoexpanding, rdf_resource
@@ -83,7 +84,7 @@ def test_rdfa_roundtrip():
                 print(parsed.serialize(format='turtle'))
 
                 # Check for isomorphism
-                assert default_graph.isomorphic(parsed), "Parsed RDFa should match original graph"
+                assert isomorphic(default_graph, parsed), "Parsed RDFa should match original graph"
 
             finally:
                 html_path.unlink()
