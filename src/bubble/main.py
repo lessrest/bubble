@@ -22,7 +22,7 @@ from bubble.logs import configure_logging
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.cert import generate_self_signed_cert
-from bubble.talk import DeepgramClientActor
+from bubble.deepgram.talk import DeepgramClientActor
 from bubble.town import (
     SimpleSupervisor,
     TownApp,

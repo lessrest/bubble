@@ -63,6 +63,7 @@ from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
+from bubble.deepgram.talk import DeepgramClientActor
 
 logger = structlog.get_logger(__name__)
 
@@ -587,6 +588,7 @@ def get_base() -> URIRef:
 
 def record_message(type: str, actor: URIRef, g: Graph):
     """Record a message in the graph."""
+    assert isinstance(g.identifier, URIRef)
     new(
         URIRef(type),
         {
@@ -599,7 +601,7 @@ def record_message(type: str, actor: URIRef, g: Graph):
     )
 
 
-def generate_health_status(id: S):
+def generate_health_status(id: URIRef):
     """Generate health status information."""
     new(
         NT.HealthCheck,
@@ -611,7 +613,7 @@ def generate_health_status(id: S):
     )
 
 
-def build_did_document(did_uri: URIRef, doc_uri: S):
+def build_did_document(did_uri: URIRef, doc_uri: URIRef):
     """Build a DID document using the town's current keypair."""
     town = hub.get()
     verification_key = new(
@@ -972,6 +974,7 @@ class TownApp:
 
             # Send end marker
             async with txgraph() as g:
+                assert isinstance(g.identifier, URIRef)
                 new(NT.End, {}, g.identifier)
                 await send(actor)
 

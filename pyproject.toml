@@ -83,6 +83,7 @@ dependencies = [
     "importhook>=1.0.9",
     "tenacity>=9.0.0",
     "pillow>=11.0.0",
+    "google-genai>=0.2.1",
 ]
 
 [tool.uv.sources]

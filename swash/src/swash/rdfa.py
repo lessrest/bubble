@@ -21,6 +21,8 @@ from rdflib import (
     Variable,
 )
 from fastapi import APIRouter, HTTPException
+from rdflib.graph import QuotedGraph
+from rdflib.collection import Collection
 
 from swash import vars
 from swash.html import (
@@ -450,9 +452,6 @@ def render_value(obj: S, predicate: Optional[P] = None) -> None:
         _render_value_inner(obj)
 
 
-from rdflib.graph import QuotedGraph
-
-
 def _render_value_inner(obj: S, label: bool = False) -> None:
     if isinstance(obj, URIRef):
         _render_uri(obj)
@@ -555,6 +554,8 @@ def _render_literal(obj: Literal) -> None:
             _render_language_literal(obj)
         else:
             _render_default_literal(obj)
+    elif isinstance(obj, Collection):
+        _render_collection(obj)
     else:
         _render_string_literal(obj)
 
@@ -681,6 +682,15 @@ def _render_language_literal(obj: Literal) -> None:
 )
 def _render_any_uri_literal(obj: Literal) -> None:
     render_linkish_string(obj)
+
+
+# rendering Collections (lists)
+@html.ul(
+    "list-decimal flex flex-col gap-1 ml-4 text-cyan-600 dark:text-cyan-500"
+)
+def _render_collection(obj: Collection) -> None:
+    for item in obj:
+        render_subresource(item)
 
 
 @html.span("text-orange-600 dark:text-orange-400")

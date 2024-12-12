@@ -1,357 +1,340 @@
-@prefix vox: <https://swa.sh/2024/vox#> .
+@prefix bfo: <http://purl.obolibrary.org/obo/bfo#> .
+@prefix iao: <http://purl.obolibrary.org/obo/iao#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix iao: <http://purl.obolibrary.org/obo/iao#> .
-@prefix bfo: <http://purl.obolibrary.org/obo/bfo#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix vox: <https://swa.sh/2024/vox#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # Speech Events and Physical Reality
 vox:SpeechEvent a owl:Class ;
-    rdfs:subClassOf bfo:Process ;
-    rdfs:label "speech event"@en ;
-    skos:definition "A real-world event of someone speaking"@en .
-
+   rdfs:subClassOf bfo:Process ;
+   rdfs:label "speech event"@en ;
+   skos:definition "A real-world event of someone speaking"@en .
 vox:Speaker a owl:Class ;
-    rdfs:subClassOf prov:Agent ;
-    rdfs:label "speaker"@en ;
-    skos:definition "An agent who produces speech"@en .
-
+   rdfs:subClassOf prov:Agent ;
+   rdfs:label "speaker"@en ;
+   skos:definition "An agent who produces speech"@en .
 vox:SpeechSegment a owl:Class ;
-    rdfs:subClassOf vox:SpeechEvent ;
-    rdfs:label "speech segment"@en ;
-    skos:definition "A continuous segment of speech from one speaker"@en .
-
+   rdfs:subClassOf vox:SpeechEvent ;
+   rdfs:label "speech segment"@en ;
+   skos:definition "A continuous segment of speech from one speaker"@en .
 vox:Utterance a owl:Class ;
-    rdfs:subClassOf vox:SpeechSegment ;
-    rdfs:label "utterance"@en ;
-    skos:definition "A coherent unit of speech (sentence, phrase, etc.)"@en .
+   rdfs:subClassOf vox:SpeechSegment ;
+   rdfs:label "utterance"@en ;
+   skos:definition "A coherent unit of speech (sentence, phrase, etc.)"@en .
 
 # Recording and Evidence
 vox:AudioEvidence a owl:Class ;
-    rdfs:subClassOf bfo:ContinuantEntity ;
-    rdfs:label "audio evidence"@en ;
-    skos:definition "Recorded audio that evidences speech events"@en .
-
+   rdfs:subClassOf bfo:ContinuantEntity ;
+   rdfs:label "audio evidence"@en ;
+   skos:definition "Recorded audio that evidences speech events"@en .
 vox:AudioSegment a owl:Class ;
-    rdfs:subClassOf vox:AudioEvidence ;
-    rdfs:label "audio segment"@en ;
-    skos:definition "A segment of audio"@en .
-
+   rdfs:subClassOf vox:AudioEvidence ;
+   rdfs:label "audio segment"@en ;
+   skos:definition "A segment of audio"@en .
+vox:AudioInterval a owl:Class ;
+   rdfs:subClassOf prov:Interval ;
+   rdfs:label "audio interval"@en ;
+   skos:definition "a designator for a contiguous segment of some audio"@en .
 vox:SpeechSignal a owl:Class ;
-    rdfs:subClassOf vox:AudioEvidence ;
-    rdfs:label "speech signal"@en ;
-    skos:definition "Audio signal containing speech"@en .
-
+   rdfs:subClassOf vox:AudioEvidence ;
+   rdfs:label "speech signal"@en ;
+   skos:definition "Audio signal containing speech"@en .
 vox:BackgroundNoise a owl:Class ;
-    rdfs:subClassOf vox:AudioEvidence ;
-    rdfs:label "background noise"@en ;
-    skos:definition "Non-speech audio in recording"@en .
+   rdfs:subClassOf vox:AudioEvidence ;
+   rdfs:label "background noise"@en ;
+   skos:definition "Non-speech audio in recording"@en .
 
 # Transcription Process and Hypotheses
 vox:TranscriptionProcess a owl:Class ;
-    rdfs:subClassOf prov:Activity ;
-    rdfs:label "transcription process"@en ;
-    skos:definition "Process of converting speech to text"@en .
-
+   rdfs:subClassOf prov:Activity ;
+   rdfs:label "transcription process"@en ;
+   skos:definition "Process of converting speech to text"@en .
 vox:TranscriptionHypothesis a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "transcription hypothesis"@en ;
-    skos:definition "A proposed textual representation of speech"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "transcription hypothesis"@en ;
+   skos:definition "A proposed textual representation of speech"@en .
 vox:InterimHypothesis a owl:Class ;
-    rdfs:subClassOf vox:TranscriptionHypothesis ;
-    rdfs:label "interim hypothesis"@en ;
-    skos:definition "Temporary hypothesis during streaming transcription"@en .
-
+   rdfs:subClassOf vox:TranscriptionHypothesis ;
+   rdfs:label "interim hypothesis"@en ;
+   skos:definition "Temporary hypothesis during streaming transcription"@en .
 vox:FinalHypothesis a owl:Class ;
-    rdfs:subClassOf vox:TranscriptionHypothesis ;
-    rdfs:label "final hypothesis"@en ;
-    skos:definition "Settled hypothesis after processing complete"@en .
-
+   rdfs:subClassOf vox:TranscriptionHypothesis ;
+   rdfs:label "final hypothesis"@en ;
+   skos:definition "Settled hypothesis after processing complete"@en .
 vox:ConfidenceScore a owl:Class ;
-    rdfs:subClassOf iao:MeasurementValue ;
-    rdfs:label "confidence score"@en ;
-    skos:definition "Confidence level in a transcription hypothesis"@en .
+   rdfs:subClassOf iao:MeasurementValue ;
+   rdfs:label "confidence score"@en ;
+   skos:definition "Confidence level in a transcription hypothesis"@en .
 
 # Temporal Alignment
 vox:TimeAlignment a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "time alignment"@en ;
-    skos:definition "Mapping between transcript and audio timing"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "time alignment"@en ;
+   skos:definition "Mapping between transcript and audio timing"@en .
 vox:WordTiming a owl:Class ;
-    rdfs:subClassOf vox:TimeAlignment ;
-    rdfs:label "word timing"@en ;
-    skos:definition "Start/end times for individual words"@en .
-
+   rdfs:subClassOf vox:TimeAlignment ;
+   rdfs:label "word timing"@en ;
+   skos:definition "Start/end times for individual words"@en .
 vox:PhonemeTiming a owl:Class ;
-    rdfs:subClassOf vox:TimeAlignment ;
-    rdfs:label "phoneme timing"@en ;
-    skos:definition "Start/end times for phonemes"@en .
+   rdfs:subClassOf vox:TimeAlignment ;
+   rdfs:label "phoneme timing"@en ;
+   skos:definition "Start/end times for phonemes"@en .
 
 # Properties - Core Relations
 vox:evidencedBy a owl:ObjectProperty ;
-    rdfs:domain vox:SpeechEvent ;
-    rdfs:range vox:AudioEvidence ;
-    rdfs:label "evidenced by"@en ;
-    skos:definition "Links speech event to its recorded evidence"@en .
-
+   rdfs:domain vox:SpeechEvent ;
+   rdfs:range vox:AudioEvidence ;
+   rdfs:label "evidenced by"@en ;
+   skos:definition "Links speech event to its recorded evidence"@en .
 vox:hasHypothesis a owl:ObjectProperty ;
-    rdfs:domain vox:SpeechSegment ;
-    rdfs:range vox:TranscriptionHypothesis ;
-    rdfs:label "has hypothesis"@en ;
-    skos:definition "Links speech to proposed transcription"@en .
-
+   rdfs:domain vox:SpeechSegment ;
+   rdfs:range vox:TranscriptionHypothesis ;
+   rdfs:label "has hypothesis"@en ;
+   skos:definition "Links speech to proposed transcription"@en .
 vox:hypothesizedFrom a owl:ObjectProperty ;
-    rdfs:domain vox:TranscriptionHypothesis ;
-    rdfs:range vox:AudioEvidence ;
-    rdfs:label "hypothesized from"@en ;
-    skos:definition "Links transcript to source audio"@en .
-
+   rdfs:domain vox:TranscriptionHypothesis ;
+   rdfs:range vox:AudioEvidence ;
+   rdfs:label "hypothesized from"@en ;
+   skos:definition "Links transcript to source audio"@en .
 vox:alignedTo a owl:ObjectProperty ;
-    rdfs:domain vox:TranscriptionHypothesis ;
-    rdfs:range vox:TimeAlignment ;
-    rdfs:label "aligned to"@en ;
-    skos:definition "Links transcript to temporal alignment"@en .
+   rdfs:domain vox:TranscriptionHypothesis ;
+   rdfs:range vox:TimeAlignment ;
+   rdfs:label "aligned to"@en ;
+   skos:definition "Links transcript to temporal alignment"@en .
 
 # Properties - Confidence and Quality
 vox:hasConfidence a owl:ObjectProperty ;
-    rdfs:domain vox:TranscriptionHypothesis ;
-    rdfs:range vox:ConfidenceScore ;
-    rdfs:label "has confidence"@en ;
-    skos:definition "Links hypothesis to its confidence score"@en .
-
+   rdfs:domain vox:TranscriptionHypothesis ;
+   rdfs:range vox:ConfidenceScore ;
+   rdfs:label "has confidence"@en ;
+   skos:definition "Links hypothesis to its confidence score"@en .
 vox:supersededBy a owl:ObjectProperty ;
-    rdfs:domain vox:TranscriptionHypothesis ;
-    rdfs:range vox:TranscriptionHypothesis ;
-    rdfs:label "superseded by"@en ;
-    skos:definition "Indicates when a better hypothesis replaces an old one"@en .
+   rdfs:domain vox:TranscriptionHypothesis ;
+   rdfs:range vox:TranscriptionHypothesis ;
+   rdfs:label "superseded by"@en ;
+   skos:definition "Indicates when a better hypothesis replaces an old one"@en .
 
 # Properties - Speech Features
 vox:hasSpeaker a owl:ObjectProperty ;
-    rdfs:domain vox:SpeechSegment ;
-    rdfs:range vox:Speaker ;
-    rdfs:label "has speaker"@en ;
-    skos:definition "Links speech segment to its speaker"@en .
-
+   rdfs:domain vox:SpeechSegment ;
+   rdfs:range vox:Speaker ;
+   rdfs:label "has speaker"@en ;
+   skos:definition "Links speech segment to its speaker"@en .
 vox:hasEmotion a owl:ObjectProperty ;
-    rdfs:domain vox:SpeechSegment ;
-    rdfs:range vox:EmotionalQuality ;
-    rdfs:label "has emotion"@en ;
-    skos:definition "Links speech segment to detected emotional qualities"@en .
-
+   rdfs:domain vox:SpeechSegment ;
+   rdfs:range vox:EmotionalQuality ;
+   rdfs:label "has emotion"@en ;
+   skos:definition "Links speech segment to detected emotional qualities"@en .
 vox:hasLanguage a owl:ObjectProperty ;
-    rdfs:domain vox:SpeechSegment ;
-    rdfs:range vox:Language ;
-    rdfs:label "has language"@en ;
-    skos:definition "Links speech segment to its language"@en .
+   rdfs:domain vox:SpeechSegment ;
+   rdfs:range vox:Language ;
+   rdfs:label "has language"@en ;
+   skos:definition "Links speech segment to its language"@en .
 
 # Temporal Properties
 vox:startTime a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "start time"@en ;
-    skos:definition "Start time in microseconds from timeline origin"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "start time"@en ;
+   skos:definition "Start time in microseconds from timeline origin"@en .
 vox:endTime a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "end time"@en ;
-    skos:definition "End time in microseconds from timeline origin"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "end time"@en ;
+   skos:definition "End time in microseconds from timeline origin"@en .
 vox:duration a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "duration"@en ;
-    skos:definition "Duration in microseconds"@en .
+   rdfs:range xsd:integer ;
+   rdfs:label "duration"@en ;
+   skos:definition "Duration in microseconds"@en .
 
 # Content Properties
 vox:text a owl:DatatypeProperty ;
-    rdfs:range xsd:string ;
-    rdfs:label "text"@en ;
-    skos:definition "Textual content of transcription"@en .
-
+   rdfs:range xsd:string ;
+   rdfs:label "text"@en ;
+   skos:definition "Textual content of transcription"@en .
 vox:confidence a owl:DatatypeProperty ;
-    rdfs:range xsd:float ;
-    rdfs:label "confidence"@en ;
-    skos:definition "Confidence value between 0 and 1"@en .
+   rdfs:range xsd:float ;
+   rdfs:label "confidence"@en ;
+   skos:definition "Confidence value between 0 and 1"@en .
 
 # Quality Properties
 vox:signalQuality a owl:DatatypeProperty ;
-    rdfs:range xsd:float ;
-    rdfs:label "signal quality"@en ;
-    skos:definition "Quality metric for audio signal"@en .
-
+   rdfs:range xsd:float ;
+   rdfs:label "signal quality"@en ;
+   skos:definition "Quality metric for audio signal"@en .
 vox:noiseLevel a owl:DatatypeProperty ;
-    rdfs:range xsd:float ;
-    rdfs:label "noise level"@en ;
-    skos:definition "Estimated level of background noise"@en .
+   rdfs:range xsd:float ;
+   rdfs:label "noise level"@en ;
+   skos:definition "Estimated level of background noise"@en .
 
 # Audio Signal Fundamentals
 vox:Signal a owl:Class ;
-    rdfs:subClassOf bfo:ContinuantEntity ;
-    rdfs:label "signal"@en ;
-    skos:definition "A time-varying physical quantity carrying information"@en .
-
+   rdfs:subClassOf bfo:ContinuantEntity ;
+   rdfs:label "signal"@en ;
+   skos:definition "A time-varying physical quantity carrying information"@en .
 vox:DigitalSignal a owl:Class ;
-    rdfs:subClassOf vox:Signal ;
-    rdfs:label "digital signal"@en ;
-    skos:definition "A discrete-time representation of a continuous signal"@en .
-
+   rdfs:subClassOf vox:Signal ;
+   rdfs:label "digital signal"@en ;
+   skos:definition "A discrete-time representation of a continuous signal"@en .
 vox:AudioSignal a owl:Class ;
-    rdfs:subClassOf vox:DigitalSignal ;
-    rdfs:label "audio signal"@en ;
-    skos:definition "Digital representation of sound pressure variations"@en .
+   rdfs:subClassOf vox:DigitalSignal ;
+   rdfs:label "audio signal"@en ;
+   skos:definition "Digital representation of sound pressure variations"@en .
 
 # Audio Frames and Packets
 vox:AudioFrame a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "audio frame"@en ;
-    skos:definition "A fixed-duration segment of audio samples"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "audio frame"@en ;
+   skos:definition "A fixed-duration segment of audio samples"@en .
 vox:OpusFrame a owl:Class ;
-    rdfs:subClassOf vox:AudioFrame ;
-    rdfs:label "opus frame"@en ;
-    skos:definition "A 2.5-20ms frame of Opus-encoded audio"@en .
-
+   rdfs:subClassOf vox:AudioFrame ;
+   rdfs:label "opus frame"@en ;
+   skos:definition "A 2.5-20ms frame of Opus-encoded audio"@en .
 vox:OggPacket a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "ogg packet"@en ;
-    skos:definition "A container packet in the Ogg stream format"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "ogg packet"@en ;
+   skos:definition "A container packet in the Ogg stream format"@en .
 vox:OpusPacket a owl:Class ;
-    rdfs:subClassOf vox:OggPacket ;
-    rdfs:label "opus packet"@en ;
-    skos:definition "An Ogg packet containing Opus-encoded audio"@en .
+   rdfs:subClassOf vox:OggPacket ;
+   rdfs:label "opus packet"@en ;
+   skos:definition "An Ogg packet containing Opus-encoded audio"@en .
 
 # Streaming and Protocol Concepts
 vox:MediaStream a owl:Class ;
-    rdfs:subClassOf bfo:Process ;
-    rdfs:label "media stream"@en ;
-    skos:definition "A continuous flow of media data"@en .
-
+   rdfs:subClassOf bfo:Process ;
+   rdfs:label "media stream"@en ;
+   skos:definition "A continuous flow of media data"@en .
 vox:RTPStream a owl:Class ;
-    rdfs:subClassOf vox:MediaStream ;
-    rdfs:label "RTP stream"@en ;
-    skos:definition "Real-time Transport Protocol media stream"@en .
-
+   rdfs:subClassOf vox:MediaStream ;
+   rdfs:label "RTP stream"@en ;
+   skos:definition "Real-time Transport Protocol media stream"@en .
 vox:WebRTCConnection a owl:Class ;
-    rdfs:subClassOf bfo:Process ;
-    rdfs:label "WebRTC connection"@en ;
-    skos:definition "Peer-to-peer connection for real-time communication"@en .
-
+   rdfs:subClassOf bfo:Process ;
+   rdfs:label "WebRTC connection"@en ;
+   skos:definition "Peer-to-peer connection for real-time communication"@en .
 vox:ICECandidate a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "ICE candidate"@en ;
-    skos:definition "Network connectivity candidate for WebRTC"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "ICE candidate"@en ;
+   skos:definition "Network connectivity candidate for WebRTC"@en .
 vox:MediaTrack a owl:Class ;
-    rdfs:subClassOf vox:MediaStream ;
-    rdfs:label "media track"@en ;
-    skos:definition "Single media type stream within a connection"@en .
+   rdfs:subClassOf vox:MediaStream ;
+   rdfs:label "media track"@en ;
+   skos:definition "Single media type stream within a connection"@en .
 
 # Codec and Encoding
 vox:AudioCodec a owl:Class ;
-    rdfs:subClassOf prov:SoftwareAgent ;
-    rdfs:label "audio codec"@en ;
-    skos:definition "System for encoding/decoding audio"@en .
-
+   rdfs:subClassOf prov:SoftwareAgent ;
+   rdfs:label "audio codec"@en ;
+   skos:definition "System for encoding/decoding audio"@en .
 vox:OpusCodec a owl:Class ;
-    rdfs:subClassOf vox:AudioCodec ;
-    rdfs:label "opus codec"@en ;
-    skos:definition "The Opus audio codec implementation"@en .
-
+   rdfs:subClassOf vox:AudioCodec ;
+   rdfs:label "opus codec"@en ;
+   skos:definition "The Opus audio codec implementation"@en .
 vox:CodecParameters a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "codec parameters"@en ;
-    skos:definition "Configuration parameters for a codec"@en .
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "codec parameters"@en ;
+   skos:definition "Configuration parameters for a codec"@en .
 
 # Network Transport
 vox:TransportProtocol a owl:Class ;
-    rdfs:subClassOf iao:InformationContentEntity ;
-    rdfs:label "transport protocol"@en ;
-    skos:definition "Protocol for transmitting media data"@en .
-
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "transport protocol"@en ;
+   skos:definition "Protocol for transmitting media data"@en .
 vox:DTLS a owl:Class ;
-    rdfs:subClassOf vox:TransportProtocol ;
-    rdfs:label "DTLS"@en ;
-    skos:definition "Datagram Transport Layer Security protocol"@en .
-
+   rdfs:subClassOf vox:TransportProtocol ;
+   rdfs:label "DTLS"@en ;
+   skos:definition "Datagram Transport Layer Security protocol"@en .
 vox:SCTP a owl:Class ;
-    rdfs:subClassOf vox:TransportProtocol ;
-    rdfs:label "SCTP"@en ;
-    skos:definition "Stream Control Transmission Protocol"@en .
+   rdfs:subClassOf vox:TransportProtocol ;
+   rdfs:label "SCTP"@en ;
+   skos:definition "Stream Control Transmission Protocol"@en .
 
 # Properties - Audio Characteristics
 vox:sampleRate a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "sample rate"@en ;
-    skos:definition "Number of samples per second (Hz)"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "sample rate"@en ;
+   skos:definition "Number of samples per second (Hz)"@en .
 vox:bitDepth a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "bit depth"@en ;
-    skos:definition "Number of bits per sample"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "bit depth"@en ;
+   skos:definition "Number of bits per sample"@en .
 vox:channels a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "channels"@en ;
-    skos:definition "Number of audio channels"@en .
+   rdfs:range xsd:integer ;
+   rdfs:label "channels"@en ;
+   skos:definition "Number of audio channels"@en .
 
 # Properties - Opus Specific
 vox:frameSize a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "frame size"@en ;
-    skos:definition "Size of frame in samples"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "frame size"@en ;
+   skos:definition "Size of frame in samples"@en .
 vox:complexity a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "complexity"@en ;
-    skos:definition "Opus encoding complexity (0-10)"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "complexity"@en ;
+   skos:definition "Opus encoding complexity (0-10)"@en .
 vox:useDTX a owl:DatatypeProperty ;
-    rdfs:range xsd:boolean ;
-    rdfs:label "use DTX"@en ;
-    skos:definition "Whether to use discontinuous transmission"@en .
+   rdfs:range xsd:boolean ;
+   rdfs:label "use DTX"@en ;
+   skos:definition "Whether to use discontinuous transmission"@en .
 
 # Properties - Stream Relations
 vox:hasCodec a owl:ObjectProperty ;
-    rdfs:domain vox:MediaStream ;
-    rdfs:range vox:AudioCodec ;
-    rdfs:label "has codec"@en ;
-    skos:definition "Links stream to its codec"@en .
-
+   rdfs:domain vox:MediaStream ;
+   rdfs:range vox:AudioCodec ;
+   rdfs:label "has codec"@en ;
+   skos:definition "Links stream to its codec"@en .
 vox:hasTrack a owl:ObjectProperty ;
-    rdfs:domain vox:WebRTCConnection ;
-    rdfs:range vox:MediaTrack ;
-    rdfs:label "has track"@en ;
-    skos:definition "Links connection to media track"@en .
-
+   rdfs:domain vox:WebRTCConnection ;
+   rdfs:range vox:MediaTrack ;
+   rdfs:label "has track"@en ;
+   skos:definition "Links connection to media track"@en .
 vox:hasTransport a owl:ObjectProperty ;
-    rdfs:domain vox:WebRTCConnection ;
-    rdfs:range vox:TransportProtocol ;
-    rdfs:label "has transport"@en ;
-    skos:definition "Links connection to transport protocol"@en .
-
+   rdfs:domain vox:WebRTCConnection ;
+   rdfs:range vox:TransportProtocol ;
+   rdfs:label "has transport"@en ;
+   skos:definition "Links connection to transport protocol"@en .
 vox:containsFrame a owl:ObjectProperty ;
-    rdfs:domain vox:MediaStream ;
-    rdfs:range vox:AudioFrame ;
-    rdfs:label "contains frame"@en ;
-    skos:definition "Links stream to contained audio frame"@en .
+   rdfs:domain vox:MediaStream ;
+   rdfs:range vox:AudioFrame ;
+   rdfs:label "contains frame"@en ;
+   skos:definition "Links stream to contained audio frame"@en .
 
 # Properties - Packet Sequence
 vox:sequenceNumber a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "sequence number"@en ;
-    skos:definition "Position in packet sequence"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "sequence number"@en ;
+   skos:definition "Position in packet sequence"@en .
 vox:timestamp a owl:DatatypeProperty ;
-    rdfs:range xsd:integer ;
-    rdfs:label "timestamp"@en ;
-    skos:definition "Media timestamp in codec timebase"@en .
-
+   rdfs:range xsd:integer ;
+   rdfs:label "timestamp"@en ;
+   skos:definition "Media timestamp in codec timebase"@en .
 vox:precedingPacket a owl:ObjectProperty ;
-    rdfs:domain vox:OggPacket ;
-    rdfs:range vox:OggPacket ;
-    rdfs:label "preceding packet"@en ;
-    skos:definition "Links to previous packet in stream"@en .
+   rdfs:domain vox:OggPacket ;
+   rdfs:range vox:OggPacket ;
+   rdfs:label "preceding packet"@en ;
+   skos:definition "Links to previous packet in stream"@en .
+
+# Transcription Segments and Revisions
+vox:TranscriptionSegment a owl:Class ;
+   rdfs:subClassOf iao:InformationContentEntity ;
+   rdfs:label "transcription segment"@en ;
+   skos:definition "A logical unit of transcription that may have multiple revisions"@en .
+vox:hasRevision a owl:ObjectProperty ;
+   rdfs:domain vox:TranscriptionSegment ;
+   rdfs:range vox:TranscriptionHypothesis ;
+   rdfs:label "has revision"@en ;
+   skos:definition "Links a transcription segment to one of its revision hypotheses"@en .
+vox:hasInitialHypothesis a owl:ObjectProperty ;
+   rdfs:subPropertyOf vox:hasRevision ;
+   rdfs:label "has initial hypothesis"@en ;
+   skos:definition "Links a transcription segment to its first interim hypothesis"@en .
+vox:hasFinalHypothesis a owl:ObjectProperty ;
+   rdfs:subPropertyOf vox:hasRevision ;
+   rdfs:label "has final hypothesis"@en ;
+   skos:definition "Links a transcription segment to its final hypothesis"@en .
+vox:revisionNumber a owl:DatatypeProperty ;
+   rdfs:range xsd:integer ;
+   rdfs:label "revision number"@en ;
+   skos:definition "The sequential number of this revision in the segment"@en .

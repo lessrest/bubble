@@ -2,16 +2,19 @@
 
 import sys
 
-from typing import Any, Optional, overload
+from typing import Any, Optional, Sequence, overload
 
 from rdflib import (
     RDF,
+    XSD,
     BNode,
     Graph,
     Literal,
     Namespace,
     IdentifiedNode,
+    URIRef,
 )
+from rdflib.collection import Collection
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
 
@@ -153,20 +156,20 @@ def add(
 
 
 @overload
-def new(type: None = None, properties: dict[P, Any] = {}) -> S: ...
+def new(type: None = None, properties: dict[P, Any] = {}) -> URIRef: ...
 @overload
 def new(
     type: S | None = None,
     properties: dict[P, Any] = {},
-    subject: S | None = None,
-) -> S: ...
+    subject: URIRef | None = None,
+) -> URIRef: ...
 
 
 def new(
     type: Optional[S] = None,
     properties: Optional[dict[P, Any]] = None,
-    subject: Optional[S] = None,
-) -> S:
+    subject: Optional[URIRef] = None,
+) -> URIRef:
     graph = vars.graph.get()
 
     if subject is None:
@@ -206,3 +209,16 @@ def bubble(type: O, ns: Namespace, claims: dict[P, O] = {}) -> Graph:
     for predicate, object in claims.items():
         graph.add((graph.identifier, predicate, object))
     return graph
+
+
+def decimal(value: float, precision: int = 2) -> Literal:
+    """Create a decimal literal with the given value, rounded to specified precision"""
+    return Literal(round(value, precision), datatype=XSD.decimal)
+
+
+def make_list(
+    seq: Sequence[O], subject: Optional[IdentifiedNode] = None
+) -> IdentifiedNode:
+    node = BNode() if subject is None else subject
+    Collection(vars.graph.get(), node, list(seq))
+    return node
