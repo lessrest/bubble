@@ -17,12 +17,11 @@ from typing import (
     MutableMapping,
 )
 from datetime import UTC, datetime
-from operator import itemgetter
 from contextlib import asynccontextmanager, contextmanager
 from collections import defaultdict
 from dataclasses import dataclass
 
-from swash.desc import resource, property
+from swash.desc import resource, has
 import trio
 import tenacity
 import structlog
@@ -53,11 +52,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from swash import Parameter, mint, rdfa, vars
-from swash.html import HypermediaResponse, tag, attr, html, text, document
+from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
 from swash.prfx import NT, DID, DEEPGRAM
 from swash.rdfa import rdf_resource, get_subject_data
-from swash.util import S, add, new, get_single_subject
+from swash.util import S, add, new
 
 from bubble.icon import favicon
 from bubble.page import base_html
@@ -150,7 +149,7 @@ class Town:
     def link_actor_to_identity(self, actor: URIRef):
         """Create a graph linking an actor to this town's identity."""
         with resource(self.identity_uri):
-            property(PROV.started, actor)
+            has(PROV.started, actor)
 
     def this(self) -> URIRef:
         return self.curr.get().addr
@@ -381,7 +380,7 @@ class SimpleSupervisor:
         self.actor = actor
 
     async def __call__(self):
-        async with with_new_transaction():
+        async with txgraph():
             new(NT.Supervisor, {}, this())
 
         def retry_sleep(retry_state: tenacity.RetryCallState) -> Any:
@@ -458,7 +457,7 @@ def create_graph(
 
 
 @asynccontextmanager
-async def with_new_transaction(graph: Optional[Graph] = None):
+async def txgraph(graph: Optional[Graph] = None):
     """Create a new transaction with a fresh graph that will be persisted."""
     g = create_graph()
     if graph is not None:
@@ -754,7 +753,7 @@ class TownApp:
 
     async def actor_message(self, id: str, type: str = Form(...)):
         actor = self.site[id]
-        async with with_new_transaction() as g:
+        async with txgraph() as g:
             record_message(type, actor, g)
             result = await call(actor, g)
             return LinkedDataResponse(result)
@@ -791,7 +790,7 @@ class TownApp:
 
     async def actor_post(self, id: str, body: dict = Body(...)):
         actor = self.site[id]
-        async with with_new_transaction() as g:
+        async with txgraph() as g:
             body["@id"] = str(g.identifier)
             g.parse(data=json.dumps(body), format="json-ld")
             result = await call(actor, g)
@@ -972,7 +971,7 @@ class TownApp:
                     ) from e
 
             # Send end marker
-            async with with_new_transaction() as g:
+            async with txgraph() as g:
                 new(NT.End, {}, g.identifier)
                 await send(actor)
 

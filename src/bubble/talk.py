@@ -1,20 +1,22 @@
-from dataclasses import dataclass, field
 import os
 
-from typing import List, Optional, Dict
-from datetime import UTC, datetime
+from typing import List, Optional
 
 from swash.mint import fresh_iri, fresh_uri
 import trio
 import structlog
 
-from rdflib import XSD, Graph, URIRef, Literal, Namespace
+from rdflib import Graph, URIRef, Literal, Namespace
 from pydantic import Field, BaseModel
 from trio_websocket import WebSocketConnection, open_websocket_url
 
 from swash.prfx import NT
-from swash.desc import a, resource, property
-from swash.util import S, add, get_single_object, is_a
+from swash.desc import has_type, resource, has
+from swash.util import add, get_single_object, is_a
+from bubble.DeepgramTranscriptionReceiver import (
+    DeepgramActorState,
+    DeepgramTranscriptionReceiver,
+)
 from bubble.town import (
     ServerActor,
     get_base,
@@ -23,13 +25,12 @@ from bubble.town import (
     spawn,
     receive,
     in_request_graph,
-    with_new_transaction,
+    txgraph,
     with_transient_graph,
 )
-from rdflib.namespace import TIME, PROV
 
 Deepgram = Namespace("https://node.town/2024/deepgram/#")
-Vox = Namespace("https://swa.sh/2024/vox#")
+VOX = Namespace("https://swa.sh/2024/vox#")
 
 
 logger = structlog.get_logger()
@@ -182,13 +183,13 @@ class DeepgramClientActor(ServerActor[str]):
 
     async def init(self):
         await super().init()
-        async with with_new_transaction():
+        async with txgraph():
             create_affordance_button(this())
 
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         logger.info("Deepgram client actor handling message", graph=graph)
         request_id = graph.identifier
-        async with with_new_transaction(graph) as result:
+        async with txgraph(graph) as result:
             result.add((result.identifier, NT.isResponseTo, request_id))
             if is_a(request_id, Deepgram.Start):
                 root = get_base()
@@ -213,14 +214,14 @@ class DeepgramClientActor(ServerActor[str]):
                     add(root, {NT.has: session})
                     add(root, {NT.has: results})
                     add(root, {NT.has: endpoint.node})
-                    property(NT.method, NT.WebSocket)
-                    property(NT.accepts, NT.AudioData)
+                    has(NT.method, NT.WebSocket)
+                    has(NT.accepts, NT.AudioData)
                     ws_url = (
                         str(session).replace("https://", "wss://")
                         + "/upload"
                     )
                     logger.info("WebSocket URL", url=ws_url)
-                    property(NT.url, ws_url)
+                    has(NT.url, ws_url)
 
                     # with property(NT.has, fresh_uri(graph)):
                     #     logger.debug("Creating event stream")
@@ -237,182 +238,9 @@ class DeepgramClientActor(ServerActor[str]):
 
 def create_affordance_button(deepgram_client: URIRef):
     with resource(deepgram_client, Deepgram.Client) as client:
-        with property(NT.affordance, fresh_iri()):
-            a(NT.Button)
-            property(NT.label, Literal("Start", "en"))
-            property(NT.message, URIRef(Deepgram.Start))
-            property(NT.target, deepgram_client)
+        with has(NT.affordance, fresh_iri()):
+            has_type(NT.Button)
+            has(NT.label, Literal("Start", "en"))
+            has(NT.message, URIRef(Deepgram.Start))
+            has(NT.target, deepgram_client)
         return client.node
-
-
-@dataclass
-class DeepgramActorState:
-    transcription_process: Optional[URIRef] = None
-    audio_timeline: Optional[URIRef] = None
-    last_end_time: float = 0.0
-    last_audio_segment: Optional[S] = None
-    last_transcription_hypothesis: Optional[URIRef] = None
-    speaker_map: Dict[int, URIRef] = field(default_factory=dict)
-
-
-class DeepgramTranscriptionReceiver(ServerActor[DeepgramActorState]):
-    """Actor that processes Deepgram messages into RDF graphs using the vox vocabulary"""
-
-    def __init__(self, state: DeepgramActorState, name: str):
-        super().__init__(state, name=name)
-
-    async def init(self):
-        await super().init()
-        logger.info("DeepgramRMLProcessor initialized", state=self.state)
-
-    async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
-        """Handle incoming Deepgram messages and convert to RDF"""
-        state = self.state
-
-        message = DeepgramMessage.model_validate_json(
-            get_single_object(graph.identifier, NT.json, graph)
-        )
-
-        async with with_new_transaction(graph) as result:
-            result.add(
-                (result.identifier, NT.isResponseTo, graph.identifier)
-            )
-
-            # Create timeline if this is first message
-            if state.audio_timeline is None:
-                state.audio_timeline = fresh_iri()
-                with resource(state.audio_timeline, a=Vox.AudioTimeline):
-                    a(TIME.TRS)  # This is a temporal reference system
-                    property(Vox.timeUnit, TIME.unitSecond)
-
-            # Create/update transcript process
-            if state.transcription_process is None:
-                state.transcription_process = fresh_iri()
-
-            with resource(
-                state.transcription_process
-            ) as transcription_process:
-                # Create temporal interval for this segment
-                segment_interval = fresh_iri()
-                with resource(segment_interval):
-                    a(TIME.ProperInterval)
-                    property(TIME.hasTRS, state.audio_timeline)
-                    property(
-                        TIME.hasBeginning,
-                        Literal(message.start, datatype=XSD.decimal),
-                    )
-                    property(
-                        TIME.hasEnd,
-                        Literal(
-                            message.start + message.duration,
-                            datatype=XSD.decimal,
-                        ),
-                    )
-
-                    # Link to previous segment if exists
-                    if message.start > state.last_end_time:
-                        property(TIME.after, state.last_end_time)
-
-                    state.last_end_time = message.start + message.duration
-
-                # create entity for the audio segment itself
-                with property(PROV.used) as audio_segment:
-                    a(Vox.AudioSegment)
-                    property(TIME.hasTime, segment_interval)
-                    if state.last_audio_segment is not None:
-                        property(
-                            TIME.intervalMetBy, state.last_audio_segment
-                        )
-                    state.last_audio_segment = audio_segment.node
-
-                # Add temporal relationship between intervals
-                if state.last_audio_segment is not None:
-                    with resource(segment_interval):
-                        property(
-                            TIME.intervalMetBy, state.last_audio_segment
-                        )
-
-                assert message.channel.alternatives
-                alternative = message.channel.alternatives[0]
-
-                # Create hypothesis as a generated entity
-                with resource(a=Vox.TranscriptionHypothesis) as hypothesis:
-                    transcription_process.add(PROV.generated, hypothesis)
-                    property(TIME.intervalEquals, segment_interval)
-                    property(PROV.generatedAtTime, datetime.now(UTC))
-                    property(PROV.value, alternative.transcript)
-                    property(
-                        Vox.confidence,
-                        Literal(
-                            round(alternative.confidence, 2),
-                            datatype=XSD.decimal,
-                        ),
-                    )
-
-                    if message.is_final:
-                        a(Vox.FinalHypothesis)
-                    else:
-                        a(Vox.InterimHypothesis)
-
-                    # Process individual words
-                    for word in alternative.words:
-                        word_entity = fresh_iri()
-                        with resource(word_entity):
-                            a(Vox.Word)
-                            a(PROV.Entity)  # Each word is an entity
-                            property(PROV.value, word.punctuated_word)
-                            property(
-                                Vox.confidence,
-                                Literal(
-                                    round(word.confidence, 2),
-                                    datatype=XSD.decimal,
-                                ),
-                            )
-
-                            # Create temporal interval for word
-                            word_interval = fresh_iri()
-                            with resource(word_interval):
-                                a(TIME.ProperInterval)
-                                property(
-                                    TIME.hasBeginning,
-                                    Literal(
-                                        word.start, datatype=XSD.decimal
-                                    ),
-                                )
-                                property(
-                                    TIME.hasEnd,
-                                    Literal(word.end, datatype=XSD.decimal),
-                                )
-                                property(
-                                    TIME.intervalDuring, segment_interval
-                                )
-                                property(TIME.hasTRS, state.audio_timeline)
-
-                            property(TIME.intervalEquals, word_interval)
-
-                            # Add speaker information if diarization is enabled
-                            if hasattr(word, "speaker"):
-                                # Get or create speaker from map
-                                speaker = state.speaker_map.get(
-                                    word.speaker
-                                )
-                                if speaker is None:
-                                    speaker = fresh_iri()
-                                    state.speaker_map[word.speaker] = (
-                                        speaker
-                                    )
-                                    # Initialize new speaker
-                                    with resource(speaker):
-                                        a(PROV.Person)
-                                        property(
-                                            Vox.speakerId,
-                                            Literal(
-                                                word.speaker,
-                                                datatype=XSD.integer,
-                                            ),
-                                        )
-
-                                # Link word to speaker
-                                property(PROV.wasAttributedTo, speaker)
-
-            return result

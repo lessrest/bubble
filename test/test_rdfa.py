@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 from rdflib import Graph, Namespace
-from swash.desc import new_dataset, resource, property, label
+from swash.desc import new_dataset, resource, has, label
 from swash.rdfa import autoexpanding, rdf_resource
 from swash.html import document, Fragment, root
 
@@ -15,7 +15,7 @@ def test_rdfa_roundtrip():
     with new_dataset() as g:
         with resource(EX.TestType) as subject:
             label("Test Label")
-            property(EX.property, "Test Value")
+            has(EX.property, "Test Value")
 
         # Render the graph to HTML with RDFa
         with document():
@@ -87,11 +87,14 @@ def test_rdfa_roundtrip():
 
                 # Check for isomorphism using rdflib.compare
                 from rdflib.compare import isomorphic
+
                 # Get default graph from dataset
                 default_graph = Graph()
                 for s, p, o in g.default_context:
                     default_graph.add((s, p, o))
-                assert isomorphic(default_graph, parsed), "Parsed RDFa should match original graph"
+                assert isomorphic(
+                    default_graph, parsed
+                ), "Parsed RDFa should match original graph"
 
             finally:
                 html_path.unlink()

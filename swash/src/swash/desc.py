@@ -4,7 +4,6 @@ Provides a declarative way to construct RDF graphs with a syntax similar to Turt
 """
 
 from contextlib import _GeneratorContextManager, contextmanager
-from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, Generator, Optional
 
@@ -18,13 +17,9 @@ from rdflib import (
 )
 from rdflib.namespace import RDF, RDFS
 from swash.util import O, S
+from swash.vars import current_subject
 
 from . import vars
-
-# Context variable to track current subject
-current_subject: ContextVar[Optional[S]] = ContextVar(
-    "current_subject", default=None
-)
 
 
 @contextmanager
@@ -60,7 +55,7 @@ class Subject:
     def add(self, pred: URIRef, obj: Any):
         """Add a predicate-object pair to this subject"""
         with self._as_current():
-            property(pred, obj)
+            has(pred, obj)
 
 
 def resource(
@@ -88,7 +83,7 @@ def resource(
     return f()
 
 
-def property(
+def has(
     pred: URIRef, obj: Optional[Any] = None
 ) -> _GeneratorContextManager[Subject]:
     """
@@ -126,28 +121,28 @@ def property(
 
 
 def label(text: str, lang: Optional[str] = "en"):
-    property(RDFS.label, Literal(text, lang=lang))
+    has(RDFS.label, Literal(text, lang=lang))
 
 
 def definition(text: str, lang: Optional[str] = "en"):
-    property(SKOS.definition, Literal(text, lang=lang))
+    has(SKOS.definition, Literal(text, lang=lang))
 
 
 def note(text: str, lang: Optional[str] = "en"):
-    property(SKOS.note, Literal(text, lang=lang))
+    has(SKOS.note, Literal(text, lang=lang))
 
 
 def example(text: str, lang: Optional[str] = "en"):
-    property(SKOS.example, Literal(text, lang=lang))
+    has(SKOS.example, Literal(text, lang=lang))
 
 
-def a(type_uri: O):
-    property(RDF.type, type_uri)
+def has_type(type_uri: O):
+    has(RDF.type, type_uri)
 
 
 def subclass(class_uri: URIRef):
     """Add an RDFS subClassOf relation to the given class"""
-    property(RDFS.subClassOf, class_uri)
+    has(RDFS.subClassOf, class_uri)
 
 
 def literal(

@@ -7,7 +7,7 @@ from swash.util import new
 from bubble.town import (
     ServerActor,
     this,
-    with_new_transaction,
+    txgraph,
     create_graph,
 )
 
@@ -17,7 +17,7 @@ class UptimeActor(ServerActor[datetime]):
 
     async def init(self):
         self.state = datetime.now(UTC)
-        async with with_new_transaction():
+        async with txgraph():
             new(NT.UptimeActor, {}, this())
 
     async def handle(self, nursery, graph: Graph) -> Graph:

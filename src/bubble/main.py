@@ -27,7 +27,7 @@ from bubble.town import (
     SimpleSupervisor,
     TownApp,
     spawn,
-    with_new_transaction,
+    txgraph,
 )
 from bubble.uptime import UptimeActor
 from datetime import datetime, UTC
@@ -124,7 +124,7 @@ def town(
                 town = TownApp(base_url, bind, repo)
                 with town.install_context():
                     # Create and persist the town's identity
-                    async with with_new_transaction():
+                    async with txgraph():
                         town.system.create_identity_graph()
 
                     supervisor = await spawn(
@@ -135,7 +135,7 @@ def town(
                     )
 
                     # Link supervisor to the town's identity
-                    async with with_new_transaction():
+                    async with txgraph():
                         town.system.link_actor_to_identity(supervisor)
 
                     uptime = await spawn(
@@ -145,7 +145,7 @@ def town(
                     )
 
                     # Link uptime actor to the town's identity
-                    async with with_new_transaction():
+                    async with txgraph():
                         town.system.link_actor_to_identity(uptime)
 
                     add(URIRef(base_url), {NT.environs: supervisor})

@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar, Optional, Sequence, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rdflib import PROV, Graph, Literal
+from rdflib import PROV, BNode, Graph, Literal, URIRef
 from rdflib.graph import QuotedGraph, _TripleType
 
 from swash.mint import fresh_iri
@@ -74,3 +74,9 @@ def bind_prefixes(g: Graph):
     g.bind("did", DID)
     g.bind("did:key", "did:key:")
     g.bind("as", AS)
+
+
+# Context variable to track current subject
+current_subject: ContextVar[Optional[URIRef | BNode]] = ContextVar(
+    "current_subject", default=None
+)

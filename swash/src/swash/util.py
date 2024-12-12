@@ -6,6 +6,7 @@ from typing import Any, Optional, overload
 
 from rdflib import (
     RDF,
+    BNode,
     Graph,
     Literal,
     Namespace,
@@ -134,8 +135,19 @@ def turtle(src: str) -> Graph:
         return graph
 
 
-def add(subject: S, properties: dict[P, Any]) -> None:
+@overload
+def add(subject: S, properties: dict[P, Any]) -> None: ...
+@overload
+def add(subject: None, properties: dict[P, Any]) -> None: ...
+
+
+def add(
+    subject: S | BNode | None = None, properties: dict[P, Any] = {}
+) -> None:
     graph = vars.graph.get()
+    if subject is None:
+        subject = vars.current_subject.get()
+    assert subject is not None
     for predicate, object in properties.items():
         graph.add((subject, predicate, object))
 
