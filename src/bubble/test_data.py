@@ -37,7 +37,7 @@ async def test_graph_repo_basics():
         await repo.save_all()
 
         # Create a new repo instance to test loading
-        repo2 = GraphRepo(git)
+        repo2 = GraphRepo(git, namespace=EX)
         await repo2.load_all()
 
         # Verify the loaded graph has our triples
