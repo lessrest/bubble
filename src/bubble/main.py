@@ -10,7 +10,7 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import FOAF, RDFS, Literal, URIRef, Namespace, PROV, DCAT
+from rdflib import Literal, URIRef, Namespace, PROV, DCAT
 from fastapi import FastAPI
 from rich.console import Console
 from rich.panel import Panel
@@ -20,8 +20,8 @@ from rich import box
 import swash.vars as vars
 
 from swash.prfx import NT
-from swash.util import add, new, print_n3
-from bubble.data import Git, Repository, FROTH, context
+from swash.util import add, print_n3
+from bubble.data import Git, Repository
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.chat import BubbleChat
 from bubble.cred import get_anthropic_credential
@@ -87,59 +87,61 @@ def shell(
         system_info = await gather_system_info()
         user = system_info["user_info"]
 
-        with repo.new_agent(
-            NT.Account,
-            {
-                NT.owner: user,
-            },
-        ) as agent:
-            # Start a new shell session activity
-            with repo.new_activity(NT.InteractiveShellSession) as activity:
-                # Create a derived graph for the shell session
-                with repo.new_derived_graph(
-                    source_graph=repo.metadata_id
-                ) as derived_id:
-                    # Get the directory path for this graph
-                    graph_dir = repo.graph_dir(derived_id)
-                    await graph_dir.mkdir(parents=True, exist_ok=True)
+        with repo.new_graph():
+            with repo.new_agent(
+                NT.Account,
+                {
+                    NT.owner: user.pw_gecos,
+                },
+            ) as agent:
+                # Start a new shell session activity
+                with repo.new_activity(
+                    NT.InteractiveShellSession
+                ) as activity:
+                    # Create a derived graph for the shell session
+                    with repo.new_derived_graph(
+                        source_graph=repo.metadata_id
+                    ) as derived_id:
+                        # Get the directory path for this graph
+                        graph_dir = repo.graph_dir(derived_id)
+                        await graph_dir.mkdir(parents=True, exist_ok=True)
 
-                    await repo.save_all()
-                    await repo.commit("new shell session")
+                        await repo.save_all()
+                        await repo.commit("new shell session")
 
-                    logger.info(
-                        "Starting shell session",
-                        graph=derived_id,
-                        activity=activity,
-                        directory=str(graph_dir),
-                    )
+                        logger.info(
+                            "Starting shell session",
+                            graph=derived_id,
+                            activity=activity,
+                            directory=str(graph_dir),
+                        )
 
-                    ascii_002_ = "\u0002"
+                        # Start bash with environment variables set and cwd set to graph directory
+                        await trio.run_process(
+                            ["bash", "-i"],
+                            stdin=None,
+                            check=False,
+                            cwd=str(graph_dir),
+                            env={
+                                "BUBBLE": repo_path,
+                                "BUBBLE_GRAPH": str(derived_id),
+                                "BUBBLE_GRAPH_DIR": str(graph_dir),
+                                "BUBBLE_ACTIVITY": str(activity),
+                                "BUBBLE_AGENT": str(agent),
+                                "PS1": r"\n\[\e[1m\]\[\e[34m\]"
+                                + derived_id.n3()
+                                + " @ "
+                                + system_info["hostname"]
+                                + r" \[\e[0m\]\[\e[1m\]\[\e[0m\]\n $ ",
+                                "BASH_SILENCE_DEPRECATION_WARNING": "1",
+                                # Inherit parent environment
+                                **os.environ,
+                            },
+                        )
 
-                    # Start bash with environment variables set and cwd set to graph directory
-                    await trio.run_process(
-                        ["bash", "-i"],
-                        stdin=None,
-                        check=False,
-                        cwd=str(graph_dir),
-                        env={
-                            "BUBBLE": repo_path,
-                            "BUBBLE_GRAPH": str(derived_id),
-                            "BUBBLE_GRAPH_DIR": str(graph_dir),
-                            "PS1": r"\n\[\e[1m\]\[\e[34m\]"
-                            + derived_id.n3()
-                            + " @ "
-                            + system_info["hostname"]
-                            + r" \[\e[0m\]\[\e[1m\]\[\e[0m\]\n $ "
-                            + ascii_002_,
-                            "BASH_SILENCE_DEPRECATION_WARNING": "1",
-                            # Inherit parent environment
-                            **os.environ,
-                        },
-                    )
-
-                    # After shell exits, commit any changes
-                    await repo.save_all()
-                    await repo.commit("Update after shell session")
+                        # After shell exits, commit any changes
+                        await repo.save_all()
+                        await repo.commit("Update after shell session")
 
     trio.run(run)
 
@@ -279,8 +281,13 @@ def info() -> None:
     bubble_path = os.environ.get("BUBBLE")
     bubble_graph = os.environ.get("BUBBLE_GRAPH")
     bubble_graph_dir = os.environ.get("BUBBLE_GRAPH_DIR")
+    bubble_activity = os.environ.get("BUBBLE_ACTIVITY")
+    bubble_agent = os.environ.get("BUBBLE_AGENT")
 
     assert bubble_graph
+    assert bubble_graph_dir
+    assert bubble_activity
+    assert bubble_agent
 
     # If no bubble environment variables are set
     if not bubble_path:
@@ -353,8 +360,14 @@ def info() -> None:
 
         console.print(graphs_table)
 
+        # Show the current activity
+        print_n3(repo.graph(URIRef(bubble_activity)), "Activity")
+
+        # Show the current agent
+        print_n3(repo.graph(URIRef(bubble_agent)), "Agent")
+
         # Show the current graph
-        print_n3(repo.graph(URIRef(bubble_graph)), bubble_graph)
+        print_n3(repo.graph(URIRef(bubble_graph)), "Graph")
 
     trio.run(show_info)
 

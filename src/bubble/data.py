@@ -21,7 +21,6 @@ import structlog
 
 from rich.padding import Padding
 from rich.text import Text
-import rich
 from rdflib import (
     RDF,
     RDFS,
