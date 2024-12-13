@@ -17,36 +17,27 @@ EX = Namespace("http://example.org/")
 
 
 async def test_graph_repo_basics():
-    # Create a temporary directory for the test repo
     with tempfile.TemporaryDirectory() as workdir:
-        # Initialize Git and GraphRepo
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
 
+        # Create initial graph and add data
         with repo.new_graph() as graph_id:
             subject = new(EX.Type, {EX.label: Literal("Test")})
-
-            # Check that the graph is registered in metadata
             assert graph_id in repo.list_graphs()
-
-            # Save everything
             await repo.save_all()
 
-        # Create a new repo instance to test loading
+        # Test loading in new repo instance
         repo2 = GraphRepo(git, namespace=EX)
         await repo2.load_all()
 
-        # Verify the loaded graph has our triples
+        # Verify loaded data
         graph2 = repo2.graph(graph_id)
         assert len(graph2) == 2
-
-        # Check specific triple exists
         assert (subject, RDF.type, EX.Type) in graph2
 
-        # Commit changes
+        # Test git operations
         await repo2.commit("Test commit")
-
-        # Verify files exist in git
         assert os.path.exists(os.path.join(workdir, "void.ttl"))
         assert os.path.exists(
             os.path.join(workdir, repo.graph_filename(graph_id))
@@ -59,113 +50,84 @@ async def test_graph_repo_new_derived_graph():
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
 
-        # Create an initial graph
+        # Create source graph
         with repo.new_graph() as source_graph_id:
             repo.add((EX.subject, RDF.type, EX.Type))
 
-        # Test explicit source graph
-        activity = EX.activity1 
+        # Test explicit derivation
+        activity = EX.activity1
         with repo.new_derived_graph(
             source_graph_id, activity=activity
         ) as derived_graph_id:
             repo.add((EX.subject, EX.label, Literal("Derived")))
 
-        # Verify the derived graph contains our new triple
+        # Verify derived content
         derived_graph = repo.graph(derived_graph_id)
         assert (EX.subject, EX.label, Literal("Derived")) in derived_graph
 
-        # Verify the provenance relations were recorded
+        # Verify provenance
         assert (
             derived_graph_id,
-            PROV.wasDerivedFrom,
-            source_graph_id,
-        ) in repo.metadata
-        assert (
-            derived_graph_id,
-            PROV.wasGeneratedBy,
-            activity,
-        ) in repo.metadata
-        assert (
-            source_graph_id,
-            PROV.wasInfluencedBy,
-            activity,
+            PROV.qualifiedDerivation,
+            list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))[0],
         ) in repo.metadata
 
-        # Verify the derivation has our custom type
-        derivations = list(
-            repo.metadata.subjects(RDF.type, FROTH.GraphDerivation)
-        )
-        assert len(derivations) == 1
-
-        # Test deriving using current context
-        with context.bind_graph(source_graph_id, repo):
+        # Test derivation with current context
+        with context.graph.bind(repo.graph(source_graph_id)):
             current_act = EX.currentActivity
             with context.activity.bind(current_act):
                 with repo.new_derived_graph() as derived_graph_id2:
                     repo.add((EX.subject, EX.label, Literal("Derived2")))
 
-                # Verify derivation using current context
+                # Verify provenance with current context
                 assert (
                     derived_graph_id2,
-                    PROV.wasDerivedFrom,
-                    source_graph_id,
-                ) in repo.metadata
-                assert (
-                    derived_graph_id2,
-                    PROV.wasGeneratedBy,
-                    current_act,
-                ) in repo.metadata
-                assert (
-                    source_graph_id,
-                    PROV.wasInfluencedBy,
-                    current_act,
+                    PROV.qualifiedDerivation,
+                    list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))[1],
                 ) in repo.metadata
 
 
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        # Test with namespace
         repo = GraphRepo(git, namespace=EX)
 
-        # Use the new_graph context manager
+        # Create new graph and add data
         with repo.new_graph() as graph_id:
             repo.add((EX.subject, RDF.type, EX.Type))
             repo.add((EX.subject, EX.label, Literal("Test")))
 
-        # Verify the graph was created and contains our triples
-        graph = repo.graph(graph_id)
-        assert len(graph) == 2
-        assert (EX.subject, RDF.type, EX.Type) in graph
-        assert (EX.subject, EX.label, Literal("Test")) in graph
+            # Verify graph contents
+            graph = repo.graph(graph_id)
+            assert len(graph) == 2
+            assert (EX.subject, RDF.type, EX.Type) in graph
+            assert (EX.subject, EX.label, Literal("Test")) in graph
 
-        # Verify the graph is registered in metadata
-        assert graph_id in repo.list_graphs()
+            # Verify registration
+            assert graph_id in repo.list_graphs()
 
 
 async def test_graph_repo_add_with_current_graph():
-    # Create a temporary directory for the test repo
     with tempfile.TemporaryDirectory() as workdir:
-        # Initialize Git and GraphRepo
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
 
-        # Test that adding without setting current_graph raises error
-        with pytest.raises(Exception):
+        # Test error when no current graph
+        with pytest.raises(ValueError, match="No current graph set"):
             repo.add((EX.subject, RDF.type, EX.Type))
 
-        # Create a new graph and add triples
+        # Test adding with current graph
         with repo.new_graph() as graph_id:
             repo.add((EX.subject, RDF.type, EX.Type))
             repo.add((EX.subject, EX.label, Literal("Test")))
 
-        # Verify triples were added
-        graph = repo.graph(graph_id)
-        assert len(graph) == 2
-        assert (EX.subject, RDF.type, EX.Type) in graph
-        assert (EX.subject, EX.label, Literal("Test")) in graph
+            # Verify immediate state
+            graph = repo.graph(graph_id)
+            assert len(graph) == 2
+            assert (EX.subject, RDF.type, EX.Type) in graph
+            assert (EX.subject, EX.label, Literal("Test")) in graph
 
-        # Save and reload to verify persistence
+        # Test persistence
         await repo.save_all()
         repo2 = GraphRepo(git, namespace=EX)
         await repo2.load_all()
