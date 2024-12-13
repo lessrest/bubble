@@ -198,10 +198,27 @@ class GraphRepo:
             yield graph_id
 
     @contextmanager
-    def new_derived_graph(self, source_graph: URIRef) -> Generator[URIRef, None, None]:
-        """Create a new graph derived from an existing graph, recording the provenance relation."""
+    def new_derived_graph(
+        self, 
+        source_graph: Optional[URIRef] = None,
+        activity: Optional[URIRef] = None
+    ) -> Generator[URIRef, None, None]:
+        """Create a new graph derived from an existing graph, recording the provenance relation.
+        
+        Args:
+            source_graph: The graph this is derived from. Defaults to current_graph.
+            activity: Optional activity that caused this derivation.
+        """
         graph_id = fresh_uri(self.namespace)
-        self.metadata.add((graph_id, PROV.wasDerivedFrom, source_graph))
+        source = source_graph if source_graph is not None else current_graph.get()
+        if source is None:
+            raise ValueError("No source graph specified and no current graph set")
+            
+        self.metadata.add((graph_id, PROV.wasDerivedFrom, source))
+        if activity:
+            self.metadata.add((graph_id, PROV.wasGeneratedBy, activity))
+            self.metadata.add((source, PROV.wasInfluencedBy, activity))
+            
         with current_graph.bind(graph_id):
             yield graph_id
 

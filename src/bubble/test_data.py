@@ -67,16 +67,27 @@ async def test_graph_repo_new_derived_graph():
         source_graph = repo.graph(source_graph_id)
         source_graph.add((EX.subject, RDF.type, EX.Type))
 
-        # Create a derived graph using the context manager
-        with repo.new_derived_graph(source_graph_id) as derived_graph_id:
+        # Test explicit source graph
+        activity = EX.activity1
+        with repo.new_derived_graph(source_graph_id, activity=activity) as derived_graph_id:
             repo.add((EX.subject, EX.label, Literal("Derived")))
 
         # Verify the derived graph contains our new triple
         derived_graph = repo.graph(derived_graph_id)
         assert (EX.subject, EX.label, Literal("Derived")) in derived_graph
 
-        # Verify the provenance relation was recorded
+        # Verify the provenance relations were recorded
         assert (derived_graph_id, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
+        assert (derived_graph_id, PROV.wasGeneratedBy, activity) in repo.metadata
+        assert (source_graph_id, PROV.wasInfluencedBy, activity) in repo.metadata
+
+        # Test deriving from current graph
+        with current_graph.bind(source_graph_id):
+            with repo.new_derived_graph() as derived_graph_id2:
+                repo.add((EX.subject, EX.label, Literal("Derived2")))
+            
+            # Verify derivation from current graph
+            assert (derived_graph_id2, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
 
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
