@@ -1,7 +1,10 @@
+from base64 import b64encode
 from swash.html import tag, text
 
 import json
 from contextlib import contextmanager
+
+from bubble.Vat import vat
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
@@ -77,3 +80,65 @@ def action_button(label: str, **attrs):
     with tag("button", **attrs):
         with tag("span", classes="font-medium"):
             text(label)
+
+
+@contextmanager
+def base_shell(title: str):
+    """Base shell layout with status bar showing town info like public key."""
+    with base_html(title):
+        with tag("div", classes="min-h-screen flex flex-col"):
+            # Status bar
+            with tag(
+                "div",
+                classes=[
+                    "bg-white dark:bg-gray-900",
+                    "text-gray-900 dark:text-white",
+                    "px-4 py-2",
+                    "flex items-center justify-between",
+                    "border-b border-gray-200 dark:border-gray-800",
+                ],
+            ):
+                with tag("div", classes="flex items-center gap-6"):
+                    # Node ID
+                    with tag("div", classes="flex flex-col"):
+                        with tag(
+                            "span",
+                            classes="text-gray-500 dark:text-gray-400 text-sm",
+                        ):
+                            text("Node ID")
+                        identity_uri = vat.get().get_identity_uri()
+                        with tag(
+                            "a",
+                            href=str(identity_uri),
+                            classes=[
+                                "font-mono text-sm",
+                                "text-emerald-600 dark:text-emerald-400",
+                                "hover:text-emerald-500 dark:hover:text-emerald-300",
+                                "transition-colors",
+                            ],
+                        ):
+                            pubkey = vat.get().get_public_key_bytes()
+                            text(b64encode(pubkey).decode())
+
+                    # Site URL
+                    with tag("div", classes="flex flex-col"):
+                        with tag(
+                            "span",
+                            classes="text-gray-500 dark:text-gray-400 text-sm",
+                        ):
+                            text("Site")
+                        with tag(
+                            "a",
+                            href=vat.get().site,
+                            classes=[
+                                "font-mono text-sm",
+                                "text-emerald-600 dark:text-emerald-400",
+                                "hover:text-emerald-500 dark:hover:text-emerald-300",
+                                "transition-colors",
+                            ],
+                        ):
+                            text(vat.get().get_base_url())
+
+            # Main content area
+            with tag("div", classes="flex-1"):
+                yield

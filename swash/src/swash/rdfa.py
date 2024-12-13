@@ -55,8 +55,9 @@ visited_resources = vars.Parameter("visited_resources", default=set())
 @contextlib.contextmanager
 def autoexpanding(depth: int):
     """Context manager for controlling resource expansion depth."""
-    with expansion_depth.bind(depth), visited_resources.bind(set()):
-        yield
+    with expansion_depth.bind(depth):
+        with visited_resources.bind(set()):
+            yield
 
 
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
@@ -90,7 +91,7 @@ def get_subject_data(
     dataset: Optional[Dataset], subject: S, context: Optional[Graph] = None
 ) -> Dict[str, Optional[S]]:
     data = {"type": None, "predicates": []}
-    graph = context or dataset
+    graph = context or vars.graph.get()
     assert isinstance(graph, Graph)
     for predicate, obj in graph.predicate_objects(subject):
         if predicate == RDF.type:
@@ -169,9 +170,10 @@ def render_expander(obj, predicate):
 
     # If we have depth remaining and haven't seen this resource yet
     if current_depth > 0 and obj not in visited:
-        visited.add(obj)
         with expansion_depth.bind(current_depth - 1):
             rdf_resource(obj)
+
+        visited.add(obj)
     else:
         # Render as expandable button if we're at depth 0 or already visited
         with tag("button", classes="text-gray-900 dark:text-white"):
@@ -191,8 +193,6 @@ def get_rdf_resource(subject: str) -> None:
 
 
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
-    visited_resources.get().add(subject)
-
     if data is None:
         data = get_subject_data(vars.dataset.get(), subject)
 
@@ -208,6 +208,7 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_button_resource(subject, data)
     else:
         render_default_resource(subject, data)
+    visited_resources.get().add(subject)
 
 
 @html.div("flex flex-col items-start gap-1")

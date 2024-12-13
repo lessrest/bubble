@@ -9,7 +9,6 @@ from . import (
     repo,
     slop,
     wiki,
-    http,
     stat,
 )
 
@@ -31,6 +30,4 @@ __all__ = [
     "vars",
     "wiki",
     "stat",
-    "stat",
-    "http",
 ]

@@ -18,7 +18,7 @@ from bubble.logs import configure_logging
 from bubble.repo import BubbleRepo, using_bubble_at
 from bubble.town import (
     ServerActor,
-    TownApp,
+    Site,
     call,
     send,
     this,
@@ -55,7 +55,7 @@ async def test_basic_actor_system(
         assert isinstance(reply_to, URIRef)
         await send(reply_to, response_graph)
 
-    town = TownApp("http://example.com", "localhost:8000", repo=temp_repo)
+    town = Site("http://example.com", "localhost:8000", repo=temp_repo)
 
     async with trio.open_nursery() as nursery:
         with town.install_context():
@@ -88,7 +88,7 @@ class CounterActor(ServerActor[int]):
 
 
 async def test_counter_actor(logger: BoundLogger, temp_repo: BubbleRepo):
-    town = TownApp("http://example.com", "localhost:8000", repo=temp_repo)
+    town = Site("http://example.com", "localhost:8000", repo=temp_repo)
     with trio.fail_after(0.5):
         async with trio.open_nursery() as nursery:
             with town.install_context():

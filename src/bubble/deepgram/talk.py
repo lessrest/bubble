@@ -52,6 +52,7 @@ from swash.util import (
     get_single_object,
 )
 from swash.vars import in_graph
+from bubble.Vat import get_base, with_transient_graph
 from bubble.time import make_instant, make_duration, make_interval
 from bubble.town import (
     ServerActor,
@@ -60,9 +61,6 @@ from bubble.town import (
     spawn,
     receive,
     txgraph,
-    get_base,
-    in_request_graph,
-    with_transient_graph,
 )
 from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage
 
@@ -177,6 +175,8 @@ def chunk_data(graph: Graph) -> bytes:
 
 
 async def deepgram_session(results: URIRef):
+    from bubble.town import in_request_graph  # Import where needed
+
     # Wait for first chunk before starting session
     msg = await receive()
 

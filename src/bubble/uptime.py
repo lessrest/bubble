@@ -4,11 +4,11 @@ from rdflib import RDF, Graph, Literal
 
 from swash.prfx import NT
 from swash.util import new
+from bubble.Vat import create_graph
 from bubble.town import (
     ServerActor,
     this,
     txgraph,
-    create_graph,
 )
 
 

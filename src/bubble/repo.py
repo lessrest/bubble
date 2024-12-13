@@ -9,6 +9,7 @@
 
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
+from typing import Optional
 
 import structlog
 import trio
@@ -30,6 +31,9 @@ from swash.util import get_single_subject, print_n3
 from swash import vars
 from bubble.blob import BlobStore, BlobStream
 from swash.mint import fresh_uri
+from bubble.keys import generate_keypair, get_public_key_bytes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 logger = structlog.get_logger()
 
@@ -44,8 +48,15 @@ class BubbleRepo:
     # The path to the bubble's root.n3 file
     rootpath: Path
 
+    # The path to the bubble's private key file
+    keypath: Path
+
     # The bubble's IRI
     bubble: _SubjectType
+
+    # The bubble's keypair
+    private_key: Optional[ed25519.Ed25519PrivateKey]
+    public_key: Optional[ed25519.Ed25519PublicKey]
 
     # The dataset containing all graphs
     dataset: Dataset
@@ -68,7 +79,10 @@ class BubbleRepo:
     def __init__(self, path: Path, dataset: Dataset, base: _SubjectType):
         self.workdir = path
         self.rootpath = path / "root.n3"
+        self.keypath = path / "bubble.key"
         self.bubble = base
+        self.private_key = None
+        self.public_key = None
 
         self.dataset = dataset
         self.graph = self.dataset.graph(NT.bubble, base=base)
@@ -151,6 +165,31 @@ class BubbleRepo:
         logger.info(f"Conclusion has {len(conclusion)} triples")
         return conclusion
 
+    async def load_keypair(self) -> None:
+        """Load the bubble's keypair from disk."""
+        if not await self.keypath.exists():
+            return
+
+        key_bytes = await self.keypath.read_bytes()
+        self.private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+            key_bytes
+        )
+        self.public_key = self.private_key.public_key()
+
+    async def save_keypair(self) -> None:
+        """Save the bubble's private key to disk."""
+        if self.private_key is None:
+            return
+
+        key_bytes = self.private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        await self.keypath.write_bytes(key_bytes)
+        # Set restrictive permissions on the key file
+        await self.keypath.chmod(0o600)
+
     @staticmethod
     async def open(path: Path) -> "BubbleRepo":
         if not await trio.Path(path).exists():
@@ -162,9 +201,12 @@ class BubbleRepo:
 
         if not await trio.Path(void_path).exists():
             logger.info("describing new bubble", path=str(path))
+            # Generate keypair for new bubble
+            private_key, public_key = generate_keypair()
             # Use site namespace for base and bubble URI
             bubble_uri = fresh_uri(vars.site.get())
-            graph = await describe_new_bubble(path, bubble_uri)
+            graph = await describe_new_bubble(path, bubble_uri, public_key)
+
             # Save the main graph
             graph.serialize(destination=path / "root.n3", format="n3")
 
@@ -172,7 +214,17 @@ class BubbleRepo:
             void_graph = Graph()
             void_graph.add((bubble_uri, RDF.type, VOID.Dataset))
             void_graph.serialize(destination=void_path, format="turtle")
+
+            # Create repo instance to save the keypair
+            repo = BubbleRepo(
+                path, Dataset(default_union=True), URIRef(bubble_uri)
+            )
+            repo.private_key = private_key
+            repo.public_key = public_key
+            await repo.save_keypair()
+
             should_commit = True
+            return repo
 
         # Only load void.ttl to get the bubble identifier
         logger.info("loading void.ttl", path=str(void_path))
@@ -181,6 +233,7 @@ class BubbleRepo:
 
         dataset = Dataset(default_union=True)
         repo = BubbleRepo(path, dataset, URIRef(bubble))
+        await repo.load_keypair()
 
         if should_commit:
             logger.info("committing bubble", repo=repo)

@@ -1,23 +1,17 @@
 import io
-import sys
 import json
 import uuid
 import pathlib
 
 from io import BytesIO
-from html import escape
 from base64 import b64encode
 from typing import (
     Any,
-    Set,
     Dict,
     List,
     Callable,
     Optional,
-    Awaitable,
-    Generator,
     AsyncGenerator,
-    MutableMapping,
 )
 from datetime import UTC, datetime
 from contextlib import (
@@ -27,7 +21,6 @@ from contextlib import (
     asynccontextmanager,
 )
 from collections import defaultdict
-from dataclasses import dataclass
 
 import trio
 import tenacity
@@ -36,7 +29,6 @@ import structlog
 from rdflib import (
     RDF,
     XSD,
-    PROV,
     Graph,
     URIRef,
     Dataset,
@@ -57,273 +49,39 @@ from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from swash import Parameter, mint, rdfa, vars
-from swash.desc import has, resource
+from swash import mint, rdfa, vars
 from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
-from swash.prfx import NT, DID, DEEPGRAM
-from swash.rdfa import rdf_resource, autoexpanding, get_subject_data
+from swash.prfx import NT, DID
+from swash.rdfa import (
+    rdf_resource,
+    autoexpanding,
+    get_subject_data,
+    visited_resources,
+)
 from swash.util import S, add, new
+from bubble.Vat import (
+    ActorContext,
+    Vat,
+    create_graph,
+    fresh_uri,
+    vat,
+    with_transient_graph,
+)
 from bubble.icon import favicon
-from bubble.page import base_html
+from bubble.keys import (
+    build_did_document,
+)
+from bubble.page import base_html, base_shell
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
+from bubble.word import describe_word
 
 logger = structlog.get_logger(__name__)
 
 
-@dataclass
-class ActorContext:
-    boss: URIRef
-    addr: URIRef
-    send: trio.MemorySendChannel
-    recv: trio.MemoryReceiveChannel
-    trap: bool = False
-    name: str = "anonymous"
-
-
-def fresh_uri(site: Optional[Namespace] = None) -> URIRef:
-    if site is None:
-        site = hub.get().site
-    return mint.fresh_uri(site)
-
-
-def new_context(parent: URIRef, name: str = "unnamed") -> ActorContext:
-    chan_send, chan_recv = trio.open_memory_channel(8)
-    return ActorContext(
-        parent, fresh_uri(), chan_send, chan_recv, name=name
-    )
-
-
-def root_context(site: Namespace, name: str = "root") -> ActorContext:
-    uri = fresh_uri(site)
-    chan_send, chan_recv = trio.open_memory_channel(8)
-    return ActorContext(uri, uri, chan_send, chan_recv, name=name)
-
-
-class Town:
-    site: Namespace
-    curr: Parameter[ActorContext]
-    deck: MutableMapping[URIRef, ActorContext]
-    yell: structlog.stdlib.BoundLogger
-    private_key: ed25519.Ed25519PrivateKey
-    public_key: ed25519.Ed25519PublicKey
-
-    def __init__(
-        self,
-        site: str,
-        yell: structlog.stdlib.BoundLogger,
-    ):
-        self.site = Namespace(site)
-        self.yell = yell.bind(site=site)
-
-        # Generate Ed25519 keypair
-        self.private_key = ed25519.Ed25519PrivateKey.generate()
-        self.public_key = self.private_key.public_key()
-        self.identity_uri = self.generate_identity_uri()
-        self.yell.info("generated Ed25519 keypair")
-
-        root = root_context(self.site)
-        self.curr = Parameter("current_actor", root)
-        self.deck = {root.addr: root}
-
-    def generate_identity_uri(self):
-        return URIRef(f"did:key:{self.get_public_key_hex()}")
-
-    def get_public_key_hex(self):
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        ).hex()
-
-    def create_identity_graph(self):
-        """Create a graph representing this town's cryptographic identity."""
-        new(
-            DID.Ed25519VerificationKey2020,
-            {
-                DID.publicKeyBase64: Literal(
-                    b64encode(self.get_public_key_bytes()).decode()
-                ),
-                NT.created: Literal(
-                    datetime.now(UTC).isoformat(), datatype=XSD.dateTime
-                ),
-            },
-            self.identity_uri,
-        )
-
-    def link_actor_to_identity(self, actor: URIRef):
-        """Create a graph linking an actor to this town's identity."""
-        with resource(self.identity_uri):
-            has(PROV.started, actor)
-
-    def this(self) -> URIRef:
-        return self.curr.get().addr
-
-    async def spawn(
-        self,
-        crib: trio.Nursery,
-        code: Callable[..., Awaitable[None]],
-        *args,
-        name: Optional[str] = None,
-    ) -> URIRef:
-        if name is None:
-            if hasattr(code, "__name__"):
-                name = code.__name__
-            else:
-                name = code.__class__.__name__
-
-        parent_ctx = self.curr.get()
-        context = new_context(parent_ctx.addr, name=name)
-        self.deck[context.addr] = context
-
-        self.yell.info(
-            "spawning",
-            actor=context.addr,
-            actor_name=name,
-            parent=parent_ctx.addr,
-        )
-
-        async def task():
-            with self.curr.bind(context):
-                try:
-                    await code(*args)
-                    self.yell.info(
-                        "actor finished",
-                        actor=context.addr,
-                        actor_name=name,
-                    )
-                except BaseException as e:
-                    logger.error(
-                        "actor crashed",
-                        actor=context.addr,
-                        actor_name=name,
-                        error=e,
-                        parent=context.boss,
-                    )
-
-                    if parent_ctx and parent_ctx.trap:
-                        self.yell.info(
-                            "sending exit signal",
-                            to=parent_ctx.addr,
-                        )
-                        await self.send_exit_signal(
-                            parent_ctx.addr, context.addr, e
-                        )
-                    else:
-                        self.yell.info("raising exception")
-                        raise
-                finally:
-                    self.yell.info(
-                        "deleting actor", actor=(context.addr, name)
-                    )
-                    del self.deck[context.addr]
-                    self.print_actor_tree()
-
-        crib.start_soon(task)
-        return context.addr
-
-    async def send_exit_signal(
-        self, parent: URIRef, child: URIRef, error: BaseException
-    ):
-        with with_transient_graph() as id:
-            new(
-                NT.Exit,
-                {NT.actor: child, NT.message: Literal(str(error))},
-                id,
-            )
-
-            child_ctx = self.deck.get(child)
-            child_name = child_ctx.name if child_ctx else "unknown"
-            self.yell.info(
-                "sending exit signal",
-                to=parent,
-                child=child,
-                child_name=child_name,
-                error=error,
-            )
-
-            await self.send(parent)
-
-    async def send(self, actor: URIRef, message: Optional[Graph] = None):
-        if message is None:
-            message = vars.graph.get()
-
-        if actor not in self.deck:
-            raise ValueError(f"Actor {actor} not found")
-
-        await self.deck[actor].send.send(message)
-
-    def get_actor_hierarchy(self) -> Dict[URIRef, Set[URIRef]]:
-        """Get the parent-child relationships between actors."""
-        kids = defaultdict(set)
-        for addr, ctx in self.deck.items():
-            if ctx.boss != ctx.addr:  # Skip root which is its own parent
-                kids[ctx.boss].add(addr)
-        return dict(kids)
-
-    def format_actor_tree(
-        self, root: URIRef, indent: str = "", is_last: bool = True
-    ) -> str:
-        """Format the actor hierarchy as a tree string starting from given root."""
-        ctx = self.deck.get(root)
-        if not ctx:
-            return f"{indent}[deleted actor {root}]\n"
-
-        marker = "└── " if is_last else "├── "
-        result = f"{indent}{marker}{ctx.name} ({root})\n"
-
-        children = self.get_actor_hierarchy().get(root, set())
-        child_list = sorted(children)  # Sort for consistent output
-
-        for i, child in enumerate(child_list):
-            is_last_child = i == len(child_list) - 1
-            next_indent = indent + ("    " if is_last else "│   ")
-            result += self.format_actor_tree(
-                child, next_indent, is_last_child
-            )
-
-        return result
-
-    def print_actor_tree(self):
-        """Print the complete actor hierarchy tree."""
-        # Find the root (actor that is its own parent)
-        root = next(
-            uri for uri, ctx in self.deck.items() if ctx.boss == ctx.addr
-        )
-        tree = self.format_actor_tree(root)
-        self.yell.info("Actor hierarchy:\n" + tree)
-
-    def sign_data(self, data: bytes) -> bytes:
-        """Sign data using the town's Ed25519 private key."""
-        return self.private_key.sign(data)
-
-    def verify_signature(self, data: bytes, signature: bytes) -> bool:
-        """Verify a signature using the town's Ed25519 public key."""
-        try:
-            self.public_key.verify(signature, data)
-            return True
-        except Exception:
-            return False
-
-    def get_public_key_bytes(self) -> bytes:
-        """Get the raw bytes of the public key."""
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        )
-
-    def get_identity_uri(self) -> URIRef:
-        """Get the URI of this town's cryptographic identity."""
-        return self.identity_uri
-
-
-hub = Parameter[Town]("hub")
-
-
 def this() -> URIRef:
-    return hub.get().this()
+    return vat.get().this()
 
 
 async def spawn(
@@ -332,12 +90,12 @@ async def spawn(
     *args,
     name: Optional[str] = None,
 ):
-    system = hub.get()
+    system = vat.get()
     return await system.spawn(nursery, action, *args, name=name)
 
 
 async def send(actor: URIRef, message: Optional[Graph] = None):
-    system = hub.get()
+    system = vat.get()
     if message is None:
         message = vars.graph.get()
     logger.info("sending message", actor=actor, graph=message)
@@ -345,7 +103,7 @@ async def send(actor: URIRef, message: Optional[Graph] = None):
 
 
 async def receive() -> Graph:
-    system = hub.get()
+    system = vat.get()
     return await system.curr.get().recv.receive()
 
 
@@ -419,7 +177,7 @@ async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
     sendchan, recvchan = trio.open_memory_channel[Graph](1)
 
     tmp = fresh_uri()
-    hub.get().deck[tmp] = ActorContext(
+    vat.get().deck[tmp] = ActorContext(
         boss=this(), addr=tmp, send=sendchan, recv=recvchan
     )
 
@@ -436,32 +194,6 @@ async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
     return await recvchan.receive()
 
 
-def create_graph(
-    suffix: Optional[str] = None, *, base: Optional[str] = None
-) -> Graph:
-    """Create a new graph with standard bindings and optional suffix-based identifier.
-
-    Args:
-        suffix: Optional path suffix for the graph ID. If None, a fresh URI is minted.
-        base: Optional base URI. If None, uses the current site.
-    """
-    site = get_site()
-    base = base or str(site)
-
-    if suffix is None:
-        id = mint.fresh_uri(site)
-    else:
-        id = site[suffix]
-
-    g = Graph(base=base, identifier=id)
-    g.bind("nt", NT)
-    g.bind("deepgram", DEEPGRAM)
-    g.bind("site", site)
-    g.bind("did", DID)
-    g.bind("prov", PROV)
-    return g
-
-
 @asynccontextmanager
 async def txgraph(graph: Optional[Graph] = None):
     """Create a new transaction with a fresh graph that will be persisted."""
@@ -473,17 +205,6 @@ async def txgraph(graph: Optional[Graph] = None):
         yield g
 
     await persist(g)
-
-
-@contextmanager
-def with_transient_graph(
-    suffix: Optional[str] = None,
-) -> Generator[URIRef, None, None]:
-    """Create a temporary graph that won't be persisted."""
-    g = create_graph(suffix)
-    with vars.graph.bind(g):
-        assert isinstance(g.identifier, URIRef)
-        yield g.identifier
 
 
 class LinkedDataResponse(HypermediaResponse):
@@ -579,16 +300,6 @@ async def persist(graph: Graph):
 #    print_n3(graph, "graph")
 
 
-def get_site() -> Namespace:
-    """Get the site namespace from the current actor system."""
-    return hub.get().site
-
-
-def get_base() -> URIRef:
-    """Get the base URI from the current actor system."""
-    return hub.get().site[""]
-
-
 def record_message(type: str, actor: URIRef, g: Graph):
     """Record a message in the graph."""
     assert isinstance(g.identifier, URIRef)
@@ -616,37 +327,7 @@ def generate_health_status(id: URIRef):
     )
 
 
-def build_did_document(did_uri: URIRef, doc_uri: URIRef):
-    """Build a DID document using the town's current keypair."""
-    town = hub.get()
-    verification_key = new(
-        DID.Ed25519VerificationKey2020,
-        {
-            DID.controller: did_uri,
-            DID.publicKeyBase64: Literal(
-                b64encode(town.get_public_key_bytes()).decode()
-            ),
-        },
-        town.get_identity_uri(),
-    )
-
-    new(
-        DID.DIDDocument,
-        {
-            DID.id: did_uri,
-            DID.controller: did_uri,
-            DID.created: Literal(
-                datetime.now(UTC).isoformat(), datatype=XSD.dateTime
-            ),
-            DID.verificationMethod: [verification_key],
-            DID.authentication: [verification_key],
-            DID.assertionMethod: [verification_key],
-        },
-        subject=doc_uri,
-    )
-
-
-class TownApp:
+class Site:
     def __init__(
         self,
         base_url: str,
@@ -665,8 +346,8 @@ class TownApp:
         self._setup_middleware()
         self._setup_routes()
 
-        self.system = Town(str(self.site), self.yell)
-        hub.set(self.system)
+        self.vat = Vat(str(self.site), self.yell)
+        vat.set(self.vat)
 
         # Add session tracking
         self.websocket_sessions: Dict[str, WebSocket] = {}
@@ -727,6 +408,9 @@ class TownApp:
         self.app.websocket("/{id}/upload")(self.ws_upload)
         self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
 
+        self.app.get("/word")(self.word_lookup)
+        self.app.get("/words")(self.word_lookup_form)
+
         # this is at the bottom because it matches too broadly
         self.app.get("/{id}")(self.actor_get)
 
@@ -741,7 +425,7 @@ class TownApp:
         )
 
         with with_transient_graph(".well-known/did.json") as id:
-            build_did_document(did_uri, id)
+            build_did_document(did_uri, id, self.vat.public_key)
             return JSONLinkedDataResponse(vocab=DID)
 
     async def get_did_document_html(self):
@@ -751,7 +435,7 @@ class TownApp:
         )
 
         with with_transient_graph(".well-known/did.html") as id:
-            build_did_document(did_uri, id)
+            build_did_document(did_uri, id, self.vat.public_key)
             with base_shell("DID Document"):
                 with tag("div", classes="p-4"):
                     with tag("h1", classes="text-2xl font-bold mb-4"):
@@ -772,7 +456,7 @@ class TownApp:
             return await call_next(request)
 
     async def bind_actor_system(self, request, call_next):
-        with hub.bind(self.system):
+        with vat.bind(self.vat):
             return await call_next(request)
 
     async def bind_bubble(self, request, call_next):
@@ -848,7 +532,7 @@ class TownApp:
             await websocket.close()
 
     async def actor_get(self, id: str):
-        actor = hub.get().deck[self.site[id]]
+        actor = vat.get().deck[self.site[id]]
 
         async def stream_messages():
             try:
@@ -960,7 +644,7 @@ class TownApp:
     @contextmanager
     def install_context(self):
         """Install the actor system and bubble context for request handling."""
-        with hub.bind(self.system):
+        with vat.bind(self.vat):
             with using_bubble(self.repo):
                 yield
 
@@ -1148,6 +832,70 @@ class TownApp:
 
         return HypermediaResponse()
 
+    async def word_lookup_form(
+        self, word: Optional[str] = None, error: Optional[str] = None
+    ):
+        """Render the word lookup form and results if any."""
+        with base_shell("Word Lookup"):
+            with tag("div", classes="p-4"):
+                with tag("h1", classes="text-2xl font-bold mb-4"):
+                    text("WordNet Lookup")
+
+                # Form
+                with tag(
+                    "form",
+                    hx_get="/word",
+                    hx_target="this",
+                    hx_params="*",
+                    classes="mb-6",
+                ):
+                    with tag("div", classes="flex gap-2"):
+                        with tag(
+                            "input",
+                            type="text",
+                            name="word",
+                            value=word or "",
+                            placeholder="Enter a word...",
+                            classes=[
+                                "flex-grow p-2 border rounded",
+                                "dark:bg-gray-800 dark:text-white",
+                                "dark:border-gray-700 focus:border-blue-500",
+                                "focus:ring-blue-500 focus:outline-none",
+                            ],
+                        ):
+                            pass
+
+                        with tag(
+                            "button",
+                            type="submit",
+                            classes=[
+                                "px-4 py-2 bg-blue-500 text-white rounded",
+                                "hover:bg-blue-600",
+                                "dark:bg-blue-600 dark:hover:bg-blue-700",
+                                "focus:outline-none focus:ring-2",
+                                "focus:ring-blue-500 focus:ring-offset-2",
+                            ],
+                        ):
+                            text("Look up")
+
+        return HypermediaResponse()
+
+    async def word_lookup(self, word: str, pos: Optional[str] = None):
+        """Handle word lookup form submission."""
+        if not word.strip():
+            return await self.word_lookup_form(error="Please enter a word")
+
+        pos = pos if pos and pos.strip() else None
+
+        with vars.graph.bind(create_graph()):
+            for word_node in describe_word(word, pos):
+                pass
+
+            render_graph_view(vars.graph.get())
+            logger.info("word lookup", graph=vars.graph.get())
+
+            return HypermediaResponse()
+
 
 @contextmanager
 def in_request_graph(g: Graph):
@@ -1159,13 +907,13 @@ def town_app(
     base_url: str, bind: str, repo: BubbleRepo, root_actor=None
 ) -> FastAPI:
     """Create and return a FastAPI app for the town."""
-    app = TownApp(base_url, bind, repo)
+    app = Site(base_url, bind, repo)
     return app.get_fastapi_app()
 
 
 def count_outbound_links(graph: Graph, node: S) -> int:
     """Count outbound links from a node, excluding rdf:type."""
-    return len([p for p in graph.predicates(node) if p != RDF.type])
+    return len(list(graph.triples((node, None, None))))
 
 
 def count_inbound_links(graph: Graph, node: S) -> int:
@@ -1181,7 +929,7 @@ def get_traversal_order(graph: Graph) -> List[S]:
         inbound = count_inbound_links(graph, subject)
         outbound = count_outbound_links(graph, subject)
         # Score = outbound - inbound to prioritize high outbound, low inbound
-        link_scores[subject] = outbound - inbound
+        link_scores[subject] = -inbound  # outbound - inbound
 
     # Group nodes by type (URIRef vs BNode)
     typed_nodes = defaultdict(list)
@@ -1219,7 +967,7 @@ def is_did_key(graph: Graph, node: S) -> bool:
 def is_current_identity(node: S) -> bool:
     """Check if a node is the current town's identity."""
     try:
-        return node == hub.get().get_identity_uri()
+        return node == vat.get().get_identity_uri()
     except Exception:
         return False
 
@@ -1243,11 +991,22 @@ def get_node_classes(graph: Graph, node: S) -> str:
 
 def render_node(graph: Graph, node: S) -> None:
     """Render a single node with appropriate styling."""
-    with tag("div", classes=get_node_classes(graph, node)):
-        dataset = current_bubble.get().dataset
-        dataset.add_graph(graph)
-        data = get_subject_data(dataset, node, context=graph)
-        rdf_resource(node, data)
+    logger.info("rendering node", node=node)
+    visited = visited_resources.get()
+    if node in visited:
+        logger.info(
+            "node already visited",
+            node=node,
+            visited=visited,
+        )
+        return
+
+    with vars.in_graph(graph):
+        with tag("div", classes=get_node_classes(graph, node)):
+            dataset = vars.dataset.get()
+            dataset.add_graph(graph)
+            data = get_subject_data(dataset, node, context=graph)
+            rdf_resource(node, data)
 
 
 def render_graph_view(graph: Graph) -> None:
@@ -1262,6 +1021,13 @@ def render_graph_view(graph: Graph) -> None:
             typed_nodes.append(node)
         else:
             untyped_nodes.append(node)
+
+    logger.info(
+        "rendering graph",
+        graph=graph,
+        typed_nodes=typed_nodes,
+        untyped_nodes=untyped_nodes,
+    )
 
     with autoexpanding(5):
         with tag("div", classes="flex flex-col gap-4"):
@@ -1357,33 +1123,6 @@ def render_graph_summary(graph: Graph) -> None:
                             text(
                                 f"{str(rdf_type).split('#')[-1].split('/')[-1]} ({count})"
                             )
-
-
-@contextmanager
-def base_shell(title: str):
-    """Base shell layout with status bar showing town info like public key."""
-    with base_html(title):
-        with tag("div", classes="min-h-screen flex flex-col"):
-            # Status bar
-            with tag(
-                "div",
-                classes="bg-gray-900 text-white px-4 py-2 flex items-center justify-between",
-            ):
-                with tag("div", classes="flex items-center space-x-4"):
-                    with tag("div", classes="font-mono text-sm"):
-                        text("Identity: ")
-                        identity_uri = hub.get().get_identity_uri()
-                        with tag(
-                            "a",
-                            href=str(identity_uri),
-                            classes="font-medium text-emerald-400 hover:text-emerald-300",
-                        ):
-                            pubkey = hub.get().get_public_key_bytes()
-                            text(b64encode(pubkey).decode()[:12] + "...")
-
-            # Main content area
-            with tag("div", classes="flex-1"):
-                yield
 
 
 @html.div("min-h-screen bg-gray-50 dark:bg-gray-900")

@@ -84,6 +84,7 @@ dependencies = [
     "tenacity>=9.0.0",
     "pillow>=11.0.0",
     "google-genai>=0.2.1",
+    "wn>=0.11.0",
 ]
 
 [tool.uv.sources]

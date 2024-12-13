@@ -9,23 +9,21 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import Namespace, URIRef
+from rdflib import URIRef, Namespace
 from fastapi import FastAPI
 from rich.console import Console
 
-# import bubble
-
 import swash.vars as vars
+
 from swash.prfx import NT
 from swash.util import add
-from bubble.cert import generate_self_signed_cert
 from bubble.chat import BubbleChat
 from bubble.cred import get_anthropic_credential
 from bubble.logs import configure_logging
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.town import (
-    TownApp,
+    Site,
     SimpleSupervisor,
     spawn,
     txgraph,
@@ -129,11 +127,11 @@ def town(
             )
             vars.site.set(Namespace(base_url))
             async with loading_bubble_from(trio.Path(bubble_path)) as repo:
-                town = TownApp(base_url, bind, repo)
+                town = Site(base_url, bind, repo)
                 with town.install_context():
                     # Create and persist the town's identity
                     async with txgraph():
-                        town.system.create_identity_graph()
+                        town.vat.create_identity_graph()
 
                     supervisor = await spawn(
                         nursery,
@@ -144,7 +142,7 @@ def town(
 
                     # Link supervisor to the town's identity
                     async with txgraph():
-                        town.system.link_actor_to_identity(supervisor)
+                        town.vat.link_actor_to_identity(supervisor)
 
                     uptime = await spawn(
                         nursery,
@@ -154,7 +152,7 @@ def town(
 
                     # Link uptime actor to the town's identity
                     async with txgraph():
-                        town.system.link_actor_to_identity(uptime)
+                        town.vat.link_actor_to_identity(uptime)
 
                     add(URIRef(base_url), {NT.environs: supervisor})
                     add(URIRef(base_url), {NT.environs: uptime})

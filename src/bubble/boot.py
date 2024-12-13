@@ -12,22 +12,29 @@ import getpass
 
 from trio import Path
 from rdflib import OWL, RDFS, Graph, URIRef, Literal, RDF
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from swash import vars
 from swash.prfx import NT, SWA, PROV, UUID
 from swash.util import new
 from bubble.stat.stat import SystemInfo, gather_system_info
+from bubble.keys import create_identity_graph, generate_identity_uri
 
 
-async def describe_new_bubble(path: Path, bubble: URIRef) -> Graph:
+async def describe_new_bubble(
+    path: Path, bubble: URIRef, public_key: ed25519.Ed25519PublicKey
+) -> Graph:
     """Create a new bubble with a unique IRI."""
     info = await gather_system_info()
-    graph = await construct_bubble_graph(path, info, bubble)
+    graph = await construct_bubble_graph(path, info, bubble, public_key)
     return graph
 
 
 async def construct_bubble_graph(
-    path, info: SystemInfo, bubble: URIRef
+    path,
+    info: SystemInfo,
+    bubble: URIRef,
+    public_key: ed25519.Ed25519PublicKey,
 ) -> Graph:
     with vars.graph.bind(
         Graph(identifier=bubble, base=URIRef(str(bubble)))
@@ -35,6 +42,9 @@ async def construct_bubble_graph(
         vars.bind_prefixes(g)
 
         machine = SWA[info["machine_id"]]
+
+        # Create identity graph for the bubble
+        create_identity_graph(public_key, bubble)
 
         # Describe filesystem
         filesystem = new(
