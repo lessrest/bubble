@@ -219,7 +219,8 @@ class GraphRepo:
     def new_graph(self) -> Generator[URIRef, None, None]:
         """Create a new graph with a fresh URI and set it as the current graph."""
         graph_id = fresh_uri(self.namespace)
-        with context.bind_graph(graph_id, self):
+        graph = self.graph(graph_id)
+        with context.graph.bind(graph):
             yield graph_id
 
     @contextmanager
@@ -263,7 +264,8 @@ class GraphRepo:
             new(None, {PROV.qualifiedDerivation: deriv}, subject=graph_id)
 
             # Add agent association if present
-            if act and (agent := context.agent.get()):
+            agent = context.agent.get(None) if act else None
+            if act and agent:
                 new(None, {PROV.wasAssociatedWith: agent}, subject=act)
 
         with context.bind_graph(graph_id, self):
