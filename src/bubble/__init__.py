@@ -1,6 +1,6 @@
 # hmm
 
-from swash import prfx, mind, mint, vars
+from swash import prfx
 
 from . import (
     boot,
@@ -8,7 +8,6 @@ from . import (
     chat,
     repo,
     slop,
-    wiki,
     stat,
 )
 
@@ -22,12 +21,7 @@ __all__ = [
     "boot",
     "cred",
     "chat",
-    "mind",
-    "mint",
-    "prfx",
     "repo",
     "slop",
-    "vars",
-    "wiki",
     "stat",
 ]

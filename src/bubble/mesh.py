@@ -1,5 +1,8 @@
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
+
+import tenacity
 from bubble.keys import (
     create_identity_graph,
     generate_identity_uri,
@@ -12,7 +15,7 @@ from bubble.keys import (
 import structlog
 import trio
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from rdflib import PROV, Graph, Literal, Namespace, URIRef
+from rdflib import PROV, RDF, XSD, Graph, Literal, Namespace, URIRef
 from swash import Parameter, mint, vars
 from swash.prfx import DEEPGRAM, DID, NT
 from swash.util import add, new
@@ -20,6 +23,7 @@ from swash.util import add, new
 
 from collections import defaultdict
 from typing import (
+    Any,
     Awaitable,
     Callable,
     Dict,
@@ -28,6 +32,9 @@ from typing import (
     Optional,
     Set,
 )
+
+from bubble.repo import current_bubble
+from bubble.town import logger
 
 
 @dataclass
@@ -306,3 +313,185 @@ vat = Parameter[Vat]("hub")
 def get_base() -> URIRef:
     """Get the base URI from the current actor system."""
     return vat.get().site[""]
+
+
+async def spawn(
+    nursery: trio.Nursery,
+    action: Callable,
+    *args,
+    name: Optional[str] = None,
+):
+    system = vat.get()
+    return await system.spawn(nursery, action, *args, name=name)
+
+
+def this() -> URIRef:
+    return vat.get().this()
+
+
+async def send(actor: URIRef, message: Optional[Graph] = None):
+    system = vat.get()
+    if message is None:
+        message = vars.graph.get()
+    logger.info("sending message", actor=actor, graph=message)
+    return await system.send(actor, message)
+
+
+async def receive() -> Graph:
+    system = vat.get()
+    return await system.curr.get().recv.receive()
+
+
+class ServerActor[State]:
+    def __init__(self, state: State, name: Optional[str] = None):
+        self.state = state
+        self.name = name or self.__class__.__name__
+        self.stop = False
+
+    async def __call__(self):
+        """Main actor message processing loop with error handling."""
+        async with trio.open_nursery() as nursery:
+            try:
+                await self.init()
+                while not self.stop:
+                    msg = await receive()
+                    logger.info("received message", graph=msg)
+                    response = await self.handle(nursery, msg)
+                    logger.info("sending response", graph=response)
+
+                    for reply_to in msg.objects(msg.identifier, NT.replyTo):
+                        await send(URIRef(reply_to), response)
+            except Exception as e:
+                logger.error("actor message handling error", error=e)
+                raise
+
+    async def init(self):
+        pass
+
+    async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
+        raise NotImplementedError
+
+
+async def persist(graph: Graph):
+    """Persist a graph to the current bubble."""
+    bubble = current_bubble.get()
+    before_count = len(bubble.graph)
+    bubble.graph += graph
+    after_count = len(bubble.graph)
+
+    await bubble.save_graph()
+
+    logger.info(
+        "persisted graph",
+        before=before_count,
+        after=after_count,
+        added=after_count - before_count,
+        bubble_graph=bubble.graph,
+        graph=graph,
+    )
+
+
+@asynccontextmanager
+async def txgraph(graph: Optional[Graph] = None):
+    """Create a new transaction with a fresh graph that will be persisted."""
+    g = create_graph()
+    if graph is not None:
+        g += graph
+
+    with vars.graph.bind(g):
+        yield g
+
+    await persist(g)
+
+
+class SimpleSupervisor:
+    def __init__(self, actor: Callable):
+        self.actor = actor
+
+    async def __call__(self):
+        async with txgraph():
+            new(NT.Supervisor, {}, this())
+
+        def retry_sleep(retry_state: tenacity.RetryCallState) -> Any:
+            return logger.warning(
+                "supervised actor tree crashed; retrying after exponential backoff",
+                retrying=retry_state,
+            )
+
+        retry = tenacity.AsyncRetrying(
+            wait=tenacity.wait_exponential(multiplier=1, max=60),
+            retry=tenacity.retry_if_exception_type(
+                (trio.Cancelled, BaseExceptionGroup)
+            ),
+            before_sleep=retry_sleep,
+        )
+
+        async for attempt in retry:
+            with attempt:
+                async with trio.open_nursery() as nursery:
+                    logger.info("starting supervised actor tree")
+                    child = await spawn(nursery, self.actor)
+                    add(this(), {NT.supervises: child})
+
+
+async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
+    if payload is None:
+        payload = vars.graph.get()
+
+    sendchan, recvchan = trio.open_memory_channel[Graph](1)
+
+    tmp = fresh_uri()
+    vat.get().deck[tmp] = ActorContext(
+        boss=this(), addr=tmp, send=sendchan, recv=recvchan
+    )
+
+    payload.add((payload.identifier, NT.replyTo, tmp))
+
+    logger.info(
+        "sending request",
+        actor=actor,
+        graph=payload,
+    )
+
+    await send(actor, payload)
+
+    return await recvchan.receive()
+
+
+def record_message(type: str, actor: URIRef, g: Graph):
+    """Record a message in the graph."""
+    assert isinstance(g.identifier, URIRef)
+    new(
+        URIRef(type),
+        {
+            NT.created: Literal(
+                datetime.now(UTC).isoformat(), datatype=XSD.dateTime
+            ),
+            NT.target: actor,
+        },
+        g.identifier,
+    )
+
+
+class UptimeActor(ServerActor[datetime]):
+    """Actor that tracks and reports uptime since its creation."""
+
+    async def init(self):
+        self.state = datetime.now(UTC)
+        async with txgraph():
+            new(NT.UptimeActor, {}, this())
+
+    async def handle(self, nursery, graph: Graph) -> Graph:
+        request_id = graph.identifier
+        uptime = datetime.now(UTC) - self.state
+
+        g = create_graph()
+        g.add((g.identifier, RDF.type, NT.UptimeResponse))
+        g.add((g.identifier, NT.uptime, Literal(str(uptime))))
+        g.add((g.identifier, NT.isResponseTo, request_id))
+
+        # If there's a replyTo field, add it to response
+        for reply_to in graph.objects(request_id, NT.replyTo):
+            g.add((g.identifier, NT.replyTo, reply_to))
+
+        return g

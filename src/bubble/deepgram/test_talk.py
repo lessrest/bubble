@@ -1,18 +1,15 @@
 import json
 from datetime import UTC, datetime
-from typing import Optional
 
 import pytest
 import trio
 from rdflib import Graph, Literal, URIRef
-from rdflib.compare import isomorphic
-from rdflib.namespace import PROV, TIME, XSD
 
-from bubble.Vat import with_transient_graph
+from bubble.mesh import spawn, with_transient_graph
 from bubble.deepgram.json import Alternative, Channel, DeepgramMessage, Word
 from bubble.deepgram.talk import deepgram_transcription_receiver
-from bubble.town import send, spawn
-from swash.prfx import NT, VOX
+from bubble.mesh import send
+from swash.prfx import NT
 from swash.util import add
 
 EXPECTED_GRAPH = """

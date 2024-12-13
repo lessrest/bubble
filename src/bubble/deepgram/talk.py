@@ -51,14 +51,17 @@ from swash.util import (
     get_single_object,
 )
 from swash.vars import in_graph
-from bubble.Vat import get_base, with_transient_graph
-from bubble.time import make_instant, make_duration, make_interval
-from bubble.town import (
+from bubble.mesh import (
     ServerActor,
-    send,
-    this,
-    spawn,
+    get_base,
     receive,
+    send,
+    spawn,
+    this,
+    with_transient_graph,
+)
+from bubble.time import make_instant, make_duration, make_interval
+from bubble.mesh import (
     txgraph,
 )
 from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage

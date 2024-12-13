@@ -4,7 +4,7 @@ from swash.html import tag, text
 import json
 from contextlib import contextmanager
 
-from bubble.Vat import vat
+from bubble.mesh import vat
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",

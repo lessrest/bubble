@@ -17,6 +17,7 @@ import swash.vars as vars
 
 from swash.prfx import NT
 from swash.util import add
+from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.chat import BubbleChat
 from bubble.cred import get_anthropic_credential
 from bubble.logs import configure_logging
@@ -24,11 +25,8 @@ from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
 from bubble.town import (
     Site,
-    SimpleSupervisor,
-    spawn,
-    txgraph,
 )
-from bubble.uptime import UptimeActor
+from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
 
 console = Console(width=80)

@@ -14,16 +14,11 @@ from asgi_lifespan import LifespanManager
 from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
 from swash.util import is_a, bubble, get_single_object
+from bubble.mesh import ServerActor, call, receive, send, spawn, this
 from bubble.logs import configure_logging
 from bubble.repo import BubbleRepo, using_bubble_at
 from bubble.town import (
-    ServerActor,
     Site,
-    call,
-    send,
-    this,
-    spawn,
-    receive,
     town_app,
 )
 
