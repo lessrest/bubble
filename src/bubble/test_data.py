@@ -125,7 +125,7 @@ async def test_graph_repo_add_with_current_graph():
 
         # Save and reload to verify persistence
         await repo.save_all()
-        repo2 = GraphRepo(git)
+        repo2 = GraphRepo(git, namespace=EX)
         await repo2.load_all()
 
         graph2 = repo2.graph(graph_id)
