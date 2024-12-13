@@ -91,7 +91,7 @@ class RichConsoleRenderer:
             "Module", style="module", min_width=6, justify="center"
         )
         table.add_column(
-            "Level", style="white", min_width=6, justify="center"
+            "Level", style="white", min_width=8, justify="center"
         )
         table.add_column("Event", style="white")
         table.add_column(
@@ -281,6 +281,9 @@ class RichConsoleRenderer:
                 title_align="left",
             )
             self._console.print(panel, end="")
+        elif name == "debug":
+            # Make debug logs appear dim by using a Panel with dim style
+            self._console.print(content, style="dim", end="")
         else:
             self._console.print(content, end="\n")
 

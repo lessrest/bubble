@@ -1,4 +1,5 @@
 import pathlib
+import os
 
 from datetime import UTC, datetime
 from urllib.parse import urlparse
@@ -9,26 +10,32 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import FOAF, Literal, URIRef, Namespace
+from rdflib import FOAF, RDFS, Literal, URIRef, Namespace, PROV, DCAT
 from fastapi import FastAPI
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich import box
 
 import swash.vars as vars
 
 from swash.prfx import NT
-from swash.util import add, new
-from bubble.data import Git, Repository
+from swash.util import add, new, print_n3
+from bubble.data import Git, Repository, FROTH, context
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.chat import BubbleChat
 from bubble.cred import get_anthropic_credential
 from bubble.logs import configure_logging
 from bubble.repo import loading_bubble_from
 from bubble.slop import Claude
+from bubble.stat.stat import gather_system_info
 from bubble.town import (
     Site,
 )
 from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
+
+logger = configure_logging()
 
 console = Console(width=80)
 
@@ -60,21 +67,79 @@ def chat(
 
 
 @app.command()
-def repository(
+def shell(
     repo_path: str = RepoPath,
     namespace: str = Option(
         "https://example.com/", "--namespace", help="Namespace"
     ),
 ) -> None:
-    """Create a new repository."""
+    """Create a new repository and start a shell session."""
+
+    configure_logging()
 
     async def run():
-        git = Git(repo_path)
+        git = Git(trio.Path(repo_path))
         await git.init()
-        repo = Repository(git, namespace=Namespace(namespace))
-        with repo.new_graph():
-            new(FOAF.Person, {FOAF.name: Literal("John Doe")})
+        repo = await Repository.create(git, namespace=Namespace(namespace))
         await repo.save_all()
+        await repo.commit("new repository")
+
+        system_info = await gather_system_info()
+        user = system_info["user_info"]
+
+        with repo.new_agent(
+            NT.Account,
+            {
+                NT.owner: user,
+            },
+        ) as agent:
+            # Start a new shell session activity
+            with repo.new_activity(NT.InteractiveShellSession) as activity:
+                # Create a derived graph for the shell session
+                with repo.new_derived_graph(
+                    source_graph=repo.metadata_id
+                ) as derived_id:
+                    # Get the directory path for this graph
+                    graph_dir = repo.graph_dir(derived_id)
+                    await graph_dir.mkdir(parents=True, exist_ok=True)
+
+                    await repo.save_all()
+                    await repo.commit("new shell session")
+
+                    logger.info(
+                        "Starting shell session",
+                        graph=derived_id,
+                        activity=activity,
+                        directory=str(graph_dir),
+                    )
+
+                    ascii_002_ = "\u0002"
+
+                    # Start bash with environment variables set and cwd set to graph directory
+                    await trio.run_process(
+                        ["bash", "-i"],
+                        stdin=None,
+                        check=False,
+                        cwd=str(graph_dir),
+                        env={
+                            "BUBBLE": repo_path,
+                            "BUBBLE_GRAPH": str(derived_id),
+                            "BUBBLE_GRAPH_DIR": str(graph_dir),
+                            "PS1": r"\n\[\e[1m\]\[\e[34m\]"
+                            + derived_id.n3()
+                            + " @ "
+                            + system_info["hostname"]
+                            + r" \[\e[0m\]\[\e[1m\]\[\e[0m\]\n $ "
+                            + ascii_002_,
+                            "BASH_SILENCE_DEPRECATION_WARNING": "1",
+                            # Inherit parent environment
+                            **os.environ,
+                        },
+                    )
+
+                    # After shell exits, commit any changes
+                    await repo.save_all()
+                    await repo.commit("Update after shell session")
 
     trio.run(run)
 
@@ -200,9 +265,98 @@ def town(
         )
 
     def get_bash_prompt():
-        return r"\[\e[1m\][\[\e[32m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
+        return r"\[\e[1m\][\[\e[34m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
 
     trio.run(run)
+
+
+@app.command()
+def info() -> None:
+    """Display information about the current bubble environment and graphs."""
+    console = Console()
+
+    # Get environment variables
+    bubble_path = os.environ.get("BUBBLE")
+    bubble_graph = os.environ.get("BUBBLE_GRAPH")
+    bubble_graph_dir = os.environ.get("BUBBLE_GRAPH_DIR")
+
+    assert bubble_graph
+
+    # If no bubble environment variables are set
+    if not bubble_path:
+        console.print(
+            Panel(
+                "No bubble environment detected. Use [bold]bubble shell[/] to create one.",
+                title="Bubble Status",
+                border_style="yellow",
+            )
+        )
+        return
+
+    async def show_info():
+        # Load the repository
+        git = Git(trio.Path(bubble_path))
+        repo = await Repository.create(
+            git, namespace=Namespace("file://" + bubble_path + "/")
+        )
+        await repo.load_all()
+
+        # Create environment info table
+        env_table = Table(box=box.ROUNDED, title="Environment")
+        env_table.add_column("Key", style="bold blue")
+        env_table.add_column("Value")
+
+        env_table.add_row("Bubble Path", bubble_path)
+        if bubble_graph:
+            env_table.add_row("Current Graph", bubble_graph)
+        if bubble_graph_dir:
+            env_table.add_row("Graph Directory", bubble_graph_dir)
+
+        console.print(env_table)
+
+        # Create graphs info table
+        graphs_table = Table(box=box.ROUNDED, title="Graphs")
+        graphs_table.add_column("Graph", style="bold")
+        graphs_table.add_column("Type")
+        graphs_table.add_column("Created")
+        graphs_table.add_column("Files")
+
+        for graph_id in repo.list_graphs():
+            graph = repo.metadata
+
+            # Get graph type
+            graph_type = "Dataset"
+
+            # Get creation time
+            created = graph.value(graph_id, PROV.generatedAtTime)
+            if created and isinstance(created, Literal):
+                try:
+                    # Parse the datetime from the Literal value
+                    dt = datetime.fromisoformat(str(created))
+                    created_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except (ValueError, TypeError):
+                    created_str = str(created)
+            else:
+                created_str = "-"
+
+            # Count distributions (files)
+            file_count = len(
+                list(graph.objects(graph_id, DCAT.distribution))
+            )
+
+            graphs_table.add_row(
+                graph_id.n3(graph.namespace_manager),
+                graph_type,
+                created_str,
+                str(file_count),
+            )
+
+        console.print(graphs_table)
+
+        # Show the current graph
+        print_n3(repo.graph(URIRef(bubble_graph)), bubble_graph)
+
+    trio.run(show_info)
 
 
 if __name__ == "__main__":
