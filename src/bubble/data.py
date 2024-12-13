@@ -28,12 +28,6 @@ class context:
         with cls.graph.bind(graph), vars.in_graph(graph):
             yield graph
             
-    @classmethod
-    @contextmanager
-    def bind_metadata(cls, repo: "GraphRepo") -> Generator[Graph, None, None]:
-        """Bind the metadata graph as the current graph."""
-        with cls.bind_graph(repo.metadata_id, repo):
-            yield repo.metadata
 
 
 class Git:
@@ -121,6 +115,12 @@ class GraphRepo:
         self.dataset = dataset or Dataset(default_union=True)
         self.metadata_id = metadata_id
         self.metadata = self.dataset.graph(metadata_id)
+
+    @contextmanager
+    def using_metadata(self) -> Generator[Graph, None, None]:
+        """Bind the metadata graph as the current graph."""
+        with context.bind_graph(self.metadata_id, self):
+            yield self.metadata
 
     async def load_metadata(self) -> None:
         try:
@@ -238,7 +238,7 @@ class GraphRepo:
         act = activity if activity is not None else context.activity.get()
             
         # Temporarily bind metadata graph for adding provenance
-        with context.bind_metadata(self):
+        with self.using_metadata():
             # Create qualified derivation using new()
             deriv = new(
                 PROV.Derivation,
