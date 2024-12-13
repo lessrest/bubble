@@ -19,7 +19,7 @@ async def test_graph_repo_basics():
     with tempfile.TemporaryDirectory() as workdir:
         # Initialize Git and GraphRepo
         git = Git(workdir)
-        repo = GraphRepo(git)
+        repo = GraphRepo(git, namespace=EX)
 
         # Create and populate a test graph
         graph_id = EX.test
@@ -60,7 +60,7 @@ async def test_graph_repo_basics():
 async def test_graph_repo_new_derived_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git)
+        repo = GraphRepo(git, namespace=EX)
 
         # Create an initial graph
         source_graph_id = EX.source
@@ -103,7 +103,7 @@ async def test_graph_repo_add_with_current_graph():
     with tempfile.TemporaryDirectory() as workdir:
         # Initialize Git and GraphRepo
         git = Git(workdir)
-        repo = GraphRepo(git)
+        repo = GraphRepo(git, namespace=EX)
 
         # Create a test graph
         graph_id = EX.test
