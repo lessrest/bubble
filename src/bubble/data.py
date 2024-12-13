@@ -10,6 +10,8 @@ from rdflib import Dataset, Graph, URIRef, RDF, VOID, Literal, Namespace
 from rdflib.namespace import PROV
 from swash import vars
 
+FROTH = Namespace("https://node.town/ns/froth#")
+
 
 logger = structlog.get_logger()
 
@@ -241,7 +243,7 @@ class GraphRepo:
         with self.using_metadata():
             # Create qualified derivation using new()
             deriv = new(
-                PROV.Derivation,
+                [PROV.Derivation, FROTH.GraphDerivation],
                 {
                     PROV.entity: source,
                     PROV.hadActivity: act if act else None

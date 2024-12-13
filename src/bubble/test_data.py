@@ -1,7 +1,8 @@
 import os
 import tempfile
-from rdflib import URIRef, Literal, RDF, Namespace
+from rdflib import URIRef, Literal, RDF, Namespace 
 from rdflib.namespace import PROV
+from bubble.data import FROTH
 import pytest
 
 from .data import Git, GraphRepo, context
@@ -81,6 +82,10 @@ async def test_graph_repo_new_derived_graph():
         assert (derived_graph_id, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
         assert (derived_graph_id, PROV.wasGeneratedBy, activity) in repo.metadata
         assert (source_graph_id, PROV.wasInfluencedBy, activity) in repo.metadata
+        
+        # Verify the derivation has our custom type
+        derivations = list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))
+        assert len(derivations) == 1
 
         # Test deriving using current context
         with context.bind_graph(source_graph_id, repo):
