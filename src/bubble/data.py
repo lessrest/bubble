@@ -5,7 +5,8 @@ from swash.mint import fresh_uri
 import structlog
 import trio
 import os
-from rdflib import Dataset, Graph, URIRef, RDF, VOID, Literal
+from rdflib import Dataset, Graph, URIRef, RDF, VOID, Literal, Namespace
+from rdflib.namespace import PROV
 from swash import vars
 
 
@@ -191,6 +192,14 @@ class GraphRepo:
     def new_graph(self) -> Generator[URIRef, None, None]:
         """Create a new graph with a fresh URI and set it as the current graph."""
         graph_id = fresh_uri()
+        with current_graph.bind(graph_id):
+            yield graph_id
+
+    @contextmanager
+    def new_derived_graph(self, source_graph: URIRef) -> Generator[URIRef, None, None]:
+        """Create a new graph derived from an existing graph, recording the provenance relation."""
+        graph_id = fresh_uri()
+        self.metadata.add((graph_id, PROV.wasDerivedFrom, source_graph))
         with current_graph.bind(graph_id):
             yield graph_id
 

@@ -56,6 +56,27 @@ async def test_graph_repo_basics():
         )
 
 
+async def test_graph_repo_new_derived_graph():
+    with tempfile.TemporaryDirectory() as workdir:
+        git = Git(workdir)
+        repo = GraphRepo(git)
+
+        # Create an initial graph
+        source_graph_id = EX.source
+        source_graph = repo.graph(source_graph_id)
+        source_graph.add((EX.subject, RDF.type, EX.Type))
+
+        # Create a derived graph using the context manager
+        with repo.new_derived_graph(source_graph_id) as derived_graph_id:
+            repo.add((EX.subject, EX.label, Literal("Derived")))
+
+        # Verify the derived graph contains our new triple
+        derived_graph = repo.graph(derived_graph_id)
+        assert (EX.subject, EX.label, Literal("Derived")) in derived_graph
+
+        # Verify the provenance relation was recorded
+        assert (derived_graph_id, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
+
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
