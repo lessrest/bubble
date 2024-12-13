@@ -56,6 +56,25 @@ async def test_graph_repo_basics():
         )
 
 
+async def test_graph_repo_new_graph():
+    with tempfile.TemporaryDirectory() as workdir:
+        git = Git(workdir)
+        repo = GraphRepo(git)
+
+        # Use the new_graph context manager
+        with repo.new_graph() as graph_id:
+            repo.add((EX.subject, RDF.type, EX.Type))
+            repo.add((EX.subject, EX.label, Literal("Test")))
+
+        # Verify the graph was created and contains our triples
+        graph = repo.graph(graph_id)
+        assert len(graph) == 2
+        assert (EX.subject, RDF.type, EX.Type) in graph
+        assert (EX.subject, EX.label, Literal("Test")) in graph
+
+        # Verify the graph is registered in metadata
+        assert graph_id in repo.list_graphs()
+
 async def test_graph_repo_add_with_current_graph():
     # Create a temporary directory for the test repo
     with tempfile.TemporaryDirectory() as workdir:

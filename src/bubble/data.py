@@ -1,6 +1,7 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import subprocess
-from typing import Optional, Iterator
+from typing import Optional, Iterator, Generator
+from swash.mint import fresh_uri
 import structlog
 import trio
 import os
@@ -185,6 +186,13 @@ class GraphRepo:
             raise ValueError("No current graph set")
         graph = self.graph(graph_id)
         graph.add(triple)
+
+    @contextmanager
+    def new_graph(self) -> Generator[URIRef, None, None]:
+        """Create a new graph with a fresh URI and set it as the current graph."""
+        graph_id = fresh_uri()
+        with current_graph.bind(graph_id):
+            yield graph_id
 
 
 @asynccontextmanager
