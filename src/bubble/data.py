@@ -13,8 +13,10 @@ from swash import vars
 logger = structlog.get_logger()
 
 
-current_graph = vars.Parameter["URIRef"]("current_graph")
-current_activity = vars.Parameter["URIRef"]("current_activity")
+class context:
+    """Manages the current graph and activity context."""
+    graph = vars.Parameter["URIRef"]("current_graph")
+    activity = vars.Parameter["URIRef"]("current_activity")
 
 
 class Git:
@@ -185,7 +187,7 @@ class GraphRepo:
 
     def add(self, triple: tuple[URIRef, URIRef, URIRef | Literal]) -> None:
         """Add a triple to the current graph."""
-        graph_id = current_graph.get()
+        graph_id = context.graph.get()
         if not graph_id:
             raise ValueError("No current graph set")
         graph = self.graph(graph_id)
@@ -195,7 +197,7 @@ class GraphRepo:
     def new_graph(self) -> Generator[URIRef, None, None]:
         """Create a new graph with a fresh URI and set it as the current graph."""
         graph_id = fresh_uri(self.namespace)
-        with current_graph.bind(graph_id):
+        with context.graph.bind(graph_id):
             yield graph_id
 
     @contextmanager
@@ -211,11 +213,11 @@ class GraphRepo:
             activity: Optional activity that caused this derivation. Defaults to current_activity.
         """
         graph_id = fresh_uri(self.namespace)
-        source = source_graph if source_graph is not None else current_graph.get()
+        source = source_graph if source_graph is not None else context.graph.get()
         if source is None:
             raise ValueError("No source graph specified and no current graph set")
             
-        act = activity if activity is not None else current_activity.get()
+        act = activity if activity is not None else context.activity.get()
             
         self.metadata.add((graph_id, PROV.wasDerivedFrom, source))
         if act:
