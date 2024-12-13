@@ -417,13 +417,13 @@ def render_property_label(predicate):
     "border border-gray-300 dark:border-slate-900",
 )
 def render_resource_header(subject, data):
-    render_value(subject)
     if data and data["type"]:
         with tag("span"):
             dataset = vars.dataset.get()
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):
                 render_value(type_label or data["type"])
+    render_value(subject)
 
 
 @html.ul(

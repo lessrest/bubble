@@ -6,18 +6,15 @@ Uses the wn library to access WordNet data.
 from typing import Optional, Generator
 
 from wn import Lexicon, Wordnet
-from rdflib import RDFS, URIRef, Literal, Namespace, VOID, PROV
+from rdflib import RDFS, URIRef, Literal, Namespace, VOID
 from swash.util import new, add
 from swash.prfx import SWA
-from html import escape
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 # Define WordNet namespace based on W3C spec
 WN = Namespace("http://www.w3.org/2006/03/wn/wn20/schema/")
-
-en = Wordnet(lang="en")  # English WordNet
 
 
 def describe_lexicon(lexicon: Lexicon) -> Optional[URIRef]:
@@ -45,6 +42,7 @@ def describe_word(
         URIRef: URI for each matching word resource
     """
     logger.info("looking up word in WordNet", word=word, pos=pos)
+    en = Wordnet(lang="en")  # English WordNet
 
     # Look up the word
     words = en.words(word, pos=pos)

@@ -3,9 +3,10 @@ import tempfile
 from pathlib import Path
 
 from rdflib import Graph, Namespace
-from swash.desc import new_dataset, resource, has, label
+from swash.desc import new_dataset, has, label
 from swash.rdfa import autoexpanding, rdf_resource
 from swash.html import document, Fragment, root
+from swash.util import new
 
 EX = Namespace("http://example.org/")
 
@@ -13,14 +14,14 @@ EX = Namespace("http://example.org/")
 def test_rdfa_roundtrip():
     # Create a simple test graph
     with new_dataset() as g:
-        with resource(EX.TestType) as subject:
-            label("Test Label")
-            has(EX.property, "Test Value")
+        subject = new(EX.TestType)
+        label("Test Label")
+        has(EX.property, "Test Value")
 
         # Render the graph to HTML with RDFa
         with document():
             with autoexpanding(4):
-                rdf_resource(subject.node)
+                rdf_resource(subject)
 
             # Get the rendered HTML
             doc = root.get()

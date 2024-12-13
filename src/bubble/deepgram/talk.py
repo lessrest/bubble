@@ -40,11 +40,10 @@ from rdflib import XSD, Graph, URIRef, Literal, IdentifiedNode
 from trio_websocket import WebSocketConnection, open_websocket_url, Endpoint
 from rdflib.namespace import PROV, TIME
 
-from swash.desc import has, has_type, resource
-from swash.mint import fresh_iri, fresh_uri
 from swash.prfx import NT, TALK, Deepgram
 from swash.util import (
     add,
+    blank,
     new,
     is_a,
     decimal,
@@ -256,33 +255,41 @@ class DeepgramClientActor(ServerActor[str]):
                 logger.info("Spawned session actor", session=session)
                 assert isinstance(result.identifier, URIRef)
 
-                with resource(
-                    fresh_uri(graph), a=NT.UploadEndpoint
-                ) as endpoint:
-                    add(root, {NT.has: session})
-                    add(root, {NT.has: results})
-                    add(root, {NT.has: endpoint.node})
-                    has(NT.method, NT.WebSocket)
-                    has(NT.accepts, NT.AudioData)
-                    ws_url = (
-                        str(session).replace("https://", "wss://")
-                        + "/upload"
-                    )
-                    logger.info("WebSocket URL", url=ws_url)
-                    has(NT.url, ws_url)
+                endpoint = blank(
+                    NT.UploadEndpoint,
+                    {
+                        NT.method: NT.WebSocket,
+                        NT.accepts: NT.AudioData,
+                    },
+                )
+                add(root, {NT.has: session})
+                add(root, {NT.has: results})
+                add(root, {NT.has: endpoint})
+                ws_url = (
+                    str(session).replace("https://", "wss://") + "/upload"
+                )
+                logger.info("WebSocket URL", url=ws_url)
+                add(endpoint, {NT.url: ws_url})
 
             logger.info("Returning result", result=result)
             return result
 
 
 def create_affordance_button(deepgram_client: URIRef):
-    with resource(deepgram_client, Deepgram.Client) as client:
-        with has(NT.affordance, fresh_iri()):
-            has_type(NT.Button)
-            has(NT.label, Literal("Start", "en"))
-            has(NT.message, URIRef(Deepgram.Start))
-            has(NT.target, deepgram_client)
-        return client.node
+    return new(
+        Deepgram.Client,
+        {
+            NT.affordance: blank(
+                NT.Button,
+                {
+                    NT.label: Literal("Start", "en"),
+                    NT.message: URIRef(Deepgram.Start),
+                    NT.target: deepgram_client,
+                },
+            )
+        },
+        subject=deepgram_client,
+    )
 
 
 async def receive_results(

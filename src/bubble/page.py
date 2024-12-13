@@ -118,7 +118,7 @@ def base_shell(title: str):
                             ],
                         ):
                             pubkey = vat.get().get_public_key_bytes()
-                            text(b64encode(pubkey).decode())
+                            text(b64encode(pubkey).decode()[0:8])
 
                     # Site URL
                     with tag("div", classes="flex flex-col"):

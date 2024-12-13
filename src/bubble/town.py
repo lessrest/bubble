@@ -928,8 +928,7 @@ def get_traversal_order(graph: Graph) -> List[S]:
     for subject in graph.subjects():
         inbound = count_inbound_links(graph, subject)
         outbound = count_outbound_links(graph, subject)
-        # Score = outbound - inbound to prioritize high outbound, low inbound
-        link_scores[subject] = -inbound  # outbound - inbound
+        link_scores[subject] = outbound / 2 - inbound * 2
 
     # Group nodes by type (URIRef vs BNode)
     typed_nodes = defaultdict(list)
@@ -1029,7 +1028,7 @@ def render_graph_view(graph: Graph) -> None:
         untyped_nodes=untyped_nodes,
     )
 
-    with autoexpanding(5):
+    with autoexpanding(2):
         with tag("div", classes="flex flex-col gap-4"):
             # First pass - render typed nodes
             for node in typed_nodes:

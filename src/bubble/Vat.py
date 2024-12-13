@@ -14,9 +14,8 @@ import trio
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rdflib import PROV, Graph, Literal, Namespace, URIRef
 from swash import Parameter, mint, vars
-from swash.desc import has, resource
 from swash.prfx import DEEPGRAM, DID, NT
-from swash.util import new
+from swash.util import add, new
 
 
 from collections import defaultdict
@@ -298,8 +297,7 @@ class Vat:
 
     def link_actor_to_identity(self, actor: URIRef):
         """Create a graph linking an actor to this town's identity."""
-        with resource(self.identity_uri):
-            has(PROV.started, actor)
+        add(self.identity_uri, {PROV.started: actor})
 
 
 vat = Parameter[Vat]("hub")
