@@ -18,18 +18,20 @@ logger = structlog.get_logger()
 
 class context:
     """Manages the current graph, activity and agent context."""
+
     graph = vars.Parameter["Graph"]("current_graph")
-    activity = vars.Parameter["URIRef"]("current_activity") 
+    activity = vars.Parameter["URIRef"]("current_activity")
     agent = vars.Parameter["URIRef"]("current_agent")
-    
+
     @classmethod
-    @contextmanager 
-    def bind_graph(cls, graph_id: URIRef, repo: "GraphRepo") -> Generator[Graph, None, None]:
+    @contextmanager
+    def bind_graph(
+        cls, graph_id: URIRef, repo: "GraphRepo"
+    ) -> Generator[Graph, None, None]:
         """Bind both the context graph and the legacy vars graph parameter."""
         graph = repo.graph(graph_id)
         with cls.graph.bind(graph), vars.in_graph(graph):
             yield graph
-            
 
 
 class Git:
@@ -222,43 +224,47 @@ class GraphRepo:
 
     @contextmanager
     def new_derived_graph(
-        self, 
+        self,
         source_graph: Optional[URIRef] = None,
-        activity: Optional[URIRef] = None
+        activity: Optional[URIRef] = None,
     ) -> Generator[URIRef, None, None]:
         """Create a new graph derived from an existing graph, recording the provenance relation.
-        
+
         Args:
             source_graph: The graph this is derived from. Defaults to current_graph.
             activity: Optional activity that caused this derivation. Defaults to current_activity.
         """
         graph_id = fresh_uri(self.namespace)
-        source = source_graph if source_graph is not None else context.graph.get()
+        source = (
+            source_graph
+            if source_graph is not None
+            else context.graph.get()
+        )
         if source is None:
-            raise ValueError("No source graph specified and no current graph set")
-            
+            raise ValueError(
+                "No source graph specified and no current graph set"
+            )
+
         act = activity if activity is not None else context.activity.get()
-            
+
         # Temporarily bind metadata graph for adding provenance
         with self.using_metadata():
             # Create qualified derivation using new()
             deriv = new(
-                [PROV.Derivation, FROTH.GraphDerivation],
+                FROTH.GraphDerivation,
                 {
                     PROV.entity: source,
-                    PROV.hadActivity: act if act else None
+                    PROV.hadActivity: act if act else None,
                 },
-                subject=fresh_uri(self.namespace)
+                subject=fresh_uri(self.namespace),
             )
-            
+
             # Link the derivation
             new(None, {PROV.qualifiedDerivation: deriv}, subject=graph_id)
-            
+
             # Add agent association if present
             if act and (agent := context.agent.get()):
                 new(None, {PROV.wasAssociatedWith: agent}, subject=act)
-            
+
         with context.bind_graph(graph_id, self):
             yield graph_id
-
-
