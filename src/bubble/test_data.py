@@ -60,12 +60,11 @@ async def test_graph_repo_new_derived_graph():
         repo = GraphRepo(git, namespace=EX)
 
         # Create an initial graph
-        source_graph_id = EX.source
-        source_graph = repo.graph(source_graph_id)
-        source_graph.add((EX.subject, RDF.type, EX.Type))
+        with repo.new_graph() as source_graph_id:
+            repo.add((EX.subject, RDF.type, EX.Type))
 
         # Test explicit source graph
-        activity = EX.activity1
+        activity = EX.activity1 
         with repo.new_derived_graph(
             source_graph_id, activity=activity
         ) as derived_graph_id:
@@ -151,15 +150,12 @@ async def test_graph_repo_add_with_current_graph():
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
 
-        # Create a test graph
-        graph_id = EX.test
-
         # Test that adding without setting current_graph raises error
         with pytest.raises(Exception):
             repo.add((EX.subject, RDF.type, EX.Type))
 
-        # Set current graph and add a triple
-        with context.graph.bind(repo.graph(graph_id)):
+        # Create a new graph and add triples
+        with repo.new_graph() as graph_id:
             repo.add((EX.subject, RDF.type, EX.Type))
             repo.add((EX.subject, EX.label, Literal("Test")))
 
