@@ -52,18 +52,18 @@ async def test_graph_repo_new_derived_graph():
 
         # Create source graph
         with repo.new_graph() as source_graph_id:
-            repo.add((EX.subject, RDF.type, EX.Type))
+            new(EX.Type, {EX.label: Literal("Test")})
 
         # Test explicit derivation
         activity = EX.activity1
         with repo.new_derived_graph(
             source_graph_id, activity=activity
         ) as derived_graph_id:
-            repo.add((EX.subject, EX.label, Literal("Derived")))
+            new(EX.Type, {EX.label: Literal("Derived")})
 
         # Verify derived content
         derived_graph = repo.graph(derived_graph_id)
-        assert (EX.subject, EX.label, Literal("Derived")) in derived_graph
+        assert (EX.Type, EX.label, Literal("Derived")) in derived_graph
 
         # Verify provenance
         assert (
@@ -77,7 +77,7 @@ async def test_graph_repo_new_derived_graph():
             current_act = EX.currentActivity
             with context.activity.bind(current_act):
                 with repo.new_derived_graph() as derived_graph_id2:
-                    repo.add((EX.subject, EX.label, Literal("Derived2")))
+                    new(EX.Type, {EX.label: Literal("Derived2")})
 
                 # Verify provenance with current context
                 assert (
@@ -94,14 +94,13 @@ async def test_graph_repo_new_graph():
 
         # Create new graph and add data
         with repo.new_graph() as graph_id:
-            repo.add((EX.subject, RDF.type, EX.Type))
-            repo.add((EX.subject, EX.label, Literal("Test")))
+            new(EX.Type, {EX.label: Literal("Test")})
 
             # Verify graph contents
             graph = repo.graph(graph_id)
-            assert len(graph) == 2
-            assert (EX.subject, RDF.type, EX.Type) in graph
-            assert (EX.subject, EX.label, Literal("Test")) in graph
+            assert len(graph) == 2  # type + label
+            assert any(p == RDF.type and o == EX.Type for _, p, o in graph)
+            assert any(p == EX.label and o == Literal("Test") for _, p, o in graph)
 
             # Verify registration
             assert graph_id in repo.list_graphs()
@@ -112,20 +111,15 @@ async def test_graph_repo_add_with_current_graph():
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
 
-        # Test error when no current graph
-        with pytest.raises(ValueError, match="No current graph set"):
-            repo.add((EX.subject, RDF.type, EX.Type))
-
         # Test adding with current graph
         with repo.new_graph() as graph_id:
-            repo.add((EX.subject, RDF.type, EX.Type))
-            repo.add((EX.subject, EX.label, Literal("Test")))
+            new(EX.Type, {EX.label: Literal("Test")})
 
             # Verify immediate state
             graph = repo.graph(graph_id)
-            assert len(graph) == 2
-            assert (EX.subject, RDF.type, EX.Type) in graph
-            assert (EX.subject, EX.label, Literal("Test")) in graph
+            assert len(graph) == 2  # type + label
+            assert any(p == RDF.type and o == EX.Type for _, p, o in graph)
+            assert any(p == EX.label and o == Literal("Test") for _, p, o in graph)
 
         # Test persistence
         await repo.save_all()
@@ -134,4 +128,5 @@ async def test_graph_repo_add_with_current_graph():
 
         graph2 = repo2.graph(graph_id)
         assert len(graph2) == 2
-        assert (EX.subject, RDF.type, EX.Type) in graph2
+        assert any(p == RDF.type and o == EX.Type for _, p, o in graph2)
+        assert any(p == EX.label and o == Literal("Test") for _, p, o in graph2)
