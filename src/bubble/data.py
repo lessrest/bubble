@@ -224,7 +224,7 @@ class GraphRepo:
             self.metadata.add((graph_id, PROV.wasGeneratedBy, act))
             self.metadata.add((source, PROV.wasInfluencedBy, act))
             
-        with current_graph.bind(graph_id):
+        with context.graph.bind(graph_id):
             yield graph_id
 
 
