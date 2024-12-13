@@ -4,6 +4,9 @@ import os
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
+from fastapi import FastAPI
+import swash
+from swash import html
 import trio
 import typer
 import hypercorn
@@ -11,7 +14,6 @@ import hypercorn.trio
 
 from typer import Option
 from rdflib import Literal, URIRef, Namespace, PROV, DCAT
-from fastapi import FastAPI
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -20,7 +22,7 @@ from rich import box
 import swash.vars as vars
 
 from swash.prfx import NT
-from swash.util import add, print_n3
+from swash.util import add
 from bubble.data import Git, Repository
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.chat import BubbleChat
@@ -34,6 +36,8 @@ from bubble.town import (
 )
 from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
+from swash.lynx import render_html
+from swash.rdfa import autoexpanding, rdf_resource
 
 logger = configure_logging()
 
@@ -275,7 +279,7 @@ def town(
 @app.command()
 def info() -> None:
     """Display information about the current bubble environment and graphs."""
-    console = Console()
+    console = Console(width=78)
 
     # Get environment variables
     bubble_path = os.environ.get("BUBBLE")
@@ -360,14 +364,31 @@ def info() -> None:
 
         console.print(graphs_table)
 
-        # Show the current activity
-        print_n3(repo.graph(URIRef(bubble_activity)), "Activity")
+        # Show the current activity using the lynx renderer
+        activity_uri = URIRef(bubble_activity)
+        with html.document() as doc:
+            with swash.vars.dataset.bind(repo.dataset):
+                rdf_resource(activity_uri)
+                #                from pudb import set_trace
 
-        # Show the current agent
-        print_n3(repo.graph(URIRef(bubble_agent)), "Agent")
+                #               set_trace()
+                render_html(doc.element, console)
 
-        # Show the current graph
-        print_n3(repo.graph(URIRef(bubble_graph)), "Graph")
+        # Show the current agent using the lynx renderer
+        agent_uri = URIRef(bubble_agent)
+        with html.document() as doc:
+            with swash.vars.dataset.bind(repo.dataset):
+                rdf_resource(agent_uri)
+                render_html(doc.element, console)
+
+        # Show the current graph using the lynx renderer
+        graph_uri = URIRef(bubble_graph)
+        with html.document() as doc:
+            with swash.vars.dataset.bind(repo.dataset):
+                with autoexpanding(4):
+                    rdf_resource(graph_uri)
+                #                print(doc.to_html(compact=False))
+                render_html(doc.element, console)
 
     trio.run(show_info)
 

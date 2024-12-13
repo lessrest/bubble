@@ -90,8 +90,10 @@ def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
 def get_subject_data(
     dataset: Optional[Dataset], subject: S, context: Optional[Graph] = None
 ) -> Dict[str, Optional[S]]:
+    #    set_trace()
+
     data = {"type": None, "predicates": []}
-    graph = context or vars.graph.get()
+    graph = context or dataset or vars.graph.get()
     assert isinstance(graph, Graph)
     for predicate, obj in graph.predicate_objects(subject):
         if predicate == RDF.type:
@@ -151,6 +153,7 @@ def group_triples(
     return sorted(grouped_triples.items())
 
 
+@html.dd("flex flex-col")
 def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
     dataset = vars.dataset.get()
     if isinstance(subject, BNode):
@@ -195,6 +198,13 @@ def get_rdf_resource(subject: str) -> None:
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
         data = get_subject_data(vars.dataset.get(), subject)
+
+    # logger.info(
+    #     "Rendering resource",
+    #     subject=subject,
+    #     data=data,
+    #     graph=vars.dataset.get(),
+    # )
 
     if data["type"] == NT.Image:
         render_image_resource(subject, data)
@@ -338,7 +348,7 @@ def render_button_resource(subject, data):
         text(label)
 
 
-@html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
+# @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
 def render_properties(data):
     if not data["predicates"]:
         classes("contents")
@@ -366,26 +376,27 @@ def render_properties(data):
                     render_property(predicate, obj)
 
 
-@html.div("flex flex-col")
+# @html.dd("flex flex-col")
 def render_property_with_multiple_literals(predicate, literals):
     render_property_label(predicate)
-    with tag("ul", classes="list-none"):
-        # Sort literals by language preference
-        prefs = language_preferences.get()
-        sorted_literals = sorted(
-            literals,
-            key=lambda x: [
-                prefs.index(x.language) if x.language else 0,
-                x.language or "",
-                x.value,
-            ],
-        )
-        for obj in sorted_literals:
-            with tag("li", classes="ml-2"):
-                render_value(obj, predicate)
+    with tag("dd"):
+        with tag("ul", classes="list-none"):
+            # Sort literals by language preference
+            prefs = language_preferences.get()
+            sorted_literals = sorted(
+                literals,
+                key=lambda x: [
+                    prefs.index(x.language) if x.language else 0,
+                    x.language or "",
+                    x.value,
+                ],
+            )
+            for obj in sorted_literals:
+                with tag("li", classes="ml-2"):
+                    render_value(obj, predicate)
 
 
-@html.div("flex flex-col")
+# @html.dd("flex flex-col")
 def render_property(predicate, obj):
     attr("property", str(predicate))
     if isinstance(obj, Literal):
@@ -405,6 +416,7 @@ def render_property(predicate, obj):
 inside_property_label = vars.Parameter("inside_property_label", False)
 
 
+@html.dt("flex flex-col")
 def render_property_label(predicate):
     dataset = vars.dataset.get()
     label = get_label(dataset, predicate)

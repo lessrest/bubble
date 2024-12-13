@@ -261,7 +261,7 @@ class Repository:
         git: Git,
         namespace: Namespace,
         dataset: Optional[Dataset] = None,
-        metadata_id: URIRef = URIRef("urn:x-meta:"),
+        metadata_id: URIRef = URIRef("urn:x-bubble:meta"),
     ) -> "Repository":
         """Factory method to create a new Repository instance."""
         self = cls.__new__(cls)
