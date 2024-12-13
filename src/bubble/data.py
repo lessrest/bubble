@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager
 import subprocess
 from typing import Optional, Iterator, Generator
 from swash.mint import fresh_uri
@@ -206,11 +206,3 @@ class GraphRepo:
             yield graph_id
 
 
-@asynccontextmanager
-async def using_repo(git: Git):
-    repo = GraphRepo(git)
-    await repo.load_all()
-    try:
-        yield repo
-    finally:
-        await repo.save_all()
