@@ -83,7 +83,7 @@ async def test_graph_repo_new_derived_graph():
         assert (source_graph_id, PROV.wasInfluencedBy, activity) in repo.metadata
 
         # Test deriving using current context
-        with context.graph.bind(source_graph_id):
+        with context.bind_graph(source_graph_id, repo):
             current_act = EX.currentActivity
             with context.activity.bind(current_act):
                 with repo.new_derived_graph() as derived_graph_id2:
@@ -129,7 +129,7 @@ async def test_graph_repo_add_with_current_graph():
             repo.add((EX.subject, RDF.type, EX.Type))
 
         # Set current graph and add a triple
-        with context.graph.bind(graph_id):
+        with context.bind_graph(graph_id, repo):
             repo.add((EX.subject, RDF.type, EX.Type))
             repo.add((EX.subject, EX.label, Literal("Test")))
 

@@ -15,16 +15,17 @@ logger = structlog.get_logger()
 
 class context:
     """Manages the current graph, activity and agent context."""
-    graph = vars.Parameter["URIRef"]("current_graph")
+    graph = vars.Parameter["Graph"]("current_graph")
     activity = vars.Parameter["URIRef"]("current_activity") 
     agent = vars.Parameter["URIRef"]("current_agent")
     
     @classmethod
     @contextmanager
-    def bind_graph(cls, graph_id: URIRef) -> Generator[URIRef, None, None]:
+    def bind_graph(cls, graph_id: URIRef, repo: "GraphRepo") -> Generator[Graph, None, None]:
         """Bind both the context graph and the legacy vars graph parameter."""
-        with cls.graph.bind(graph_id), vars.in_graph(graph_id):
-            yield graph_id
+        graph = repo.graph(graph_id)
+        with cls.graph.bind(graph), vars.in_graph(graph_id):
+            yield graph
 
 
 class Git:
@@ -195,17 +196,16 @@ class GraphRepo:
 
     def add(self, triple: tuple[URIRef, URIRef, URIRef | Literal]) -> None:
         """Add a triple to the current graph."""
-        graph_id = context.graph.get()
-        if not graph_id:
+        graph = context.graph.get()
+        if not graph:
             raise ValueError("No current graph set")
-        graph = self.graph(graph_id)
         graph.add(triple)
 
     @contextmanager
     def new_graph(self) -> Generator[URIRef, None, None]:
         """Create a new graph with a fresh URI and set it as the current graph."""
         graph_id = fresh_uri(self.namespace)
-        with context.bind_graph(graph_id):
+        with context.bind_graph(graph_id, self):
             yield graph_id
 
     @contextmanager
@@ -239,7 +239,7 @@ class GraphRepo:
             if agent:
                 self.metadata.add((act, PROV.wasAssociatedWith, agent))
             
-        with context.bind_graph(graph_id):
+        with context.bind_graph(graph_id, self):
             yield graph_id
 
 
