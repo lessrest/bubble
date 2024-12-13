@@ -9,14 +9,15 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import URIRef, Namespace
+from rdflib import FOAF, Literal, URIRef, Namespace
 from fastapi import FastAPI
 from rich.console import Console
 
 import swash.vars as vars
 
 from swash.prfx import NT
-from swash.util import add
+from swash.util import add, new
+from bubble.data import Git, Repository
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.chat import BubbleChat
 from bubble.cred import get_anthropic_credential
@@ -39,6 +40,7 @@ app = typer.Typer(
 home = pathlib.Path.home()
 
 BubblePath = Option(str(home / "bubble"), "--bubble", help="Bubble path")
+RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
 
 
 @app.command()
@@ -53,6 +55,26 @@ def chat(
             claude = Claude(credential)
             bubble_chat = BubbleChat(claude, console)
             await bubble_chat.run()
+
+    trio.run(run)
+
+
+@app.command()
+def repository(
+    repo_path: str = RepoPath,
+    namespace: str = Option(
+        "https://example.com/", "--namespace", help="Namespace"
+    ),
+) -> None:
+    """Create a new repository."""
+
+    async def run():
+        git = Git(repo_path)
+        await git.init()
+        repo = Repository(git, namespace=Namespace(namespace))
+        with repo.new_graph():
+            new(FOAF.Person, {FOAF.name: Literal("John Doe")})
+        await repo.save_all()
 
     trio.run(run)
 

@@ -1,8 +1,9 @@
 from contextlib import contextmanager
+from datetime import datetime
 import subprocess
-from typing import Optional, Iterator, Generator
+from typing import Callable, Optional, Iterator, Generator
 from swash.mint import fresh_uri
-from swash.util import new
+from swash.util import O, add, new
 import structlog
 import trio
 import os
@@ -22,11 +23,12 @@ class context:
     graph = vars.Parameter["Graph"]("current_graph")
     activity = vars.Parameter["URIRef"]("current_activity")
     agent = vars.Parameter["URIRef"]("current_agent")
+    clock = vars.Parameter[Callable[[], O]]("current_clock")
 
     @classmethod
     @contextmanager
     def bind_graph(
-        cls, graph_id: URIRef, repo: "GraphRepo"
+        cls, graph_id: URIRef, repo: "Repository"
     ) -> Generator[Graph, None, None]:
         """Bind both the context graph and the legacy vars graph parameter."""
         graph = repo.graph(graph_id)
@@ -34,11 +36,18 @@ class context:
             yield graph
 
 
+context.clock.set(lambda: Literal(datetime.now().isoformat()))
+
+
 class Git:
     def __init__(self, workdir: str):
         self.workdir = workdir
 
     async def init(self) -> None:
+        if not await trio.Path(self.workdir).exists():
+            logger.info("Creating workdir", workdir=self.workdir)
+            await trio.Path(self.workdir).mkdir()
+
         if not await self.exists(".git"):
             logger.info("Initializing git repository", workdir=self.workdir)
             await trio.run_process(
@@ -106,7 +115,7 @@ class Git:
             os.unlink(temp_path)
 
 
-class GraphRepo:
+class Repository:
     def __init__(
         self,
         git: Git,
@@ -126,6 +135,14 @@ class GraphRepo:
         with context.bind_graph(self.metadata_id, self):
             yield self.metadata
 
+    @contextmanager
+    def using_graph(
+        self, identifier: URIRef
+    ) -> Generator[Graph, None, None]:
+        """Bind the specified graph as the current graph."""
+        with context.bind_graph(identifier, self) as graph:
+            yield graph
+
     async def load_metadata(self) -> None:
         try:
             content = await self.git.read_file("void.ttl")
@@ -135,10 +152,24 @@ class GraphRepo:
             logger.info("No existing metadata found")
 
     def graph(self, identifier: URIRef) -> Graph:
-        if identifier not in self.list_graphs():
+        if (
+            identifier not in self.list_graphs()
+            and identifier is not self.metadata_id
+        ):
             logger.info("Registering new graph", identifier=identifier)
-            self.metadata.add((identifier, RDF.type, VOID.Dataset))
-        return self.dataset.graph(identifier)
+            with self.using_metadata():
+                add(
+                    identifier,
+                    {
+                        RDF.type: VOID.Dataset,
+                        PROV.generatedAtTime: context.clock.get()(),
+                        VOID.dataDump: Literal(
+                            f"file://{self.absolute_graph_path(identifier)}"
+                        ),
+                    },
+                )
+
+        return self.dataset.graph(identifier, base=self.namespace)
 
     def graphs(self) -> Iterator[Graph]:
         for identifier in self.list_graphs():
@@ -153,8 +184,15 @@ class GraphRepo:
         ]
 
     def graph_filename(self, identifier: URIRef) -> str:
-        safe_name = str(identifier).replace("/", "_").replace(":", "_")
+        safe_name = str(identifier)
+        safe_name = safe_name.removeprefix(str(self.namespace))
+        safe_name = safe_name.replace("/", "_").replace(":", "_")
         return f"{safe_name}.trig"
+
+    def absolute_graph_path(self, identifier: URIRef) -> str:
+        return os.path.join(
+            self.git.workdir, self.graph_filename(identifier)
+        )
 
     async def save_graph(self, identifier: URIRef) -> None:
         graph = self.graph(identifier)
@@ -219,7 +257,7 @@ class GraphRepo:
     def new_graph(self) -> Generator[URIRef, None, None]:
         """Create a new graph with a fresh URI and set it as the current graph."""
         graph_id = fresh_uri(self.namespace)
-        with context.bind_graph(graph_id, self):
+        with self.using_graph(graph_id):
             yield graph_id
 
     @contextmanager
@@ -245,30 +283,19 @@ class GraphRepo:
                 "No source graph specified and no current graph set"
             )
 
-        act = activity if activity is not None else context.activity.get()
+        act = activity or context.activity.get()
 
-        # Temporarily bind metadata graph for adding provenance
         with self.using_metadata():
-            # Create qualified derivation using new()
-            deriv = new(
-                FROTH.GraphDerivation,
+            add(
+                graph_id,
                 {
-                    PROV.entity: source,
-                    PROV.hadActivity: act if act else None,
+                    PROV.qualifiedDerivation: new(
+                        FROTH.GraphDerivation,
+                        {PROV.entity: source, PROV.hadActivity: act},
+                    ),
+                    PROV.generatedAtTime: context.clock.get()(),
                 },
-                subject=fresh_uri(self.namespace),
             )
-
-            # Link the derivation
-            new(None, {PROV.qualifiedDerivation: deriv}, subject=graph_id)
-
-            # Add agent association if present
-            try:
-                agent = context.agent.get(None) if act else None
-            except LookupError:
-                agent = None
-            if act and agent:
-                new(None, {PROV.wasAssociatedWith: agent}, subject=act)
 
         with context.bind_graph(graph_id, self):
             yield graph_id

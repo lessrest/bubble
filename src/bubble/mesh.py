@@ -34,7 +34,9 @@ from typing import (
 )
 
 from bubble.repo import current_bubble
-from bubble.town import logger
+
+
+logger = structlog.get_logger()
 
 
 @dataclass

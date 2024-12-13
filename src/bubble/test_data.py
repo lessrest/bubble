@@ -6,7 +6,7 @@ from swash.util import new
 from bubble.data import FROTH
 import pytest
 
-from .data import Git, GraphRepo, context
+from .data import Git, Repository, context
 
 from bubble.logs import configure_logging
 
@@ -19,7 +19,7 @@ EX = Namespace("http://example.org/")
 async def test_graph_repo_basics():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git, namespace=EX)
+        repo = Repository(git, namespace=EX)
 
         # Create initial graph and add data
         with repo.new_graph() as graph_id:
@@ -28,7 +28,7 @@ async def test_graph_repo_basics():
             await repo.save_all()
 
         # Test loading in new repo instance
-        repo2 = GraphRepo(git, namespace=EX)
+        repo2 = Repository(git, namespace=EX)
         await repo2.load_all()
 
         # Verify loaded data
@@ -48,7 +48,7 @@ async def test_graph_repo_new_derived_graph():
     """Test deriving graphs with explicit and current context parameters"""
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git, namespace=EX)
+        repo = Repository(git, namespace=EX)
 
         # Create source graph
         with repo.new_graph() as source_graph_id:
@@ -75,7 +75,7 @@ async def test_graph_repo_new_derived_graph():
         ) in repo.metadata
 
         # Test derivation with current context
-        with context.graph.bind(repo.graph(source_graph_id)):
+        with context.bind_graph(source_graph_id, repo):
             current_act = EX.currentActivity
             with context.activity.bind(current_act):
                 with repo.new_derived_graph() as derived_graph_id2:
@@ -96,7 +96,7 @@ async def test_graph_repo_new_derived_graph():
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git, namespace=EX)
+        repo = Repository(git, namespace=EX)
 
         # Create new graph and add data
         with repo.new_graph() as graph_id:
@@ -117,7 +117,7 @@ async def test_graph_repo_new_graph():
 async def test_graph_repo_add_with_current_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git, namespace=EX)
+        repo = Repository(git, namespace=EX)
 
         # Test adding with current graph
         with repo.new_graph() as graph_id:
@@ -133,7 +133,7 @@ async def test_graph_repo_add_with_current_graph():
 
         # Test persistence
         await repo.save_all()
-        repo2 = GraphRepo(git, namespace=EX)
+        repo2 = Repository(git, namespace=EX)
         await repo2.load_all()
 
         graph2 = repo2.graph(graph_id)
