@@ -81,7 +81,8 @@ async def test_graph_repo_new_derived_graph():
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
-        repo = GraphRepo(git)
+        # Test with namespace
+        repo = GraphRepo(git, namespace=EX)
 
         # Use the new_graph context manager
         with repo.new_graph() as graph_id:
