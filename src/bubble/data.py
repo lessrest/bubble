@@ -20,11 +20,11 @@ class context:
     agent = vars.Parameter["URIRef"]("current_agent")
     
     @classmethod
-    @contextmanager
+    @contextmanager 
     def bind_graph(cls, graph_id: URIRef, repo: "GraphRepo") -> Generator[Graph, None, None]:
         """Bind both the context graph and the legacy vars graph parameter."""
         graph = repo.graph(graph_id)
-        with cls.graph.bind(graph), vars.in_graph(graph_id):
+        with cls.graph.bind(graph), vars.in_graph(graph):
             yield graph
 
 
@@ -227,17 +227,19 @@ class GraphRepo:
             
         act = activity if activity is not None else context.activity.get()
             
-        # Create qualified derivation
-        deriv = fresh_uri(self.namespace)
-        self.metadata.add((deriv, RDF.type, PROV.Derivation))
-        self.metadata.add((graph_id, PROV.qualifiedDerivation, deriv))
-        self.metadata.add((deriv, PROV.entity, source))
+        # Temporarily bind metadata graph for adding provenance
+        with context.bind_graph(self.metadata.identifier, self):
+            # Create qualified derivation
+            deriv = fresh_uri(self.namespace)
+            self.add((deriv, RDF.type, PROV.Derivation))
+            self.add((graph_id, PROV.qualifiedDerivation, deriv))
+            self.add((deriv, PROV.entity, source))
 
-        if act:
-            self.metadata.add((deriv, PROV.hadActivity, act))
-            agent = context.agent.get()
-            if agent:
-                self.metadata.add((act, PROV.wasAssociatedWith, agent))
+            if act:
+                self.add((deriv, PROV.hadActivity, act))
+                agent = context.agent.get()
+                if agent:
+                    self.add((act, PROV.wasAssociatedWith, agent))
             
         with context.bind_graph(graph_id, self):
             yield graph_id
