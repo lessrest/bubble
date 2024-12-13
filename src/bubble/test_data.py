@@ -106,8 +106,7 @@ async def test_graph_repo_new_graph():
         repo = GraphRepo(git, namespace=EX)
 
         # Use the new_graph context manager
-        with repo.new_graph() as graph_id, \
-             context.graph.bind(repo.graph(graph_id)):
+        with repo.new_graph() as graph_id:
             repo.add((EX.subject, RDF.type, EX.Type))
             repo.add((EX.subject, EX.label, Literal("Test")))
 
