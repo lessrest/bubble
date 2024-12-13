@@ -1,3 +1,31 @@
+"""
+Real-time Audio Transcription with Semantic Grounding
+==================================================
+
+This code demonstrates a prototype of a real-time audio transcription system
+that outputs semantically grounded RDF data. It uses the W3C PROV-O ontology
+to represent the transcription process and its outputs, and the W3C Time
+Ontology to anchor recognized speech in time.
+
+The PROV-O ontology models the transcription process, tracking:
+
+  * The transcription activity itself
+  * Audio segments and transcript fragments as entities
+  * How transcripts evolve from interim to final versions
+  * Speakers (initially anonymous, with potential for later identity linking)
+
+The Time Ontology provides temporal structure by defining:
+
+  * A timeline as reference frame
+  * Points and intervals in the audio stream
+  * Temporal relationships between segments
+
+The resulting RDF data can be queried, integrated, and extended for richer
+downstream semantic applications. While this implementation is currently
+rudimentary and not feature-complete, it outlines a scalable approach to
+structuring real-time audio transcriptions within a semantic framework.
+"""
+
 import os
 
 from typing import Optional
@@ -14,7 +42,7 @@ from rdflib.namespace import PROV, TIME
 
 from swash.desc import has, has_type, resource
 from swash.mint import fresh_iri, fresh_uri
-from swash.prfx import NT, VOX, Deepgram
+from swash.prfx import NT, TALK, Deepgram
 from swash.util import (
     add,
     new,
@@ -69,41 +97,41 @@ async def deepgram_transcription_receiver():
         return speakers[i]
 
     process = new(
-        VOX.TranscriptionProcess,
+        TALK.TranscriptionProcess,
         {
             PROV.startedAtTime: datetime.now(UTC),
-            PROV.wasAssociatedWith: VOX.Deepgram,
+            PROV.wasAssociatedWith: TALK.Deepgram,
         },
     )
 
-    def message_recognition(message: DeepgramMessage):
+    def represent_transcript(payload: DeepgramMessage):
         def word_segment(word: Word):
             return new(
-                VOX.Recognition,
+                TALK.Transcript,
                 {
-                    VOX.hasTextWithoutPunctuation: word.word,
-                    VOX.hasText: word.punctuated_word,
-                    VOX.hasConfidence: decimal(word.confidence),
+                    TALK.hasTextWithoutPunctuation: word.word,
+                    TALK.hasText: word.punctuated_word,
+                    TALK.hasConfidence: decimal(word.confidence),
                     TIME.hasBeginning: make_instant(stream, word.start),
                     TIME.hasDuration: make_duration(word.end - word.start),
                     PROV.wasAttributedTo: speaker(word.speaker),
                 },
             )
 
-        alternative = message.channel.alternatives[0]
+        alternative = payload.channel.alternatives[0]
 
         return new(
-            VOX.Recognition if message.is_final else VOX.DraftRecognition,
+            TALK.Transcript if payload.is_final else TALK.DraftTranscript,
             {
                 PROV.generatedAtTime: datetime.now(UTC),
                 PROV.wasDerivedFrom: stream,
                 PROV.wasGeneratedBy: process,
-                VOX.hasTime: make_interval(
-                    stream, message.start, message.duration
+                TALK.hasTime: make_interval(
+                    stream, payload.start, payload.duration
                 ),
-                VOX.hasPunctuatedText: alternative.transcript,
-                VOX.hasConfidence: decimal(alternative.confidence),
-                VOX.hasSubdivision: make_list(
+                TALK.hasPunctuatedText: alternative.transcript,
+                TALK.hasConfidence: decimal(alternative.confidence),
+                TALK.hasSubdivision: make_list(
                     list(word_segment(word) for word in alternative.words),
                     subject=None,
                 ),
@@ -115,9 +143,9 @@ async def deepgram_transcription_receiver():
     while True:
         message, payload = await receive_event()
         async with txgraph():
-            recognition = message_recognition(payload)
+            transcript = represent_transcript(payload)
             if interim is not None:
-                add(recognition, {PROV.wasRevisionOf: interim})
+                add(transcript, {PROV.wasRevisionOf: interim})
                 add(interim, {PROV.wasInvalidatedBy: process})
         with in_graph(message):
             add(message.identifier, {PROV.wasUsedBy: process})
