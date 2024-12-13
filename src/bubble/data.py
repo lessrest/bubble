@@ -14,9 +14,10 @@ logger = structlog.get_logger()
 
 
 class context:
-    """Manages the current graph and activity context."""
+    """Manages the current graph, activity and agent context."""
     graph = vars.Parameter["URIRef"]("current_graph")
-    activity = vars.Parameter["URIRef"]("current_activity")
+    activity = vars.Parameter["URIRef"]("current_activity") 
+    agent = vars.Parameter["URIRef"]("current_agent")
 
 
 class Git:
@@ -219,10 +220,17 @@ class GraphRepo:
             
         act = activity if activity is not None else context.activity.get()
             
-        self.metadata.add((graph_id, PROV.wasDerivedFrom, source))
+        # Create qualified derivation
+        deriv = fresh_uri(self.namespace)
+        self.metadata.add((deriv, RDF.type, PROV.Derivation))
+        self.metadata.add((graph_id, PROV.qualifiedDerivation, deriv))
+        self.metadata.add((deriv, PROV.entity, source))
+
         if act:
-            self.metadata.add((graph_id, PROV.wasGeneratedBy, act))
-            self.metadata.add((source, PROV.wasInfluencedBy, act))
+            self.metadata.add((deriv, PROV.hadActivity, act))
+            agent = context.agent.get()
+            if agent:
+                self.metadata.add((act, PROV.wasAssociatedWith, agent))
             
         with context.graph.bind(graph_id):
             yield graph_id
