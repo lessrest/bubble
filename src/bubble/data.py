@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import subprocess
 from typing import Optional, Iterator, Generator
 from swash.mint import fresh_uri
+from swash.util import new
 import structlog
 import trio
 import os
@@ -106,11 +107,13 @@ class GraphRepo:
         git: Git,
         namespace: Namespace,
         dataset: Optional[Dataset] = None,
+        metadata_id: URIRef = URIRef("urn:x-meta:"),
     ):
         self.git = git
         self.namespace = namespace
         self.dataset = dataset or Dataset(default_union=True)
-        self.metadata = self.dataset.graph(URIRef("urn:x-meta:"))
+        self.metadata_id = metadata_id
+        self.metadata = self.dataset.graph(metadata_id)
 
     async def load_metadata(self) -> None:
         try:
@@ -228,18 +231,23 @@ class GraphRepo:
         act = activity if activity is not None else context.activity.get()
             
         # Temporarily bind metadata graph for adding provenance
-        with context.bind_graph(self.metadata.identifier, self):
-            # Create qualified derivation
-            deriv = fresh_uri(self.namespace)
-            self.add((deriv, RDF.type, PROV.Derivation))
-            self.add((graph_id, PROV.qualifiedDerivation, deriv))
-            self.add((deriv, PROV.entity, source))
-
-            if act:
-                self.add((deriv, PROV.hadActivity, act))
-                agent = context.agent.get()
-                if agent:
-                    self.add((act, PROV.wasAssociatedWith, agent))
+        with context.bind_graph(self.metadata_id, self):
+            # Create qualified derivation using new()
+            deriv = new(
+                PROV.Derivation,
+                {
+                    PROV.entity: source,
+                    PROV.hadActivity: act if act else None
+                },
+                subject=fresh_uri(self.namespace)
+            )
+            
+            # Link the derivation
+            new(None, {PROV.qualifiedDerivation: deriv}, subject=graph_id)
+            
+            # Add agent association if present
+            if act and (agent := context.agent.get()):
+                new(None, {PROV.wasAssociatedWith: agent}, subject=act)
             
         with context.bind_graph(graph_id, self):
             yield graph_id
