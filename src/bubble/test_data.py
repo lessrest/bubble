@@ -4,7 +4,7 @@ from rdflib import URIRef, Literal, RDF, Namespace
 from rdflib.namespace import PROV
 import pytest
 
-from .data import Git, GraphRepo, current_graph
+from .data import Git, GraphRepo, current_graph, current_activity
 
 from bubble.logs import configure_logging
 
