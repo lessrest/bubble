@@ -5,13 +5,17 @@ from swash.mint import fresh_uri
 from swash.prfx import JSON, SWA
 from swash.util import O, S, is_a, new, select_rows
 from swash import vars
-import importhook
+# import importhook
+
+logger = structlog.get_logger()
+
+# logger.info("registering import hook")
 
 
-@importhook.on_import("aiohttp")  # type: ignore
-def on_aiohttp_import(aiohttp):
-    # This is a hack to avoid PyLD crashing on load in IPython.
-    raise ImportError("hehe")
+# @importhook.on_import("aiohttp")  # type: ignore
+# def on_aiohttp_import(aiohttp):
+#     # This is a hack to avoid PyLD crashing on load in IPython.
+#     raise ImportError("hehe")
 
 
 try:

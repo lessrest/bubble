@@ -8,6 +8,7 @@
 @prefix vox: <https://swa.sh/2024/vox#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+
 # Speech Events and Physical Reality
 vox:SpeechEvent a owl:Class ;
    rdfs:subClassOf bfo:Process ;

@@ -1,12 +1,9 @@
-from swash.util import decimal
-
-
+from swash.util import decimal, blank
 from rdflib.namespace import TIME
-from swash.util import new
 
 
 def make_duration(seconds: float):
-    return new(
+    return blank(
         TIME.Duration,
         {
             TIME.numericDuration: decimal(seconds),
@@ -16,10 +13,10 @@ def make_duration(seconds: float):
 
 
 def make_instant(timeline, seconds: float):
-    return new(
+    return blank(
         TIME.Instant,
         {
-            TIME.inTimePosition: new(
+            TIME.inTimePosition: blank(
                 TIME.TimePosition,
                 {
                     TIME.numericPosition: decimal(seconds),
@@ -32,7 +29,7 @@ def make_instant(timeline, seconds: float):
 
 
 def make_interval(timeline, start, duration):
-    return new(
+    return blank(
         TIME.Interval,
         {
             TIME.hasTRS: timeline,

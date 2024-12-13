@@ -36,8 +36,8 @@ from urllib.parse import urlencode
 import trio
 import structlog
 
-from rdflib import BNode, Graph, URIRef, Literal, IdentifiedNode
-from trio_websocket import WebSocketConnection, open_websocket_url
+from rdflib import XSD, Graph, URIRef, Literal, IdentifiedNode
+from trio_websocket import WebSocketConnection, open_websocket_url, Endpoint
 from rdflib.namespace import PROV, TIME
 
 from swash.desc import has, has_type, resource
@@ -71,8 +71,12 @@ logger = structlog.get_logger()
 
 def using_deepgram_live_session(params: DeepgramParams):
     """Create a websocket connection to Deepgram's streaming API"""
-    # Filter out None values and create the query string
     query_params = params.model_dump(exclude_none=True)
+    # lowercase the boolean values
+    query_params = {
+        k: str(v).lower() if isinstance(v, bool) else v
+        for k, v in query_params.items()
+    }
     url = f"wss://api.deepgram.com/v1/listen?{urlencode(query_params)}"
 
     logger.info("Connecting to Deepgram", url=url)
@@ -85,10 +89,9 @@ async def deepgram_results_actor():
         await trio.sleep(1)
 
 
-async def deepgram_transcription_receiver():
-    """Actor that processes Deepgram messages into RDF graphs using the vox vocabulary"""
+async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
+    """Actor that processes Deepgram messages into RDF graphs using the TALK vocabulary"""
 
-    stream = BNode()  # should use a real audio stream
     speakers = defaultdict(lambda: new(PROV.Person))
 
     def speaker(i: Optional[int]) -> Optional[IdentifiedNode]:
@@ -147,6 +150,12 @@ async def deepgram_transcription_receiver():
             if interim is not None:
                 add(transcript, {PROV.wasRevisionOf: interim})
                 add(interim, {PROV.wasInvalidatedBy: process})
+
+            if payload.is_final:
+                interim = None
+            else:
+                interim = transcript
+
         with in_graph(message):
             add(message.identifier, {PROV.wasUsedBy: process})
 
@@ -170,11 +179,49 @@ def chunk_data(graph: Graph) -> bytes:
 async def deepgram_session(results: URIRef):
     # Wait for first chunk before starting session
     msg = await receive()
+
     with in_request_graph(msg) as request_graph:
         first_chunk = chunk_data(request_graph)
         async with using_deepgram_live_session(DeepgramParams()) as client:
+            assert isinstance(client.remote, Endpoint)
+            assert isinstance(client.local, Endpoint)
+            async with txgraph():
+                socket = new(
+                    NT.WebSocket,
+                    {
+                        NT.hasClientAddress: Literal(
+                            client.remote.url, datatype=XSD.anyURI
+                        ),
+                        NT.hasServerAddress: Literal(
+                            client.local.url, datatype=XSD.anyURI
+                        ),
+                    },
+                )
+
+                stream = new(
+                    TALK.AudioStream,
+                    {
+                        PROV.wasDerivedFrom: socket,
+                        PROV.startedAtTime: datetime.now(UTC),
+                    },
+                )
+                session = new(
+                    TALK.LiveTranscriptionProcess,
+                    {
+                        PROV.wasAssociatedWith: TALK.Deepgram,
+                        PROV.startedAtTime: datetime.now(UTC),
+                        PROV.used: stream,
+                    },
+                )
             async with trio.open_nursery() as nursery:
-                await spawn(nursery, receive_results, client, results)
+                await spawn(
+                    nursery,
+                    receive_results,
+                    stream,
+                    session,
+                    client,
+                    results,
+                )
                 await client.send_message(first_chunk)
                 while True:
                     msg = await receive()
@@ -238,11 +285,18 @@ def create_affordance_button(deepgram_client: URIRef):
         return client.node
 
 
-async def receive_results(client: WebSocketConnection, results: URIRef):
+async def receive_results(
+    session: URIRef,
+    stream: URIRef,
+    client: WebSocketConnection,
+    results: URIRef,
+):
     async with trio.open_nursery() as nursery:
         transcription_receiver = await spawn(
             nursery,
             deepgram_transcription_receiver,
+            session,
+            stream,
             name="Deepgram transcription receiver",
         )
 

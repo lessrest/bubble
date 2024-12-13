@@ -1,8 +1,11 @@
+import io
+import sys
 import json
 import uuid
 import pathlib
 
 from io import BytesIO
+from html import escape
 from base64 import b64encode
 from typing import (
     Any,
@@ -17,19 +20,23 @@ from typing import (
     MutableMapping,
 )
 from datetime import UTC, datetime
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import (
+    contextmanager,
+    redirect_stderr,
+    redirect_stdout,
+    asynccontextmanager,
+)
 from collections import defaultdict
 from dataclasses import dataclass
 
-from swash.desc import resource, has
 import trio
 import tenacity
 import structlog
 
 from rdflib import (
-    PROV,
     RDF,
     XSD,
+    PROV,
     Graph,
     URIRef,
     Dataset,
@@ -50,20 +57,19 @@ from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from swash import Parameter, mint, rdfa, vars
+from swash.desc import has, resource
 from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
 from swash.prfx import NT, DID, DEEPGRAM
-from swash.rdfa import rdf_resource, get_subject_data
+from swash.rdfa import rdf_resource, autoexpanding, get_subject_data
 from swash.util import S, add, new
-
 from bubble.icon import favicon
 from bubble.page import base_html
 from bubble.repo import BubbleRepo, using_bubble, current_bubble
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat.primitives import serialization
-from bubble.deepgram.talk import DeepgramClientActor
 
 logger = structlog.get_logger(__name__)
 
@@ -452,7 +458,6 @@ def create_graph(
     g.bind("deepgram", DEEPGRAM)
     g.bind("site", site)
     g.bind("did", DID)
-    g.bind("did:key", "did:key:")
     g.bind("prov", PROV)
     return g
 
@@ -466,8 +471,6 @@ async def txgraph(graph: Optional[Graph] = None):
 
     with vars.graph.bind(g):
         yield g
-
-    logger.info("persisting transaction", graph=g)
 
     await persist(g)
 
@@ -713,9 +716,9 @@ class TownApp:
         self.app.get("/.well-known/did.html")(self.get_did_document_html)
         self.app.get("/graphs")(graphs_view)
         self.app.get("/graph")(graph_view)
+        self.app.get("/eval")(self.eval_form)
+        self.app.post("/eval")(self.eval_code)
         self.app.get("/")(self.root)
-
-        self.app.get("/{id}")(self.actor_get)
 
         self.app.post("/{id}/message")(self.actor_message)
         self.app.post("/{id}")(self.actor_post)
@@ -723,6 +726,9 @@ class TownApp:
 
         self.app.websocket("/{id}/upload")(self.ws_upload)
         self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
+
+        # this is at the bottom because it matches too broadly
+        self.app.get("/{id}")(self.actor_get)
 
     async def health_check(self):
         with with_transient_graph("health") as id:
@@ -1044,6 +1050,104 @@ class TownApp:
             )
             return False
 
+    async def eval_form(self):
+        """Render the Python code evaluation form."""
+        with base_shell("Python Evaluator"):
+            with tag("div", classes="p-4"):
+                with tag("h1", classes="text-2xl font-bold mb-4"):
+                    text("Python Code Evaluator")
+
+                self.render_exec_form()
+
+        return HypermediaResponse()
+
+    def render_exec_form(self, code: str = ""):
+        with tag(
+            "form",
+            hx_post="/eval",
+            hx_target="this",
+            classes="space-y-4",
+        ):
+            with tag("div"):
+                with tag(
+                    "textarea",
+                    name="code",
+                    placeholder="Enter Python code here...",
+                    classes=[
+                        "w-full h-48 p-2 border font-mono",
+                        "dark:bg-gray-800 dark:text-white",
+                        "dark:border-gray-700 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:outline-none",
+                    ],
+                ):
+                    text(code)
+
+            with tag(
+                "button",
+                type="submit",
+                classes=[
+                    "px-4 py-2 bg-blue-500 text-white hover:bg-blue-600",
+                    "dark:bg-blue-600 dark:hover:bg-blue-700",
+                    "dark:text-white",
+                    "dark:focus:outline-none dark:focus:ring-2 dark:focus:ring-blue-500 dark:focus:ring-offset-2",
+                    "dark:border-blue-500",
+                ],
+            ):
+                text("Run")
+
+    async def eval_code(self, code: str = Form(...)):
+        """Evaluate Python code and return the results."""
+        # Capture stdout and stderr
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        try:
+            # Redirect output
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                # Execute the code in a restricted environment
+                exec_globals = {"print": print}
+                exec(code, exec_globals, {"town": self})
+
+            output = stdout.getvalue()
+            errors = stderr.getvalue()
+
+            # Format the input form again
+            self.render_exec_form(code)
+
+            # Format the response
+            with tag(
+                "div", classes="font-mono whitespace-pre-wrap p-4 rounded"
+            ):
+                if output:
+                    with tag("div", classes="bg-gray-100 p-2 rounded"):
+                        with tag(
+                            "div", classes="text-sm text-gray-600 mb-1"
+                        ):
+                            text("Output:")
+                        text(output)
+
+                if errors:
+                    with tag("div", classes="bg-red-100 p-2 rounded mt-2"):
+                        with tag(
+                            "div", classes="text-sm text-red-600 mb-1"
+                        ):
+                            text("Errors:")
+                        text(errors)
+
+                if not output and not errors:
+                    with tag("div", classes="text-gray-500 italic"):
+                        text("No output")
+
+            # Render the next form
+            self.render_exec_form()
+
+        except Exception as e:
+            with tag("div", classes="bg-red-100 p-2 rounded"):
+                with tag("div", classes="text-sm text-red-600 mb-1"):
+                    text("Error:")
+                text(str(e))
+
+        return HypermediaResponse()
+
 
 @contextmanager
 def in_request_graph(g: Graph):
@@ -1159,24 +1263,25 @@ def render_graph_view(graph: Graph) -> None:
         else:
             untyped_nodes.append(node)
 
-    with tag("div", classes="flex flex-col gap-4"):
-        # First pass - render typed nodes
-        for node in typed_nodes:
-            render_node(graph, node)
+    with autoexpanding(5):
+        with tag("div", classes="flex flex-col gap-4"):
+            # First pass - render typed nodes
+            for node in typed_nodes:
+                render_node(graph, node)
 
-        # Second pass - render untyped nodes
-        if untyped_nodes:
-            with tag(
-                "div",
-                classes="mt-4 border-t border-gray-300 dark:border-gray-700 pt-4",
-            ):
+            # Second pass - render untyped nodes
+            if untyped_nodes:
                 with tag(
-                    "h3",
-                    classes="text-lg font-semibold mb-2 text-gray-600 dark:text-gray-400",
+                    "div",
+                    classes="mt-4 border-t border-gray-300 dark:border-gray-700 pt-4",
                 ):
-                    text("Additional Resources")
-                for node in untyped_nodes:
-                    render_node(graph, node)
+                    with tag(
+                        "h3",
+                        classes="text-lg font-semibold mb-2 text-gray-600 dark:text-gray-400",
+                    ):
+                        text("Additional Resources")
+                    for node in untyped_nodes:
+                        render_node(graph, node)
 
 
 def render_graphs_overview(dataset: Dataset) -> None:

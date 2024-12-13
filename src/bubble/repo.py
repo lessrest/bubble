@@ -19,6 +19,7 @@ from rdflib import (
     Graph,
     URIRef,
     Dataset,
+    VOID,
 )
 from rdflib.graph import _SubjectType
 
@@ -28,6 +29,7 @@ from swash.prfx import NT
 from swash.util import get_single_subject, print_n3
 from swash import vars
 from bubble.blob import BlobStore, BlobStream
+from swash.mint import fresh_uri
 
 logger = structlog.get_logger()
 
@@ -156,28 +158,30 @@ class BubbleRepo:
             await trio.Path(path).mkdir(parents=True)
 
         should_commit = False
+        void_path = path / "void.ttl"
 
-        if not await trio.Path(path / "root.n3").exists():
+        if not await trio.Path(void_path).exists():
             logger.info("describing new bubble", path=str(path))
-            graph = await describe_new_bubble(path)
+            # Use site namespace for base and bubble URI
+            bubble_uri = fresh_uri(vars.site.get())
+            graph = await describe_new_bubble(path, bubble_uri)
+            # Save the main graph
             graph.serialize(destination=path / "root.n3", format="n3")
+
+            # Create void.ttl with just the bubble identifier
+            void_graph = Graph()
+            void_graph.add((bubble_uri, RDF.type, VOID.Dataset))
+            void_graph.serialize(destination=void_path, format="turtle")
             should_commit = True
 
+        # Only load void.ttl to get the bubble identifier
+        logger.info("loading void.ttl", path=str(void_path))
+        void_graph = Graph().parse(void_path, format="turtle")
+        bubble = get_single_subject(RDF.type, VOID.Dataset, void_graph)
+
         dataset = Dataset(default_union=True)
-
-        logger.info("parsing root.n3", path=str(path / "root.n3"))
-        with vars.graph.bind(
-            Graph(base=URIRef(str(path))).parse(
-                path / "root.n3", format="n3"
-            )
-        ) as graph:
-            bubble = get_single_subject(RDF.type, NT.Bubble)
-            bubble_graph = dataset.graph(NT.bubble)
-            for triple in graph:
-                bubble_graph.add(triple)
-
         repo = BubbleRepo(path, dataset, URIRef(bubble))
-        logger.info("created repo", repo=repo)
+
         if should_commit:
             logger.info("committing bubble", repo=repo)
             await repo.commit()
@@ -215,9 +219,9 @@ class BubbleRepo:
                 ],
             )
 
-        # Add all files to the index
+        # Add both root.n3 and void.ttl to the index
         await trio.run_process(
-            ["git", "-C", str(self.workdir), "add", "root.n3"],
+            ["git", "-C", str(self.workdir), "add", "root.n3", "void.ttl"],
         )
 
         await trio.run_process(

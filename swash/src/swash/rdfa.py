@@ -153,7 +153,7 @@ def group_triples(
 def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
     dataset = vars.dataset.get()
     if isinstance(subject, BNode):
-        if RDF.List in dataset.objects(subject, RDF.type):
+        if any(dataset.triples((subject, RDF.first, None))):
             render_list(dataset.collection(subject), predicate)
         else:
             render_expander(subject, predicate)
@@ -191,14 +191,10 @@ def get_rdf_resource(subject: str) -> None:
 
 
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
+    visited_resources.get().add(subject)
+
     if data is None:
         data = get_subject_data(vars.dataset.get(), subject)
-        logger.info(
-            "getting subject data",
-            subject=subject,
-            dataset=vars.dataset.get(),
-            data=data,
-        )
 
     if data["type"] == NT.Image:
         render_image_resource(subject, data)

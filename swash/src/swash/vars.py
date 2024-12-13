@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar, Optional, Sequence, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rdflib import PROV, BNode, Graph, Literal, URIRef
+from rdflib import PROV, BNode, Dataset, Graph, Literal, URIRef, Namespace
 from rdflib.graph import QuotedGraph, _TripleType
 
 from swash.mint import fresh_iri
@@ -45,8 +45,9 @@ class Parameter(Generic[T]):
         self._var.set(value)
 
 
-graph = Parameter("graph", Graph())
-dataset = Parameter("dataset", None)
+graph: Parameter[Graph] = Parameter("graph", Graph())
+dataset: Parameter[Dataset] = Parameter("dataset", None)
+site: Parameter[Namespace] = Parameter("site")
 
 
 @contextmanager
@@ -72,7 +73,6 @@ def bind_prefixes(g: Graph):
     g.bind("as", AS)
     g.bind("prov", PROV)
     g.bind("did", DID)
-    g.bind("did:key", "did:key:")
     g.bind("as", AS)
 
 

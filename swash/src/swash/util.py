@@ -170,25 +170,9 @@ def new(
     properties: Optional[dict[P, Any]] = None,
     subject: Optional[URIRef] = None,
 ) -> URIRef:
-    graph = vars.graph.get()
-
     if subject is None:
-        subject = fresh_uri(graph)
-
-    if type is not None:
-        graph.add((subject, RDF.type, type))
-
-    if properties is not None:
-        for predicate, object in properties.items():
-            if isinstance(object, list):
-                for item in object:
-                    o = item if isinstance(item, O) else Literal(item)
-                    graph.add((subject, predicate, o))
-            else:
-                o = object if isinstance(object, O) else Literal(object)
-                graph.add((subject, predicate, o))
-
-    return subject
+        subject = fresh_uri(vars.graph.get())
+    return build_resource(subject, type, properties)
 
 
 def is_a(subject: S, type: S, graph=None) -> bool:
@@ -222,3 +206,60 @@ def make_list(
     node = BNode() if subject is None else subject
     Collection(vars.graph.get(), node, list(seq))
     return node
+
+
+@overload
+def blank(type: None = None, properties: dict[P, Any] = {}) -> BNode: ...
+@overload
+def blank(
+    type: S | None = None, properties: dict[P, Any] = {}
+) -> BNode: ...
+
+
+def blank(
+    type: Optional[S] = None,
+    properties: Optional[dict[P, Any]] = None,
+) -> BNode:
+    """Create a new blank node with optional type and properties.
+
+    Args:
+        type: Optional RDF type for the blank node
+        properties: Optional dictionary of predicate-object pairs
+
+    Returns:
+        BNode: The newly created blank node
+    """
+    return build_resource(BNode(), type, properties)
+
+
+def build_resource[Subject: S](
+    subject: Subject,
+    type: Optional[S] = None,
+    properties: Optional[dict[P, Any]] = None,
+) -> Subject:
+    """Build a resource with optional type and properties.
+
+    Args:
+        subject: The subject node to build upon
+        type: Optional RDF type for the resource
+        properties: Optional dictionary of predicate-object pairs
+
+    Returns:
+        The subject node with added properties
+    """
+    graph = vars.graph.get()
+
+    if type is not None:
+        graph.add((subject, RDF.type, type))
+
+    if properties is not None:
+        for predicate, object in properties.items():
+            if isinstance(object, list):
+                for item in object:
+                    o = item if isinstance(item, O) else Literal(item)
+                    graph.add((subject, predicate, o))
+            else:
+                o = object if isinstance(object, O) else Literal(object)
+                graph.add((subject, predicate, o))
+
+    return subject
