@@ -14,6 +14,7 @@ logger = structlog.get_logger()
 
 
 current_graph = vars.Parameter["URIRef"]("current_graph")
+current_activity = vars.Parameter["URIRef"]("current_activity")
 
 
 class Git:
@@ -207,17 +208,19 @@ class GraphRepo:
         
         Args:
             source_graph: The graph this is derived from. Defaults to current_graph.
-            activity: Optional activity that caused this derivation.
+            activity: Optional activity that caused this derivation. Defaults to current_activity.
         """
         graph_id = fresh_uri(self.namespace)
         source = source_graph if source_graph is not None else current_graph.get()
         if source is None:
             raise ValueError("No source graph specified and no current graph set")
             
+        act = activity if activity is not None else current_activity.get()
+            
         self.metadata.add((graph_id, PROV.wasDerivedFrom, source))
-        if activity:
-            self.metadata.add((graph_id, PROV.wasGeneratedBy, activity))
-            self.metadata.add((source, PROV.wasInfluencedBy, activity))
+        if act:
+            self.metadata.add((graph_id, PROV.wasGeneratedBy, act))
+            self.metadata.add((source, PROV.wasInfluencedBy, act))
             
         with current_graph.bind(graph_id):
             yield graph_id

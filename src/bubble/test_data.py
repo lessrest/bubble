@@ -58,6 +58,7 @@ async def test_graph_repo_basics():
 
 
 async def test_graph_repo_new_derived_graph():
+    """Test deriving graphs with explicit and current context parameters"""
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(workdir)
         repo = GraphRepo(git, namespace=EX)
@@ -81,13 +82,17 @@ async def test_graph_repo_new_derived_graph():
         assert (derived_graph_id, PROV.wasGeneratedBy, activity) in repo.metadata
         assert (source_graph_id, PROV.wasInfluencedBy, activity) in repo.metadata
 
-        # Test deriving from current graph
+        # Test deriving using current context
         with current_graph.bind(source_graph_id):
-            with repo.new_derived_graph() as derived_graph_id2:
-                repo.add((EX.subject, EX.label, Literal("Derived2")))
+            current_act = EX.currentActivity
+            with current_activity.bind(current_act):
+                with repo.new_derived_graph() as derived_graph_id2:
+                    repo.add((EX.subject, EX.label, Literal("Derived2")))
             
-            # Verify derivation from current graph
-            assert (derived_graph_id2, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
+                # Verify derivation using current context
+                assert (derived_graph_id2, PROV.wasDerivedFrom, source_graph_id) in repo.metadata
+                assert (derived_graph_id2, PROV.wasGeneratedBy, current_act) in repo.metadata
+                assert (source_graph_id, PROV.wasInfluencedBy, current_act) in repo.metadata
 
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
