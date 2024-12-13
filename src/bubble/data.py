@@ -152,14 +152,14 @@ class GraphRepo:
             )
         ]
 
-    def _graph_filename(self, identifier: URIRef) -> str:
+    def graph_filename(self, identifier: URIRef) -> str:
         safe_name = str(identifier).replace("/", "_").replace(":", "_")
         return f"{safe_name}.trig"
 
     async def save_graph(self, identifier: URIRef) -> None:
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
-        filename = self._graph_filename(identifier)
+        filename = self.graph_filename(identifier)
         logger.info(
             "Saving graph",
             identifier=identifier,
@@ -181,7 +181,7 @@ class GraphRepo:
             await self.save_graph(identifier)
 
     async def load_graph(self, identifier: URIRef) -> None:
-        filename = self._graph_filename(identifier)
+        filename = self.graph_filename(identifier)
         try:
             content = await self.git.read_file(filename)
             logger.info(

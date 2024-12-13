@@ -59,17 +59,19 @@ async def test_graph_repo_new_derived_graph():
         with repo.new_derived_graph(
             source_graph_id, activity=activity
         ) as derived_graph_id:
-            new(EX.Type, {EX.label: Literal("Derived")})
+            x = new(EX.Type, {EX.label: Literal("Derived")})
 
         # Verify derived content
         derived_graph = repo.graph(derived_graph_id)
-        assert (EX.Type, EX.label, Literal("Derived")) in derived_graph
+        assert (x, EX.label, Literal("Derived")) in derived_graph
 
         # Verify provenance
         assert (
             derived_graph_id,
             PROV.qualifiedDerivation,
-            list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))[0],
+            list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))[
+                0
+            ],
         ) in repo.metadata
 
         # Test derivation with current context
@@ -83,7 +85,11 @@ async def test_graph_repo_new_derived_graph():
                 assert (
                     derived_graph_id2,
                     PROV.qualifiedDerivation,
-                    list(repo.metadata.subjects(RDF.type, FROTH.GraphDerivation))[1],
+                    list(
+                        repo.metadata.subjects(
+                            RDF.type, FROTH.GraphDerivation
+                        )
+                    )[1],
                 ) in repo.metadata
 
 
@@ -100,7 +106,9 @@ async def test_graph_repo_new_graph():
             graph = repo.graph(graph_id)
             assert len(graph) == 2  # type + label
             assert any(p == RDF.type and o == EX.Type for _, p, o in graph)
-            assert any(p == EX.label and o == Literal("Test") for _, p, o in graph)
+            assert any(
+                p == EX.label and o == Literal("Test") for _, p, o in graph
+            )
 
             # Verify registration
             assert graph_id in repo.list_graphs()
@@ -119,7 +127,9 @@ async def test_graph_repo_add_with_current_graph():
             graph = repo.graph(graph_id)
             assert len(graph) == 2  # type + label
             assert any(p == RDF.type and o == EX.Type for _, p, o in graph)
-            assert any(p == EX.label and o == Literal("Test") for _, p, o in graph)
+            assert any(
+                p == EX.label and o == Literal("Test") for _, p, o in graph
+            )
 
         # Test persistence
         await repo.save_all()
@@ -129,4 +139,6 @@ async def test_graph_repo_add_with_current_graph():
         graph2 = repo2.graph(graph_id)
         assert len(graph2) == 2
         assert any(p == RDF.type and o == EX.Type for _, p, o in graph2)
-        assert any(p == EX.label and o == Literal("Test") for _, p, o in graph2)
+        assert any(
+            p == EX.label and o == Literal("Test") for _, p, o in graph2
+        )
