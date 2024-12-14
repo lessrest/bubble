@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI
 import swash
-from swash import html
+from swash.html import document
+from swash.rdfa import autoexpanding, rdf_resource
 import trio
 import typer
 import hypercorn
@@ -37,7 +38,6 @@ from bubble.town import (
 from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
 from swash.lynx import render_html
-from swash.rdfa import autoexpanding, rdf_resource
 
 logger = configure_logging()
 
@@ -365,30 +365,39 @@ def info() -> None:
         console.print(graphs_table)
 
         # Show the current activity using the lynx renderer
-        activity_uri = URIRef(bubble_activity)
-        with html.document() as doc:
-            with swash.vars.dataset.bind(repo.dataset):
-                rdf_resource(activity_uri)
-                #                from pudb import set_trace
+        #        activity_uri = URIRef(bubble_activity)
+        # with document() as doc:
+        #     with swash.vars.dataset.bind(repo.dataset):
+        #         rdf_resource(activity_uri)
+        #         #                from pudb import set_trace
 
-                #               set_trace()
-                render_html(doc.element, console)
+        #         #               set_trace()
+        #         render_html(doc.element, console)
 
-        # Show the current agent using the lynx renderer
-        agent_uri = URIRef(bubble_agent)
-        with html.document() as doc:
-            with swash.vars.dataset.bind(repo.dataset):
-                rdf_resource(agent_uri)
-                render_html(doc.element, console)
+        # # Show the current agent using the lynx renderer
+        # agent_uri = URIRef(bubble_agent)
+        # with document() as doc:
+        #     with swash.vars.dataset.bind(repo.dataset):
+        #         rdf_resource(agent_uri)
+        #         render_html(doc.element, console)
 
         # Show the current graph using the lynx renderer
         graph_uri = URIRef(bubble_graph)
-        with html.document() as doc:
+        with document() as doc:
             with swash.vars.dataset.bind(repo.dataset):
-                with autoexpanding(4):
+                with autoexpanding(0):
                     rdf_resource(graph_uri)
                 #                print(doc.to_html(compact=False))
                 render_html(doc.element, console)
+
+        # with document() as doc:
+        #     with swash.vars.dataset.bind(repo.dataset):
+        #         with tag("a"):
+        #             with tag("span"):
+        #                 text("Hello")
+        #             with tag("span"):
+        #                 text("World")
+        #         render_html(doc.element, console)
 
     trio.run(show_info)
 
