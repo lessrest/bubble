@@ -14,6 +14,7 @@ from rdflib import (
     RDF,
     XSD,
     RDFS,
+    SKOS,
     BNode,
     Graph,
     URIRef,
@@ -64,12 +65,21 @@ def autoexpanding(depth: int):
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
     # Get all labels with their languages
     labels = []
-    # this should prefer SKOS.prefLabel over RDFS.label, AI!
-    for s, p, o, c in dataset.quads((uri, RDFS.label, None, None)):
+    
+    # First try SKOS prefLabel
+    for s, p, o, c in dataset.quads((uri, SKOS.prefLabel, None, None)):
         if isinstance(o, Literal):
-            labels.append((o, o.language or ""))
+            labels.append((o, o.language or "", 1))  # Priority 1 for prefLabel
         else:
-            labels.append((o, ""))
+            labels.append((o, "", 1))
+            
+    # Fall back to RDFS label if no prefLabel found
+    if not labels:
+        for s, p, o, c in dataset.quads((uri, RDFS.label, None, None)):
+            if isinstance(o, Literal):
+                labels.append((o, o.language or "", 2))  # Priority 2 for label
+            else:
+                labels.append((o, "", 2))
 
     if not labels:
         return None
@@ -78,11 +88,11 @@ def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
     prefs = language_preferences.get()
 
     def lang_key(label_tuple):
-        lang = label_tuple[1]
+        label, lang, priority = label_tuple
         try:
-            return prefs.index(lang)
+            return (priority, prefs.index(lang))
         except ValueError:
-            return len(prefs) if lang else len(prefs) + 1
+            return (priority, len(prefs) if lang else len(prefs) + 1)
 
     sorted_labels = sorted(labels, key=lang_key)
     return sorted_labels[0][0] if sorted_labels else None
