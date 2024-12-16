@@ -514,8 +514,7 @@ class Site:
 
     async def ws_actor_join(self, websocket: WebSocket, key: str):
         """Handle a remote actor joining the town with a provided identity key."""
-        from bubble.join import handle_actor_join
-        from bubble.keys import parse_public_key_hex
+        from bubble.peer import handle_actor_join
 
         # Parse the hex key string into an Ed25519PublicKey object before passing to handle_actor_join
         public_key = parse_public_key_hex(key)
@@ -523,7 +522,8 @@ class Site:
 
     async def ws_anonymous_join(self, websocket: WebSocket):
         """Handle an anonymous/transient actor joining the town."""
-        from bubble.join import handle_anonymous_join
+        from bubble.peer import handle_anonymous_join
+
         await handle_anonymous_join(websocket, self.vat)
 
     @contextmanager

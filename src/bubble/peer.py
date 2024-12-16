@@ -25,7 +25,7 @@ logger = structlog.get_logger(__name__)
 async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
     """
     Handle an anonymous/transient actor joining a town via WebSocket.
-    
+
     This involves:
     - Accepting the connection
     - Assigning a temporary identity
@@ -33,13 +33,13 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
     - Setting up an actor context
     - Forwarding messages between the actor and town
     - Handling heartbeat messages
-    
+
     Args:
         websocket: The WebSocket connection object
         vat: The Vat instance managing the town and its actors
     """
     await websocket.accept()
-    
+
     try:
         # Generate a temporary identity for this anonymous actor
         remote_actor_uri = fresh_uri(vat.site)
@@ -51,25 +51,29 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
         handshake.add((handshake_id, RDF.type, NT.AnonymousHandshake))
         handshake.add((handshake_id, NT.protocol, NT.Protocol_1))
         handshake.add((handshake_id, NT.actor, remote_actor_uri))
-        
+
         await websocket.send_text(handshake.serialize(format="turtle"))
-        
+        logger.info("sent handshake", handshake=handshake)
+
         # Wait for acknowledgment
         try:
             ack_msg = await websocket.receive_text()
             ack = Graph()
             ack.parse(data=ack_msg, format="turtle")
-            
-            if not any(ack.triples((handshake_id, NT.acknowledged, Literal(True)))):
+            logger.info("received handshake acknowledgment", ack=ack)
+
+            if not any(
+                ack.triples((handshake_id, NT.acknowledged, Literal(True)))
+            ):
                 raise ValueError("Invalid handshake acknowledgment")
-                
+
         except Exception as e:
             logger.error("handshake acknowledgment failed", error=e)
             raise
-        
+
         # Create send/receive channels for actor messages
         send, recv = open_memory_channel[Graph](8)
-        
+
         # Create and register the actor context
         remote_actor_context = ActorContext(
             boss=vat.get_identity_uri(),
@@ -79,7 +83,7 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
             recv=recv,
         )
         vat.deck[remote_actor_uri] = remote_actor_context
-        
+
         # Record the anonymous actor session
         new(
             NT.AnonymousActor,
@@ -89,7 +93,7 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
             },
             remote_actor_uri,
         )
-        
+
         new(
             NT.AnonymousActorSession,
             {
@@ -98,18 +102,23 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
             },
             proc,
         )
-        
+
         # Add the remote actor to the current process
         add(vat.curr.get().proc, {NT.hasRemoteActor: remote_actor_uri})
-        
-        logger.info("anonymous actor joined", addr=remote_actor_uri, proc=proc)
-        
+
+        logger.info(
+            "anonymous actor joined", addr=remote_actor_uri, proc=proc
+        )
+
         # Launch message forwarding tasks
-        await _run_message_forwarders(websocket, remote_actor_uri, proc, recv)
-        
+        await _run_message_forwarders(
+            websocket, remote_actor_uri, proc, recv
+        )
+
     except Exception as e:
         logger.error("anonymous websocket handler error", error=e)
         raise
+
 
 async def handle_actor_join(
     websocket: WebSocket, key: Ed25519PublicKey, vat: Vat
@@ -369,7 +378,7 @@ async def _run_message_forwarders(websocket, remote_actor_uri, proc, recv):
         Receive a dataset from the WebSocket.
         """
         data = await websocket.receive_text()
-        msg = Dataset()
+        msg = Dataset(default_union=True)
         msg.parse(data=data, format="trig")
         return msg
 

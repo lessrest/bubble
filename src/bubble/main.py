@@ -1,55 +1,50 @@
-import pathlib
 import os
-
-from datetime import UTC, datetime
 import sys
+import logging
+import pathlib
+
+from datetime import datetime
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, WebSocket
-import rdflib
-import rdflib.collection
-from swash.html import document
-from swash.mint import fresh_id
-from swash.rdfa import autoexpanding, rdf_resource
 import trio
-import trio_asyncio
 import typer
+import rdflib
 import hypercorn
+import trio_asyncio
 import hypercorn.trio
+import rdflib.collection
 
+from rich import box
 from typer import Option
-from rdflib import SKOS, BNode, Literal, URIRef, Namespace, PROV, DCAT, XSD
-from rich.console import Console
+from rdflib import XSD, DCAT, PROV, SKOS, BNode, URIRef, Literal, Namespace
+from fastapi import FastAPI, WebSocket
 from rich.panel import Panel
 from rich.table import Table
-from rich import box
-
+from rich.console import Console
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 import swash.vars as vars
 
+from swash.html import document
+from swash.lynx import render_html
+from swash.mint import fresh_id
 from swash.prfx import NT, RDF
+from swash.rdfa import rdf_resource, autoexpanding
 from swash.util import add, new
-from bubble.data import Git, Repository, context
-from bubble.mesh import SimpleSupervisor, spawn, this, txgraph
-from bubble.logs import configure_logging
-from bubble.stat.stat import gather_system_info
-from bubble.town import (
-    Site,
-)
-from bubble.mesh import UptimeActor
-from bubble.deepgram.talk import DeepgramClientActor
+from bubble.data import Git, Repository, context, from_env
 from bubble.join import (
-    handle_messages,
     receive_datasets,
     signed_connection,
     anonymous_connection,
 )
-from swash.lynx import render_html
+from bubble.logs import configure_logging
+from bubble.mesh import SimpleSupervisor, this, spawn
+from bubble.town import (
+    Site,
+)
+from bubble.stat.stat import gather_system_info
+from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import ReplicateClientActor, make_image
-from bubble.data import from_env
-
-import logging
 
 console = Console(width=80)
 
@@ -319,7 +314,7 @@ def join_simple(
     async def handle_dataset_receiving(ws: WebSocket, actor_uri: URIRef):
         logger.info("connected to town", actor_uri=actor_uri)
         async for msg in receive_datasets(ws):
-            logger.info("Received dataset", graph=msg)
+            logger.debug("Received dataset", graph=msg)
 
     def generate_key_pair():
         private_key = ed25519.Ed25519PrivateKey.generate()
