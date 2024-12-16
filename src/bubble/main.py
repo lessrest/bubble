@@ -35,7 +35,7 @@ from bubble.stat.stat import gather_system_info
 from bubble.town import (
     Site,
 )
-from bubble.mesh import UptimeActor 
+from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.peer import Peer
 from swash.lynx import render_html
@@ -43,8 +43,6 @@ from bubble.replicate.make import ReplicateClientActor, make_image
 from bubble.data import from_env
 
 import logging
-
-logger = configure_logging()
 
 console = Console(width=80)
 
@@ -75,7 +73,7 @@ def shell(
 ) -> None:
     """Create a new repository and start a shell session."""
 
-    configure_logging(level=get_log_level())
+    logger = configure_logging(level=get_log_level())
 
     async def run():
         git = Git(trio.Path(repo_path))
@@ -291,14 +289,14 @@ def join_simple(
     town_url: str = Option(..., "--town", help="Town URL to join"),
 ) -> None:
     """Join a remote town as a simple peer that prints incoming messages."""
-    configure_logging(level=get_log_level())
+    logger = configure_logging(level=get_log_level())
 
     async def run():
         # Create a new peer with fresh keypair
         peer = Peer.generate()
         logger.info(
             "generated new peer identity",
-            public_key=peer.get_public_key_hex()
+            public_key=peer.get_public_key_hex(),
         )
 
         try:

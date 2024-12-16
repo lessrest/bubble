@@ -3,7 +3,7 @@ import io
 import json
 import uuid
 import pathlib
-from datetime import datetime
+from datetime import UTC, datetime
 
 from io import BytesIO
 from base64 import b64encode
@@ -598,10 +598,22 @@ class Site:
                     NT.RemoteActor,
                     {
                         NT.publicKey: Literal(
-                            key,
+                            base64.b64encode(public_key.public_bytes_raw()),
                             datatype=XSD.base64Binary,
                         ),
                         PROV.wasAssociatedWith: proc,
+                        NT.affordance: new(
+                            NT.Prompt,
+                            {
+                                NT.label: Literal("Send", "en"),
+                                NT.message: NT.TextMessage,
+                                NT.target: remote_actor_uri,
+                                NT.placeholder: Literal(
+                                    "Enter a message to send to the remote actor...",
+                                    "en",
+                                ),
+                            },
+                        ),
                     },
                     remote_actor_uri,
                 )
@@ -610,10 +622,14 @@ class Site:
                     NT.RemoteActorSession,
                     {
                         NT.remoteActor: remote_actor_uri,
-                        NT.remoteActorContext: remote_actor_context,
                         PROV.startedAtTime: context.clock.get()(),
                     },
                     proc,
+                )
+
+                add(
+                    self.vat.curr.get().proc,
+                    {NT.hasRemoteActor: remote_actor_uri},
                 )
 
                 logger.info(
@@ -631,9 +647,28 @@ class Site:
                     while True:
                         try:
                             data = await websocket.receive_text()
-                            msg_graph = Graph()
+                            msg_graph = Dataset()
                             msg_graph.parse(data=data, format="trig")
-                            await send.send(msg_graph)
+                            logger.info("received message", graph=msg_graph)
+                            # check if the dataset has a heartbeat resource
+                            if heartbeat := msg_graph.value(
+                                None, RDF.type, NT.Heartbeat
+                            ):
+                                logger.info(
+                                    "heartbeat received",
+                                    heartbeat=heartbeat,
+                                )
+                                # respond with a heartbeat
+                                msg_graph.add(
+                                    (
+                                        heartbeat,
+                                        NT.acknowledgedAtTime,
+                                        Literal(datetime.now(UTC)),
+                                    )
+                                )
+                                await websocket.send_text(
+                                    msg_graph.serialize(format="trig")
+                                )
                         except Exception as e:
                             logger.error("websocket receive error", error=e)
                             break

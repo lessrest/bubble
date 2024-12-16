@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 import json
 import base64
 import pathlib
@@ -14,7 +15,7 @@ from cryptography.hazmat.primitives import serialization
 from rdflib import XSD, Dataset, Graph, Literal, URIRef, RDF
 
 from bubble.keys import verify_signed_data
-from swash.prfx import NT
+from swash.prfx import NT, PROV
 
 logger = structlog.get_logger(__name__)
 
@@ -70,7 +71,6 @@ class Peer:
                 async with aconnect_ws(join_url, client=client) as ws:
                     # Receive initial handshake
                     handshake_msg = await ws.receive_text()
-                    logger.info("received handshake", message=handshake_msg)
                     handshake = Graph()
                     handshake.parse(data=handshake_msg, format="turtle")
 
@@ -124,7 +124,7 @@ class Peer:
             while True:
                 try:
                     message = await ws.receive_text()
-                    msg_graph = Graph()
+                    msg_graph = Dataset()
                     msg_graph.parse(data=message, format="trig")
                     await self.handle_message(msg_graph)
                 except Exception as e:
@@ -137,15 +137,38 @@ class Peer:
         """Send periodic heartbeat messages."""
         try:
             while True:
-                await trio.sleep(30)
-                heartbeat = Graph()
+                await trio.sleep(5)
+                heartbeat = Dataset()
                 heartbeat.add(
                     (URIRef("#heartbeat"), RDF.type, NT.Heartbeat)
                 )
+                heartbeat.add(
+                    (
+                        URIRef("#heartbeat"),
+                        PROV.generatedAtTime,
+                        Literal(datetime.now(UTC)),
+                    )
+                )
                 await ws.send_text(heartbeat.serialize(format="trig"))
+                logger.info("sent heartbeat")
         except Exception as e:
             logger.error("heartbeat error", error=e)
 
     async def handle_message(self, message: Graph) -> None:
         """Handle an incoming message. Override this in subclasses."""
         logger.info("received message", graph=message)
+        # check if the dataset has a heartbeat resource
+        if heartbeat := message.value(None, RDF.type, NT.Heartbeat):
+            if t0 := message.value(heartbeat, PROV.generatedAtTime):
+                if t1 := message.value(heartbeat, NT.acknowledgedAtTime):
+                    t0 = t0.toPython()
+                    t1 = t1.toPython()
+                    assert isinstance(t0, datetime)
+                    assert isinstance(t1, datetime)
+                    dt = t1 - t0
+                    logger.info(
+                        "heartbeat latency",
+                        t0=t0,
+                        t1=t1,
+                        latency=dt,
+                    )

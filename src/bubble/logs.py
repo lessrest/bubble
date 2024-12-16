@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import logging
 
 import traceback
@@ -220,6 +221,10 @@ class RichConsoleRenderer:
                         ),
                     )
             else:
+                if isinstance(value, datetime):
+                    value = value.isoformat()
+                elif isinstance(value, timedelta):
+                    value = f"{value.total_seconds()}s"
                 table.add_row(key, rich.pretty.Pretty(value))
 
         return table
@@ -320,6 +325,7 @@ def configure_logging(
         cache_logger_on_first_use=True,
     )
 
-    logging.basicConfig(level=level)
+    if level == logging.DEBUG:
+        logging.basicConfig(level=level)
 
     return structlog.get_logger()
