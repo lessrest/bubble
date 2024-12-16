@@ -1,7 +1,7 @@
+import functools
 import os
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 from datetime import UTC, datetime
-from urllib.parse import urlencode
 
 import trio
 import trio_asyncio
@@ -12,17 +12,11 @@ from rdflib import PROV, URIRef, Literal, XSD, Graph, Namespace
 from swash.prfx import NT, Schema
 import swash.vars as vars
 from swash.util import add, new, is_a, get_single_object
-from bubble.blob import BlobStore
 from bubble.data import Repository
 from bubble.mesh import (
     ServerActor,
-    get_base,
-    receive,
-    send,
-    spawn,
     this,
     txgraph,
-    with_transient_graph,
 )
 
 logger = structlog.get_logger(__name__)
@@ -37,19 +31,19 @@ class AsyncReadable(Protocol):
 
 
 async def make_image(prompt: str) -> list[AsyncReadable]:
-    result = await trio_asyncio.aio_as_trio(
-        replicate.async_run(
-            "recraft-ai/recraft-v3",
-            # "black-forest-labs/flux-dev",
-            input={
-                "prompt": prompt,
-                "size": "2048x1024",
-                "style": "realistic_image/hard_flash",
-                # "num_outputs": 4,
-                # "disable_safety_checker": True,
-            },
-        )
+    f = functools.partial(
+        replicate.async_run,
+        # "recraft-ai/recraft-v3",
+        "black-forest-labs/flux-dev",
+        input={
+            "prompt": prompt,
+            "size": "2048x1024",
+            #    "style": "realistic_image",
+            "num_outputs": 1,
+            "disable_safety_checker": True,
+        },
     )
+    result = await trio_asyncio.aio_as_trio(f)()
     logger.info("replicate.make.image", result=result)
 
     if isinstance(result, list):

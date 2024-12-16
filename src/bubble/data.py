@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 import os
 import hashlib
 import subprocess
@@ -14,7 +15,7 @@ from typing import (
 import swash
 from swash.prfx import NT
 from trio import Path
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import trio
 import arrow
@@ -28,6 +29,7 @@ from rdflib import (
     XSD,
     VOID,
     Graph,
+    IdentifiedNode,
     URIRef,
     Dataset,
     Literal,
@@ -312,7 +314,7 @@ class Repository:
 
     async def get_file(
         self,
-        identifier: URIRef,
+        identifier: IdentifiedNode,
         filename: str,
         media_type: str = "application/octet-stream",
     ) -> FileBlob:
@@ -323,6 +325,7 @@ class Repository:
             filename: Name of the file
             media_type: MIME type of the file content (default: application/octet-stream)
         """
+        assert isinstance(identifier, URIRef)
         file_path = self.graph_dir(identifier) / filename
         # Create a URI for the file
         file_uri = URIRef(f"file://{await file_path.absolute()}")
@@ -594,8 +597,8 @@ class Repository:
             return False
 
 
-@contextmanager
-def from_env() -> Generator["Repository", None, None]:
+@asynccontextmanager
+async def from_env() -> AsyncIterator[Repository]:
     """Load repository and context from environment variables.
 
     Requires the following environment variables:
@@ -633,7 +636,7 @@ def from_env() -> Generator["Repository", None, None]:
         return repo
 
     # Run async init in sync context
-    repo = trio.run(init_repo)
+    repo = await init_repo()
 
     graph_uri = URIRef(bubble_graph)
     activity_uri = URIRef(bubble_activity)

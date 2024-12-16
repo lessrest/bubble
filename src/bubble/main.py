@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 from fastapi import FastAPI
 import rdflib
 import rdflib.collection
-import swash
 from swash.html import document
+from swash.mint import fresh_id
 from swash.rdfa import autoexpanding, rdf_resource
 import trio
 import trio_asyncio
@@ -39,7 +39,6 @@ from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
 from swash.lynx import render_html
 from bubble.replicate.make import ReplicateClientActor, make_image
-from bubble.blob import BlobStore
 from bubble.data import from_env
 
 logger = configure_logging()
@@ -58,7 +57,6 @@ RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
 
 @app.command()
 def shell(
-    ctx: typer.Context,
     repo_path: str = RepoPath,
     namespace: str = Option(
         "https://example.com/", "--namespace", help="Namespace"
@@ -288,72 +286,78 @@ def info() -> None:
         )
         return
 
-    try:
-        with from_env() as repo:
-            # Create environment info table
-            env_table = Table(box=box.ROUNDED, title="Environment")
-            env_table.add_column("Key", style="bold blue")
-            env_table.add_column("Value")
+    async def run():
+        try:
+            async with from_env() as repo:
+                # Create environment info table
+                env_table = Table(box=box.ROUNDED, title="Environment")
+                env_table.add_column("Key", style="bold blue")
+                env_table.add_column("Value")
 
-            env_table.add_row("Bubble Path", os.environ["BUBBLE"])
-            env_table.add_row("Current Graph", os.environ["BUBBLE_GRAPH"])
-            env_table.add_row(
-                "Graph Directory", os.environ.get("BUBBLE_GRAPH_DIR", "-")
-            )
-
-            console.print(env_table)
-
-            # Create graphs info table
-            graphs_table = Table(box=box.ROUNDED, title="Graphs")
-            graphs_table.add_column("Graph", style="bold")
-            graphs_table.add_column("Type")
-            graphs_table.add_column("Created")
-            graphs_table.add_column("Files")
-
-            for graph_id in repo.list_graphs():
-                graph = repo.metadata
-
-                # Get graph type
-                graph_type = "Dataset"
-
-                # Get creation time
-                created = graph.value(graph_id, PROV.generatedAtTime)
-                if created and isinstance(created, Literal):
-                    try:
-                        # Parse the datetime from the Literal value
-                        dt = datetime.fromisoformat(str(created))
-                        created_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                    except (ValueError, TypeError):
-                        created_str = str(created)
-                else:
-                    created_str = "-"
-
-                # Count distributions (files)
-                file_count = len(
-                    list(graph.objects(graph_id, DCAT.distribution))
+                env_table.add_row("Bubble Path", os.environ["BUBBLE"])
+                env_table.add_row(
+                    "Current Graph", os.environ["BUBBLE_GRAPH"]
+                )
+                env_table.add_row(
+                    "Graph Directory",
+                    os.environ.get("BUBBLE_GRAPH_DIR", "-"),
                 )
 
-                graphs_table.add_row(
-                    graph_id.n3(graph.namespace_manager),
-                    graph_type,
-                    created_str,
-                    str(file_count),
-                )
+                console.print(env_table)
 
-            console.print(graphs_table)
+                # Create graphs info table
+                graphs_table = Table(box=box.ROUNDED, title="Graphs")
+                graphs_table.add_column("Graph", style="bold")
+                graphs_table.add_column("Type")
+                graphs_table.add_column("Created")
+                graphs_table.add_column("Files")
 
-            # Show the current activity using the lynx renderer
-            activity_uri = URIRef(os.environ["BUBBLE_ACTIVITY"])
-            with document() as doc:
-                with autoexpanding(3):
-                    rdf_resource(activity_uri)
-                    print(doc.to_html(compact=False))
-                    render_html(doc.element, console)
+                for graph_id in repo.list_graphs():
+                    graph = repo.metadata
 
-    except ValueError as e:
-        # Handle missing environment variables
-        console.print(f"[red]Error:[/] {str(e)}")
-        return
+                    # Get graph type
+                    graph_type = "Dataset"
+
+                    # Get creation time
+                    created = graph.value(graph_id, PROV.generatedAtTime)
+                    if created and isinstance(created, Literal):
+                        try:
+                            # Parse the datetime from the Literal value
+                            dt = datetime.fromisoformat(str(created))
+                            created_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        except (ValueError, TypeError):
+                            created_str = str(created)
+                    else:
+                        created_str = "-"
+
+                    # Count distributions (files)
+                    file_count = len(
+                        list(graph.objects(graph_id, DCAT.distribution))
+                    )
+
+                    graphs_table.add_row(
+                        graph_id.n3(graph.namespace_manager),
+                        graph_type,
+                        created_str,
+                        str(file_count),
+                    )
+
+                console.print(graphs_table)
+
+                # Show the current activity using the lynx renderer
+                activity_uri = URIRef(os.environ["BUBBLE_ACTIVITY"])
+                with document() as doc:
+                    with autoexpanding(3):
+                        rdf_resource(activity_uri)
+                        print(doc.to_html(compact=False))
+                        render_html(doc.element, console)
+
+        except ValueError as e:
+            # Handle missing environment variables
+            console.print(f"[red]Error:[/] {str(e)}")
+            return
+
+    trio_asyncio.run(run)
 
 
 @app.command()
@@ -363,7 +367,7 @@ def img(
 ) -> None:
     """Generate an image using Replicate AI."""
 
-    async def run():
+    async def run_generate_images():
         # Ensure REPLICATE_API_TOKEN is set
         if "REPLICATE_API_TOKEN" not in os.environ:
             console.print(
@@ -376,7 +380,7 @@ def img(
         # Try to use bubble environment if available
         if "BUBBLE" in os.environ:
             try:
-                with from_env() as repo:
+                async with from_env() as repo:
                     await generate_images(repo, prompt)
             except ValueError as e:
                 console.print(f"[red]Error:[/] {str(e)}")
@@ -397,20 +401,22 @@ def img(
 
             for i, readable in enumerate(readables):
                 img_data = await readable.aread()
+                name = f"{fresh_id()}.webp"
 
                 # Save the image
                 blob = await repo.get_file(
-                    URIRef(f"image_{i}"), "image.webp", "image/webp"
+                    context.graph.get().identifier, name, "image/webp"
                 )
                 await blob.write(img_data)
                 await repo.save_all()
 
                 console.print(f"[green]Image saved to:[/] {blob.path}")
+                await trio.run_process(["open", str(blob.path)])
 
         except Exception as e:
             console.print(f"[red]Error generating image:[/] {str(e)}")
 
-    trio_asyncio.run(run)
+    trio_asyncio.run(run_generate_images)
 
 
 if __name__ == "__main__":
