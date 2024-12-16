@@ -1,0 +1,7 @@
+# write turtle defns here that define prefixes for e.g. prov
+# and then define skos:prefLabel for the properties and classes we use
+# formatted like e.g. "was derived from"@en, etc etc
+# so not using camel case, just good english phrases
+# and changing e.g. generatedAtTime to "was generated at time"@en
+# to have a consistent grammatical phrase style
+# AI!
