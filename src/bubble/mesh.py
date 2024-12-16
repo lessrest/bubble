@@ -493,10 +493,10 @@ async def txgraph(graph: Optional[Graph] = None):
 
 class SimpleSupervisor:
     """A simple supervisor that manages named actors."""
-    
+
     def __init__(self, actors: dict[str, Callable]):
         """Initialize with a dictionary mapping names to actor constructors.
-        
+
         Args:
             actors: Dictionary mapping actor names to their constructor callables
         """
@@ -524,8 +524,10 @@ class SimpleSupervisor:
 
                 #                async for attempt in retry:
                 #                   with attempt:
-                logger.info("starting supervised actor", actor=actor)
-                child = await spawn(nursery, actor)
+                logger.info(
+                    "starting supervised actor", actor=actor, name=name
+                )
+                child = await spawn(nursery, actor, name=name)
                 add(this(), {NT.supervises: child})
 
 
