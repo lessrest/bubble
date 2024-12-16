@@ -250,9 +250,9 @@ class Repository:
 
         self.metadata.bind("home", namespace)
         
-        # Register built-in external graphs
-        vocab_ext = URIRef("urn:x-bubble:vocab:ext")
-        self.register_external_graph(vocab_ext, "vocab/ext.ttl")
+        # Register builtin graphs
+        vocab_ext = URIRef("urn:x-bubble:vocab:ext") 
+        self.register_builtin_graph(vocab_ext, "vocab/ext.ttl")
         # Base path for graphs
         self.graphs_path = Path(self.git.workdir) / "graphs"
 
@@ -445,10 +445,10 @@ class Repository:
         """Save a graph to its graph.trig file"""
         assert isinstance(identifier, URIRef)
         
-        # Check if this is an external graph
-        is_external = (identifier, FROTH.isExternal, Literal(True)) in self.metadata
-        if is_external:
-            raise ValueError(f"Cannot save external graph {identifier}")
+        # Check if this is a builtin graph
+        is_builtin = (identifier, FROTH.isBuiltin, Literal(True)) in self.metadata
+        if is_builtin:
+            raise ValueError(f"Cannot save builtin graph {identifier}")
             
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
@@ -521,24 +521,38 @@ class Repository:
         with context.bind_graph(identifier, self) as graph:
             yield graph
 
-    def register_external_graph(self, identifier: URIRef, path: str) -> Graph:
-        """Register an external graph that lives in the project source.
+    def register_builtin_graph(self, identifier: URIRef, path: str) -> Graph:
+        """Register a builtin graph that lives in the project source.
         
         Args:
-            identifier: The graph identifier
+            identifier: The graph identifier 
             path: Path relative to project root
             
         Returns:
             The registered graph
         """
-        logger.debug("Registering external graph", identifier=identifier, path=path)
+        logger.debug("Registering builtin graph", identifier=identifier, path=path)
         self.metadata.add((identifier, RDF.type, VOID.Dataset))
-        self.metadata.add((identifier, FROTH.isExternal, Literal(True)))
+        self.metadata.add((identifier, FROTH.isBuiltin, Literal(True)))
         self.metadata.add((identifier, NT.hasFilePath, Literal(path)))
         
         graph = self.dataset.graph(identifier, base=self.namespace)
         graph.parse(path, format="turtle")
         return graph
+
+    def reload_builtin_graphs(self) -> None:
+        """Reload all registered builtin graphs from their source files."""
+        for s, p, o in self.metadata.triples((None, FROTH.isBuiltin, Literal(True))):
+            identifier = URIRef(str(s))
+            path = str(get_single_object(identifier, NT.hasFilePath))
+            logger.debug("Reloading builtin graph", identifier=identifier, path=path)
+            
+            # Clear existing graph
+            graph = self.dataset.graph(identifier)
+            graph.remove((None, None, None))
+            
+            # Reload from file
+            graph.parse(path, format="turtle")
 
     def graph(self, identifier: URIRef) -> Graph:
         if (
