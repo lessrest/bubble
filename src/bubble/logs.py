@@ -320,4 +320,6 @@ def configure_logging(
         cache_logger_on_first_use=True,
     )
 
+    logging.basicConfig(level=level)
+
     return structlog.get_logger()

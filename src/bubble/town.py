@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import uuid
@@ -59,9 +60,10 @@ from swash.rdfa import (
     get_subject_data,
     visited_resources,
 )
-from swash.util import P, S, new
+from swash.util import P, S, add, new
 from bubble.data import Repository, context
 from bubble.mesh import (
+    ActorContext,
     Vat,
     call,
     create_graph,
@@ -75,6 +77,8 @@ from bubble.mesh import (
 from bubble.icon import favicon
 from bubble.keys import (
     build_did_document,
+    parse_public_key_hex,
+    verify_signed_data,
 )
 from bubble.page import base_html, base_shell
 from bubble.word import describe_word
@@ -519,43 +523,133 @@ class Site:
         #
         # Then, messages are relayed between the actor and the town.
 
-        with with_transient_graph() as outgoing_handshake:
-            new(
-                NT.Handshake,
-                {
-                    NT.signedMessage: Literal(
-                        self.vat.sign_data(b"hello"),
-                        datatype=XSD.base64Binary,
-                    ),
-                },
-                outgoing_handshake,
-            )
-            msg = vars.graph.get().serialize(format="json-ld")
-            await websocket.send_json(msg)
-            response = await websocket.receive_json()
-            response_graph = Graph()
-            response_graph.parse(
-                data=json.dumps(response), format="json-ld"
-            )
-            
-            # Extract and verify the signature from response
-            signed_message = response_graph.value(None, NT.signedMessage)
-            if not signed_message:
-                raise ValueError("No signed message in response")
-                
-            # Convert key from hex to bytes
-            try:
-                public_key_bytes = bytes.fromhex(key)
-            except ValueError:
-                raise ValueError("Invalid public key format")
-                
-            # Verify signature using provided public key
-            if not self.vat.verify_data(
-                b"hello", 
-                signed_message.value, 
-                public_key_bytes
-            ):
-                raise ValueError("Invalid signature")
+        await websocket.accept()
+        try:
+            with with_transient_graph() as outgoing_handshake:
+                new(
+                    NT.Handshake,
+                    {
+                        NT.signedQuestion: Literal(
+                            base64.b64encode(self.vat.sign_data(b"hello")),
+                            datatype=XSD.base64Binary,
+                        )
+                    },
+                    outgoing_handshake,
+                )
+                msg = vars.graph.get().serialize(format="turtle")
+                logger.info("sending handshake", graph=msg)
+                await websocket.send_text(msg)
+                response = await websocket.receive_text()
+                response_graph = Graph()
+                response_graph.parse(data=response, format="turtle")
+                logger.info("received response", graph=response_graph)
+
+                # Extract and verify the signature from response
+                signed_message = response_graph.value(
+                    outgoing_handshake, NT.signedAnswer
+                )
+                if not signed_message:
+                    raise ValueError("No signed message in response")
+
+                # Convert key from hex to bytes
+                try:
+                    public_key = parse_public_key_hex(key)
+                except ValueError:
+                    raise ValueError("Invalid public key format")
+
+                signed_message_bytes = signed_message.toPython()
+                assert isinstance(signed_message_bytes, bytes)
+
+                # Verify signature using provided public key
+                if not verify_signed_data(
+                    b"hello", signed_message_bytes, public_key
+                ):
+                    raise ValueError("Invalid signature")
+
+                logger.info("signature verified", public_key=public_key)
+
+                # The URI of the actor is derived from its public key
+                # by Base32 encoding the public key and prefixing it with
+                # the site namespace.
+                remote_actor_uri = self.site[
+                    base64.b32encode(public_key.public_bytes_raw())
+                    .decode("ascii")
+                    .rstrip("=")
+                    .upper()
+                ]
+
+                # We mint a new process URI for this session
+                proc = mint.fresh_uri(self.site)
+
+                # We create a send and receive channel for the remote actor
+                send, recv = trio.open_memory_channel[Graph](8)
+
+                remote_actor_context = ActorContext(
+                    boss=self.vat.get_identity_uri(),
+                    addr=remote_actor_uri,
+                    proc=proc,
+                    send=send,
+                    recv=recv,
+                )
+
+                self.vat.deck[remote_actor_uri] = remote_actor_context
+
+                new(
+                    NT.RemoteActor,
+                    {
+                        NT.publicKey: Literal(
+                            key,
+                            datatype=XSD.base64Binary,
+                        ),
+                        PROV.wasAssociatedWith: proc,
+                    },
+                    remote_actor_uri,
+                )
+
+                new(
+                    NT.RemoteActorSession,
+                    {
+                        NT.remoteActor: remote_actor_uri,
+                        NT.remoteActorContext: remote_actor_context,
+                        PROV.startedAtTime: context.clock.get()(),
+                    },
+                    proc,
+                )
+
+                logger.info(
+                    "remote actor joined",
+                    addr=remote_actor_uri,
+                    proc=proc,
+                )
+
+                async def forward_messages_to_remote_actor():
+                    async for message in recv:
+                        msg_json = message.serialize(format="trig")
+                        await websocket.send_text(msg_json)
+
+                async def forward_messages_to_town():
+                    while True:
+                        try:
+                            data = await websocket.receive_text()
+                            msg_graph = Graph()
+                            msg_graph.parse(data=data, format="trig")
+                            await send.send(msg_graph)
+                        except Exception as e:
+                            logger.error("websocket receive error", error=e)
+                            break
+
+                try:
+                    async with trio.open_nursery() as nursery:
+                        nursery.start_soon(forward_messages_to_remote_actor)
+                        nursery.start_soon(forward_messages_to_town)
+                except Exception as e:
+                    logger.error("websocket handler error", error=e)
+                    raise
+                finally:
+                    add(proc, {PROV.endedAtTime: context.clock.get()()})
+        except Exception as e:
+            logger.error("websocket handler error", error=e)
+            raise
 
     @contextmanager
     def install_context(self):

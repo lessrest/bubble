@@ -87,6 +87,7 @@ dependencies = [
     "wn>=0.11.0",
     "pudb>=2024.1.3",
     "trio-asyncio>=0.15.0",
+    "httpx-ws>=0.7.0",
 ]
 
 [tool.uv.sources]

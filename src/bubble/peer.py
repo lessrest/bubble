@@ -11,7 +11,7 @@ import httpx
 from httpx_ws import aconnect_ws
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
-from rdflib import Graph, URIRef, RDF
+from rdflib import XSD, Dataset, Graph, Literal, URIRef, RDF
 
 from bubble.keys import verify_signed_data
 from swash.prfx import NT
@@ -66,12 +66,13 @@ class Peer:
             )
 
             # Create WebSocket connection using httpx-ws
-            async with httpx.AsyncClient() as client:
-                async with aconnect_ws(join_url, client=client, verify=ssl_context) as ws:
+            async with httpx.AsyncClient(verify=False) as client:
+                async with aconnect_ws(join_url, client=client) as ws:
                     # Receive initial handshake
                     handshake_msg = await ws.receive_text()
+                    logger.info("received handshake", message=handshake_msg)
                     handshake = Graph()
-                    handshake.parse(data=handshake_msg, format="json-ld")
+                    handshake.parse(data=handshake_msg, format="turtle")
 
                     logger.info("received handshake", graph=handshake)
 
@@ -90,8 +91,9 @@ class Peer:
                                 (
                                     subject,
                                     NT.signedAnswer,
-                                    URIRef(
-                                        base64.b64encode(signed_answer).decode()
+                                    Literal(
+                                        base64.b64encode(signed_answer),
+                                        datatype=XSD.base64Binary,
                                     ),
                                 )
                             )
@@ -100,14 +102,16 @@ class Peer:
 
                             # Send response
                             await ws.send_text(
-                                response.serialize(format="json-ld")
+                                response.serialize(format="turtle")
                             )
 
                             logger.info("handshake complete")
 
                             # Start message handling loop
                             async with trio.open_nursery() as nursery:
-                                nursery.start_soon(self._handle_messages, ws)
+                                nursery.start_soon(
+                                    self._handle_messages, ws
+                                )
                                 nursery.start_soon(self._heartbeat, ws)
 
         except Exception as e:
@@ -121,7 +125,7 @@ class Peer:
                 try:
                     message = await ws.receive_text()
                     msg_graph = Graph()
-                    msg_graph.parse(data=message, format="json-ld")
+                    msg_graph.parse(data=message, format="trig")
                     await self.handle_message(msg_graph)
                 except Exception as e:
                     logger.error("message handling error", error=e)
@@ -135,14 +139,13 @@ class Peer:
             while True:
                 await trio.sleep(30)
                 heartbeat = Graph()
-                heartbeat.add((URIRef("#heartbeat"), RDF.type, NT.Heartbeat))
-                await ws.send_text(
-                    heartbeat.serialize(format="json-ld")
+                heartbeat.add(
+                    (URIRef("#heartbeat"), RDF.type, NT.Heartbeat)
                 )
+                await ws.send_text(heartbeat.serialize(format="trig"))
         except Exception as e:
             logger.error("heartbeat error", error=e)
 
     async def handle_message(self, message: Graph) -> None:
         """Handle an incoming message. Override this in subclasses."""
         logger.info("received message", graph=message)
-

@@ -55,7 +55,7 @@ class ActorContext:
     proc: URIRef
     send: trio.MemorySendChannel
     recv: trio.MemoryReceiveChannel
-    name: str
+    name: str = "anonymous"
     trap: bool = False
 
 
