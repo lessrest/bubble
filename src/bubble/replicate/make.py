@@ -57,8 +57,8 @@ class ReplicateClientActor(ServerActor[str]):
 
     store: Repository
 
-    def __init__(self, name: str, store: Repository):
-        super().__init__(os.environ["REPLICATE_API_TOKEN"], name=name)
+    def __init__(self, store: Repository):
+        super().__init__(os.environ["REPLICATE_API_TOKEN"])
         self.store = store
 
     async def init(self):
