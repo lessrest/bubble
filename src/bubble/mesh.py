@@ -56,7 +56,7 @@ class ActorContext:
     send: trio.MemorySendChannel
     recv: trio.MemoryReceiveChannel
     trap: bool = False
-    name: str = "anonymous"
+    name: str = "Deepgram client"
 
 
 def fresh_uri(site: Optional[Namespace] = None) -> URIRef:
