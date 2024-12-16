@@ -2,12 +2,12 @@ import json
 import base64
 import pathlib
 import ssl
-from typing import Optional
+from typing import Optional, AsyncGenerator
 import structlog
 from dataclasses import dataclass
 
 import trio
-import trio_websocket
+import httpx
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 from rdflib import Graph, URIRef
@@ -24,6 +24,7 @@ class Peer:
 
     private_key: ed25519.Ed25519PrivateKey
     public_key: ed25519.Ed25519PublicKey
+    client: Optional[httpx.AsyncClient] = None
 
     @classmethod
     def generate(cls) -> "Peer":
@@ -44,37 +45,35 @@ class Peer:
         return self.private_key.sign(data)
 
     async def connect(self, town_url: str) -> None:
-        """Connect to a town's websocket endpoint."""
-        # Convert http(s):// to ws(s)://
-        if town_url.startswith("https://"):
-            ws_url = f"wss://{town_url[8:]}"
-        elif town_url.startswith("http://"):
-            ws_url = f"ws://{town_url[7:]}"
-        else:
-            ws_url = town_url
-
+        """Connect to a town via HTTP."""
         # Ensure URL ends with /
-        if not ws_url.endswith("/"):
-            ws_url += "/"
+        if not town_url.endswith("/"):
+            town_url += "/"
 
         # Add join endpoint and public key
-        ws_url += f"join/{self.get_public_key_hex()}"
+        join_url = f"{town_url}join/{self.get_public_key_hex()}"
 
-        logger.info("connecting to town", url=ws_url)
+        logger.info("connecting to town", url=join_url)
 
         try:
+            # Setup SSL context
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ssl_context.load_verify_locations(
                 cafile=pathlib.Path(__file__).parent.parent.parent
                 / "priv/localhost.pem",
             )
-            # pudb.set_trace()
-            async with trio_websocket.open_websocket_url(
-                ws_url,
-                ssl_context=ssl_context,
-            ) as ws:
-                # Receive handshake
-                handshake_msg = await ws.get_message()
+
+            # Create HTTP client
+            self.client = httpx.AsyncClient(
+                verify=ssl_context,
+                headers={"Accept": "application/ld+json"},
+                timeout=30.0,
+            )
+
+            # Get initial handshake
+            async with self.client.stream("GET", join_url) as response:
+                response.raise_for_status()
+                handshake_msg = await response.aread()
                 handshake = Graph()
                 handshake.parse(data=handshake_msg, format="json-ld")
 
@@ -104,45 +103,71 @@ class Peer:
                         logger.info("sending response", graph=response)
 
                         # Send response
-                        await ws.send_message(
-                            response.serialize(format="json-ld")
+                        resp = await self.client.post(
+                            join_url,
+                            content=response.serialize(format="json-ld"),
+                            headers={"Content-Type": "application/ld+json"},
                         )
+                        resp.raise_for_status()
 
                         logger.info("handshake complete")
 
-                        # Now enter message loop
+                        # Start message polling
                         async with trio.open_nursery() as nursery:
-                            nursery.start_soon(self._receive_messages, ws)
-                            nursery.start_soon(self._heartbeat, ws)
+                            nursery.start_soon(self._poll_messages, join_url)
+                            nursery.start_soon(self._heartbeat, join_url)
 
-        except BaseException as e:
-            logger.error("websocket error", error=e)
+        except Exception as e:
+            logger.error("connection error", error=e)
+            if self.client:
+                await self.client.aclose()
             raise
 
-    async def _receive_messages(
-        self, ws: trio_websocket.WebSocketConnection
-    ) -> None:
-        """Receive and handle messages from the websocket."""
+    async def _poll_messages(self, url: str) -> None:
+        """Poll for messages from the server."""
         try:
             while True:
-                message = await ws.get_message()
-                msg_graph = Graph()
-                msg_graph.parse(data=message, format="json-ld")
-                await self.handle_message(msg_graph)
-        except trio_websocket.ConnectionClosed:
-            logger.info("websocket closed")
+                if not self.client:
+                    break
+                    
+                async with self.client.stream("GET", f"{url}/messages") as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            msg_data = line[6:]
+                            msg_graph = Graph()
+                            msg_graph.parse(data=msg_data, format="json-ld")
+                            await self.handle_message(msg_graph)
+                
+                # Small delay between polls
+                await trio.sleep(0.1)
+                
+        except Exception as e:
+            logger.error("polling error", error=e)
+            if self.client:
+                await self.client.aclose()
 
-    async def _heartbeat(
-        self, ws: trio_websocket.WebSocketConnection
-    ) -> None:
+    async def _heartbeat(self, url: str) -> None:
         """Send periodic heartbeat messages."""
         try:
             while True:
+                if not self.client:
+                    break
+                    
                 await trio.sleep(30)
-                await ws.send_message(json.dumps({"type": "heartbeat"}))
-        except trio_websocket.ConnectionClosed:
-            pass
+                await self.client.post(
+                    f"{url}/heartbeat",
+                    json={"type": "heartbeat"},
+                )
+        except Exception as e:
+            logger.error("heartbeat error", error=e)
 
     async def handle_message(self, message: Graph) -> None:
         """Handle an incoming message. Override this in subclasses."""
         logger.info("received message", graph=message)
+
+    async def close(self) -> None:
+        """Close the connection."""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
