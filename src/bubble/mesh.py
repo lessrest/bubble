@@ -492,6 +492,7 @@ async def txgraph(graph: Optional[Graph] = None):
 
 
 class SimpleSupervisor:
+    # actors here should be a dict of name -> actor AI!
     def __init__(self, *actors: Callable):
         self.actors = actors
 
