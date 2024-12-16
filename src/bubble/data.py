@@ -204,6 +204,12 @@ class FileBlob:
         assert self._file is not None
         return self._file
 
+    async def write(self, data: bytes) -> None:
+        """Write data to the file"""
+        io = await self.open("wb")
+        io.write(data)
+        io.close()
+
     def close(self) -> None:
         """Close the file if open"""
         if self._file:
@@ -303,7 +309,7 @@ class Repository:
         """Get the path to the graph.trig file for a graph"""
         return self.rdf_dir(identifier) / "graph.trig"
 
-    def get_file(
+    async def get_file(
         self,
         identifier: URIRef,
         filename: str,
@@ -318,7 +324,7 @@ class Repository:
         """
         file_path = self.graph_dir(identifier) / filename
         # Create a URI for the file
-        file_uri = URIRef(f"file://{file_path.absolute()}")
+        file_uri = URIRef(f"file://{await file_path.absolute()}")
 
         # Record file metadata in the graph itself
         with self.using_graph(identifier):

@@ -13,6 +13,7 @@ from swash.prfx import NT, Schema
 import swash.vars as vars
 from swash.util import add, new, is_a, get_single_object
 from bubble.blob import BlobStore
+from bubble.data import Repository
 from bubble.mesh import (
     ServerActor,
     get_base,
@@ -60,9 +61,9 @@ async def make_image(prompt: str) -> list[AsyncReadable]:
 class ReplicateClientActor(ServerActor[str]):
     """Actor that manages image generation requests"""
 
-    store: BlobStore
+    store: Repository
 
-    def __init__(self, name: str, store: BlobStore):
+    def __init__(self, name: str, store: Repository):
         super().__init__(os.environ["REPLICATE_API_TOKEN"], name=name)
         self.store = store
 
@@ -111,7 +112,11 @@ class ReplicateClientActor(ServerActor[str]):
                         },
                     )
                     add(result.identifier, {PROV.generated: entity})
-                    self.store.append_blob(str(entity), 0, img)
+                    # self.store.append_blob(str(entity), 0, img)
+                    blob = await self.store.get_file(
+                        entity, "image.webp", "image/webp"
+                    )
+                    await blob.write(img)
 
             return result
 

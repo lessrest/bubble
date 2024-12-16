@@ -213,9 +213,7 @@ def town(
                         nursery,
                         SimpleSupervisor(
                             DeepgramClientActor("Deepgram Client"),
-                            ReplicateClientActor(
-                                "Replicate Client", repo.blobs
-                            ),
+                            ReplicateClientActor("Replicate Client", repo),
                         ),
                     )
 
@@ -390,7 +388,7 @@ def info() -> None:
 @app.command()
 def img(
     prompt: str,
-    bubble_path: str = BubblePath,
+    repo_path: str = RepoPath,
 ) -> None:
     """Generate an image using Replicate AI."""
 
@@ -404,27 +402,30 @@ def img(
 
         console.print(f"[green]Generating image for prompt:[/] {prompt}")
 
-        async with loading_bubble_from(trio.Path(bubble_path)) as repo:
-            # Create temporary blob store for the image
-            store = BlobStore(repo.git.path / "blobs")
+        git = Git(trio.Path(repo_path))
+        repo = await Repository.create(
+            git, namespace=Namespace("file://" + repo_path + "/")
+        )
+        await repo.load_all()
 
-            try:
-                readables = await make_image(prompt)
+        # Create temporary blob store for the image
+        try:
+            readables = await make_image(prompt)
 
-                for i, readable in enumerate(readables):
-                    img_data = await readable.aread()
-                    output_path = repo.git.path / f"image_{i}.png"
+            for i, readable in enumerate(readables):
+                img_data = await readable.aread()
 
-                    # Save the image
-                    async with await trio.open_file(output_path, "wb") as f:
-                        await f.write(img_data)
+                # Save the image
+                blob = await repo.get_file(
+                    URIRef(f"image_{i}"), "image.webp", "image/webp"
+                )
+                await blob.write(img_data)
+                await repo.save_all()
 
-                    console.print(
-                        f"[green]Image saved to:[/] {output_path}"
-                    )
+                console.print(f"[green]Image saved to:[/] {blob.path}")
 
-            except Exception as e:
-                console.print(f"[red]Error generating image:[/] {str(e)}")
+        except Exception as e:
+            console.print(f"[red]Error generating image:[/] {str(e)}")
 
     trio_asyncio.run(run)
 
