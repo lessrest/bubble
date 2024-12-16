@@ -1,7 +1,7 @@
 import base64
 from datetime import UTC, datetime
 import structlog
-from rdflib import XSD, Graph, Literal, URIRef, RDF, PROV
+from rdflib import XSD, Graph, Literal, URIRef, RDF, PROV, Dataset
 from swash.mint import fresh_uri
 from swash.prfx import NT
 from swash.util import new, add
