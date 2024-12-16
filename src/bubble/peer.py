@@ -125,15 +125,10 @@ class Peer:
         for subject in handshake.subjects(None, NT.Handshake):
             signed_question = handshake.value(subject, NT.signedQuestion)
             if signed_question:
-                # Extract the nonce from the handshake
-                nonce = handshake.value(subject, NT.nonce)
-                if not nonce:
-                    raise ValueError("No nonce found in handshake")
+                # Use the handshake URI itself as the nonce
+                nonce_bytes = str(subject).encode()
                 
-                nonce_bytes = nonce.toPython()
-                assert isinstance(nonce_bytes, bytes)
-                
-                # Sign our response using the nonce
+                # Sign our response using the handshake URI as nonce
                 signed_answer = self.sign(nonce_bytes)
 
                 # Build a response graph
