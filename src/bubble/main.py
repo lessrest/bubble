@@ -287,20 +287,25 @@ def town(
 @app.command()
 def join_simple(
     town_url: str = Option(..., "--town", help="Town URL to join"),
+    anonymous: bool = Option(False, "--anonymous", help="Join anonymously without an identity"),
 ) -> None:
     """Join a remote town as a simple peer that prints incoming messages."""
     logger = configure_logging(level=get_log_level())
 
     async def run():
-        # Create a new peer with fresh keypair
-        peer = Peer.generate()
-        logger.info(
-            "generated new peer identity",
-            public_key=peer.get_public_key_hex(),
-        )
-
         try:
-            await peer.connect(town_url)
+            if anonymous:
+                # Connect anonymously without generating a keypair
+                peer = await Peer.connect_anonymous(town_url)
+                logger.info("connected anonymously to town")
+            else:
+                # Create a new peer with fresh keypair
+                peer = Peer.generate()
+                logger.info(
+                    "generated new peer identity",
+                    public_key=peer.get_public_key_hex(),
+                )
+                await peer.connect(town_url)
         except Exception as e:
             logger.error("connection failed", error=e)
             raise
