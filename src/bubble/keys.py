@@ -37,9 +37,45 @@ def generate_identity_uri(public_key: ed25519.Ed25519PublicKey) -> URIRef:
     return URIRef(f"did:key:{get_public_key_hex(public_key)}")
 
 
-# define functions to parse a public key from a hex string
-# and to verify a signed bytes object using a public key
-# AI!
+def parse_public_key_hex(hex_string: str) -> ed25519.Ed25519PublicKey:
+    """Parse a hex-encoded Ed25519 public key.
+    
+    Args:
+        hex_string: Hex-encoded public key
+        
+    Returns:
+        Ed25519PublicKey: The parsed public key
+        
+    Raises:
+        ValueError: If the hex string is invalid
+    """
+    try:
+        key_bytes = bytes.fromhex(hex_string)
+        return ed25519.Ed25519PublicKey.from_public_bytes(key_bytes)
+    except ValueError as e:
+        raise ValueError(f"Invalid public key hex string: {e}")
+
+
+def verify_signed_data(
+    message: bytes,
+    signature: bytes, 
+    public_key: ed25519.Ed25519PublicKey
+) -> bool:
+    """Verify a signed message using an Ed25519 public key.
+    
+    Args:
+        message: The original message bytes
+        signature: The signature bytes to verify
+        public_key: The public key to verify with
+        
+    Returns:
+        bool: True if signature is valid, False otherwise
+    """
+    try:
+        public_key.verify(signature, message)
+        return True
+    except Exception:
+        return False
 
 
 def create_identity_graph(
