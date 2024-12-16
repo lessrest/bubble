@@ -1,272 +1,412 @@
 import base64
-import pathlib
-import ssl
-from dataclasses import dataclass
-from typing import Optional, AsyncGenerator
+
 from datetime import UTC, datetime
+from typing import Tuple
 
-import trio
-import httpx
-from httpx_ws import aconnect_ws
 import structlog
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat.primitives import serialization
-from rdflib import XSD, Dataset, Graph, Literal, URIRef, RDF
 
-from bubble.connect import anonymous_connection, signed_connection
-from swash.prfx import NT, PROV
+from trio import open_nursery, open_memory_channel
+from rdflib import RDF, XSD, PROV, Graph, Dataset, Literal, URIRef
+from fastapi import WebSocket
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PublicKey,
+)
+
+from swash.mint import fresh_uri
+from swash.prfx import NT
+from swash.util import S, add, new
+from bubble.data import context
+from bubble.keys import verify_signed_data
+from bubble.mesh import Vat, ActorContext, with_transient_graph
 
 logger = structlog.get_logger(__name__)
 
 
-@dataclass
-class Peer:
+async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
     """
-    A peer that can connect to a Bubble Town service via WebSocket.
+    Handle an anonymous/transient actor joining a town via WebSocket.
     
-    This class represents an established connection to a town,
-    either with a signed identity or anonymously.
-    """
-    ws: AsyncGenerator  # The WebSocket connection
-    actor_uri: URIRef  # The peer's identity URI in the town
-
-    @classmethod
-    async def connect_anonymous(cls, town_url: str) -> "Peer":
-        """Connect to a town anonymously via WebSocket."""
-        ws_url = convert_to_ws_url(town_url)
-        async with anonymous_connection(ws_url) as (ws, actor_uri):
-            return cls(ws=ws, actor_uri=actor_uri)
-
-    @classmethod
-    async def connect_with_identity(cls, town_url: str) -> "Peer":
-        """Connect to a town with a signed identity via WebSocket."""
-        private_key = ed25519.Ed25519PrivateKey.generate()
-        public_key = private_key.public_key()
-        ws_url = convert_to_ws_url(town_url)
-        async with signed_connection(ws_url, private_key, public_key) as (ws, actor_uri):
-            return cls(ws=ws, actor_uri=actor_uri)
-
-async def establish_anonymous_connection(town_url: str) -> tuple[AsyncGenerator, URIRef]:
-    """
-    Establish an anonymous connection to a town.
+    This involves:
+    - Accepting the connection
+    - Assigning a temporary identity
+    - Performing a simple handshake to confirm protocol version
+    - Setting up an actor context
+    - Forwarding messages between the actor and town
+    - Handling heartbeat messages
     
     Args:
-        town_url: The HTTPS URL of the town to connect to.
-    
-    Returns:
-        A tuple of (websocket, actor_uri) for the established connection.
+        websocket: The WebSocket connection object
+        vat: The Vat instance managing the town and its actors
     """
-    ws_url = convert_to_ws_url(town_url)
-    join_url = f"{ws_url}join"
-    logger.info("Connecting anonymously to town", url=join_url)
-
+    await websocket.accept()
+    
     try:
-        async with httpx.AsyncClient(verify=False) as client:
-            async with aconnect_ws(join_url, client=client) as ws:
-                # Receive the handshake with our temporary identity
-                handshake_msg = await ws.receive_text()
-                handshake = Graph()
-                handshake.parse(data=handshake_msg, format="turtle")
-                logger.info("Received anonymous handshake", graph=handshake)
+        # Generate a temporary identity for this anonymous actor
+        remote_actor_uri = fresh_uri(vat.site)
+        proc = fresh_uri(vat.site)
 
-                # Extract our assigned actor URI and verify protocol version
-                for subject in handshake.subjects(RDF.type, NT.AnonymousHandshake):
-                    if handshake.value(subject, NT.protocol) != NT.Protocol_1:
-                        raise ValueError("Unsupported protocol version")
-                    
-                    actor_uri = handshake.value(subject, NT.actor)
-                    if not actor_uri:
-                        raise ValueError("No actor URI in handshake")
-
-                    # Send acknowledgment
-                    ack = Graph()
-                    ack.add((subject, NT.acknowledged, Literal(True)))
-                    await ws.send_text(ack.serialize(format="turtle"))
-                    logger.info("Sent handshake acknowledgment")
-                    break
-                else:
-                    raise ValueError("Invalid handshake message")
-
-                # Launch concurrent tasks for message handling and heartbeat
-                async with trio.open_nursery() as nursery:
-                    nursery.start_soon(handle_messages, ws)
-                    nursery.start_soon(heartbeat, ws)
-
-                return ws, actor_uri
-
-    except Exception as e:
-        logger.error("Connection error", error=e)
-        raise
-
-async def establish_signed_connection(
-    town_url: str,
-    private_key: ed25519.Ed25519PrivateKey,
-    public_key: ed25519.Ed25519PublicKey,
-) -> tuple[AsyncGenerator, URIRef]:
-    """
-    Establish a signed connection to a town.
-    
-    Args:
-        town_url: The HTTPS URL of the town to connect to.
-        private_key: The Ed25519 private key for signing.
-        public_key: The corresponding public key.
-    
-    Returns:
-        A tuple of (websocket, actor_uri) for the established connection.
-    """
-    ws_url = convert_to_ws_url(town_url)
-    public_key_hex = public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw,
-    ).hex()
-    
-    join_url = f"{ws_url}join/{public_key_hex}"
-    logger.info("Connecting to town with identity", url=join_url)
-
-    # Create an SSL context to trust the local CA if necessary
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    cert_path = (
-        pathlib.Path(__file__).parent.parent.parent
-        / "priv"
-        / "localhost.pem"
-    )
-    ssl_context.load_verify_locations(cafile=cert_path)
-
-    try:
-        async with httpx.AsyncClient(verify=False) as client:
-            async with aconnect_ws(join_url, client=client) as ws:
-                # Perform the handshake
-                actor_uri = await perform_handshake(ws, private_key)
-
-                # Launch concurrent tasks for message handling and heartbeat
-                async with trio.open_nursery() as nursery:
-                    nursery.start_soon(handle_messages, ws)
-                    nursery.start_soon(heartbeat, ws)
-
-                return ws, actor_uri
-
-    except Exception as e:
-        logger.error("Connection error", error=e)
-        raise
-
-def convert_to_ws_url(town_url: str) -> str:
-    """Convert an HTTPS town URL to a WSS URL, ensuring a trailing slash."""
-    ws_url = town_url.replace("https://", "wss://")
-    if not ws_url.endswith("/"):
-        ws_url += "/"
-    return ws_url
-
-async def perform_handshake(
-    ws,
-    private_key: ed25519.Ed25519PrivateKey,
-) -> URIRef:
-    """
-    Perform the initial handshake with the remote town via the WebSocket.
-    Returns the actor URI assigned by the town.
-    """
-    # Receive the initial handshake message from the server
-    handshake_msg = await ws.receive_text()
-    handshake = Graph()
-    handshake.parse(data=handshake_msg, format="turtle")
-    logger.info("Received handshake", graph=handshake)
-
-    # Locate the handshake subject and extract the signed question
-    for subject in handshake.subjects(None, NT.Handshake):
-        signed_question = handshake.value(subject, NT.signedQuestion)
-        if signed_question:
-            # Use the handshake URI itself as the nonce
-            nonce_bytes = str(subject).encode()
-
-            # Sign our response using the handshake URI as nonce
-            signed_answer = private_key.sign(nonce_bytes)
-
-            # Build a response graph
-            response = Graph()
-            response.add(
-                (
-                    subject,
-                    NT.signedAnswer,
-                    Literal(
-                        base64.b64encode(signed_answer),
-                        datatype=XSD.base64Binary,
-                    ),
-                )
-            )
-            logger.info("Sending handshake response", graph=response)
-
-            # Send the response to complete the handshake
-            await ws.send_text(response.serialize(format="turtle"))
-            logger.info("Handshake complete")
+        # Send handshake with protocol version and actor URI
+        handshake = Graph()
+        handshake_id = fresh_uri(vat.site)
+        handshake.add((handshake_id, RDF.type, NT.AnonymousHandshake))
+        handshake.add((handshake_id, NT.protocol, NT.Protocol_1))
+        handshake.add((handshake_id, NT.actor, remote_actor_uri))
+        
+        await websocket.send_text(handshake.serialize(format="turtle"))
+        
+        # Wait for acknowledgment
+        try:
+            ack_msg = await websocket.receive_text()
+            ack = Graph()
+            ack.parse(data=ack_msg, format="turtle")
             
-            # Return the actor URI from the handshake
-            actor_uri = handshake.value(subject, NT.actor)
-            if not actor_uri:
-                raise ValueError("No actor URI in handshake response")
-            return actor_uri
+            if not any(ack.triples((handshake_id, NT.acknowledged, Literal(True)))):
+                raise ValueError("Invalid handshake acknowledgment")
+                
+        except Exception as e:
+            logger.error("handshake acknowledgment failed", error=e)
+            raise
+        
+        # Create send/receive channels for actor messages
+        send, recv = open_memory_channel[Graph](8)
+        
+        # Create and register the actor context
+        remote_actor_context = ActorContext(
+            boss=vat.get_identity_uri(),
+            addr=remote_actor_uri,
+            proc=proc,
+            send=send,
+            recv=recv,
+        )
+        vat.deck[remote_actor_uri] = remote_actor_context
+        
+        # Record the anonymous actor session
+        new(
+            NT.AnonymousActor,
+            {
+                PROV.wasAssociatedWith: proc,
+                NT.affordance: create_message_prompt(remote_actor_uri),
+            },
+            remote_actor_uri,
+        )
+        
+        new(
+            NT.AnonymousActorSession,
+            {
+                NT.remoteActor: remote_actor_uri,
+                PROV.startedAtTime: context.clock.get()(),
+            },
+            proc,
+        )
+        
+        # Add the remote actor to the current process
+        add(vat.curr.get().proc, {NT.hasRemoteActor: remote_actor_uri})
+        
+        logger.info("anonymous actor joined", addr=remote_actor_uri, proc=proc)
+        
+        # Launch message forwarding tasks
+        await _run_message_forwarders(websocket, remote_actor_uri, proc, recv)
+        
+    except Exception as e:
+        logger.error("anonymous websocket handler error", error=e)
+        raise
 
-    raise ValueError("Invalid handshake message")
+async def handle_actor_join(
+    websocket: WebSocket, key: Ed25519PublicKey, vat: Vat
+):
+    """
+    Handle a remote actor (identified by their public key) joining a town via WebSocket.
 
-async def handle_messages(ws) -> None:
-    """Continuously receive and process messages from the WebSocket."""
+    This involves:
+    - Performing a handshake with a signed challenge-response mechanism.
+    - Verifying the actor's public key signature.
+    - Setting up a remote actor context and registering it with the vat.
+    - Forwarding messages between the remote actor and the town.
+    - Handling heartbeat messages.
+
+    Args:
+        websocket: The WebSocket connection object.
+        key: The Ed25519 public key object of the remote actor.
+        vat: The Vat instance managing the town and its actors.
+    """
+    await websocket.accept()
+
     try:
+        # Perform the handshake and verify the actor's signature
+        await _perform_handshake(websocket, vat, key)
+
+        # Setup the remote actor context and register them with the vat
+        remote_actor_uri, proc, recv = _setup_remote_actor_context(vat, key)
+
+        # Launch message forwarding tasks
+        await _run_message_forwarders(
+            websocket, remote_actor_uri, proc, recv
+        )
+
+    except Exception as e:
+        logger.error("websocket handler error", error=e)
+        raise
+
+
+async def _perform_handshake(
+    websocket: WebSocket, vat: Vat, key: Ed25519PublicKey
+):
+    """
+    Perform the handshake with the remote actor. The handshake is a challenge-response
+    mechanism where the vat sends a signed nonce and the actor responds by signing the
+    same nonce, proving possession of the corresponding private key.
+
+    Args:
+        websocket: The WebSocket connection.
+        vat: The Vat instance managing the town.
+        key: The Ed25519 public key object of the remote actor.
+
+    Returns:
+        public_key: The verified public key object.
+
+    Raises:
+        ValueError: If the signature verification fails or the response is invalid.
+    """
+
+    # Create a transient graph for the outgoing handshake
+    with with_transient_graph() as outgoing_handshake:
+        # Use the handshake URI as the nonce
+        nonce = str(outgoing_handshake).encode()
+
+        # Sign the nonce using the vat key and send it to the actor
+        signed_question = vat.sign_data(nonce)
+        new(
+            NT.Handshake,
+            {
+                NT.signedQuestion: Literal(
+                    base64.b64encode(signed_question),
+                    datatype=XSD.base64Binary,
+                )
+            },
+            outgoing_handshake,
+        )
+
+        handshake_msg = context.graph.get().serialize(format="turtle")
+        logger.info("sending handshake", graph=handshake_msg)
+        await websocket.send_text(handshake_msg)
+
+    # Receive and parse the actor's response
+    response_graph = await receive_graph(websocket)
+    logger.info("received handshake response", graph=response_graph)
+
+    # Extract the signed answer from the response
+    signed_answer = response_graph.value(
+        outgoing_handshake, NT.signedAnswer
+    )
+    if not signed_answer:
+        raise ValueError("No signed answer in handshake response")
+
+    signed_answer_bytes = signed_answer.toPython()
+    assert isinstance(signed_answer_bytes, bytes)
+
+    # Verify that the signed answer is correct by checking against the nonce
+    if not verify_signed_data(nonce, signed_answer_bytes, key):
+        raise ValueError("Invalid signature during handshake")
+
+    logger.info("signature verified successfully", public_key=key)
+
+
+async def receive_graph(websocket) -> Graph:
+    response = await websocket.receive_text()
+    response_graph = Graph()
+    response_graph.parse(data=response, format="turtle")
+    return response_graph
+
+
+def _setup_remote_actor_context(vat: Vat, key: Ed25519PublicKey):
+    """
+    Set up the remote actor's context once their identity has been verified.
+    This includes:
+    - Deriving the remote actor URI from their public key.
+    - Minting a new process URI for this session.
+    - Creating a memory channel for communication.
+    - Registering the actor in the vat's deck.
+
+    Args:
+        vat: The Vat instance.
+        key: The verified public key of the remote actor.
+
+    Returns:
+        (remote_actor_uri, proc, recv):
+            remote_actor_uri: The URI of the remote actor.
+            proc: The process URI minted for this session.
+            recv: The receive channel for messages intended for this actor.
+    """
+
+    # Derive the remote actor's URI from their public key
+    remote_actor_uri = derive_actor_uri(vat, key)
+
+    # Mint a new process URI
+    proc = fresh_uri(vat.site)
+
+    # Create send/receive channels for actor messages
+    send, recv = open_memory_channel[Graph](8)
+
+    # Create and register the actor context
+    remote_actor_context = ActorContext(
+        boss=vat.get_identity_uri(),
+        addr=remote_actor_uri,
+        proc=proc,
+        send=send,
+        recv=recv,
+    )
+    vat.deck[remote_actor_uri] = remote_actor_context
+
+    # Annotate the actor with their key and a message prompt affordance
+    new(
+        NT.RemoteActor,
+        {
+            NT.publicKey: encode_public_key_to_literal(key),
+            PROV.wasAssociatedWith: proc,
+            NT.affordance: create_message_prompt(remote_actor_uri),
+        },
+        remote_actor_uri,
+    )
+
+    # Record the start of the remote actor session
+    new(
+        NT.RemoteActorSession,
+        {
+            NT.remoteActor: remote_actor_uri,
+            PROV.startedAtTime: context.clock.get()(),
+        },
+        proc,
+    )
+
+    # Add the remote actor to the current process
+    add(vat.curr.get().proc, {NT.hasRemoteActor: remote_actor_uri})
+
+    logger.info("remote actor joined", addr=remote_actor_uri, proc=proc)
+    return remote_actor_uri, proc, recv
+
+
+def encode_public_key_to_literal(key: Ed25519PublicKey) -> Literal:
+    """
+    Encode a public key to a base64-encoded literal.
+    """
+    return Literal(
+        base64.b64encode(key.public_bytes_raw()).decode("ascii"),
+        datatype=XSD.base64Binary,
+    )
+
+
+def create_message_prompt(remote_actor_uri: URIRef):
+    return new(
+        NT.Prompt,
+        {
+            NT.label: Literal("Send", "en"),
+            NT.message: NT.TextMessage,
+            NT.target: remote_actor_uri,
+            NT.placeholder: Literal(
+                "Enter a message to send to the remote actor...",
+                "en",
+            ),
+        },
+    )
+
+
+def derive_actor_uri(vat: Vat, key: Ed25519PublicKey) -> URIRef:
+    """
+    Derive the remote actor's URI from their public key.
+
+    Args:
+        vat: The Vat instance.
+        key: The Ed25519 public key object of the remote actor.
+
+    Returns:
+        The URI of the remote actor.
+    """
+    key_raw = key.public_bytes_raw()
+    actor_id = base64.b32encode(key_raw).decode("ascii").rstrip("=").upper()
+    return vat.site[actor_id]
+
+
+async def _run_message_forwarders(websocket, remote_actor_uri, proc, recv):
+    """
+    Run two concurrent tasks:
+    - Forward messages from the town to the remote actor.
+    - Forward messages from the remote actor to the town (including handling heartbeats).
+
+    Args:
+        websocket: The WebSocket connection.
+        remote_actor_uri: The URI of the remote actor.
+        proc: The process URI associated with this session.
+        recv: The receive channel for messages destined for the remote actor.
+    """
+
+    async def forward_messages_to_remote_actor():
+        """
+        Forward messages from the town (received on `recv` channel) to the remote actor via WebSocket.
+        """
+        async for message in recv:
+            msg_trig = message.serialize(format="trig")
+            await websocket.send_text(msg_trig)
+
+    async def forward_messages_to_town():
+        """
+        Forward messages from the remote actor (received via WebSocket) to the town.
+        Also handles heartbeat messages, acknowledging them when received.
+        """
         while True:
             try:
-                message = await ws.receive_text()
-                msg_graph = Dataset()
-                msg_graph.parse(data=message, format="trig")
-                await process_message(msg_graph)
+                msg = await receive_dataset()
+                logger.info("received message from remote actor", graph=msg)
+
+                # Check if the dataset includes a heartbeat
+                if heartbeat := msg.value(None, RDF.type, NT.Heartbeat):
+                    await acknowledge_heartbeat(msg, heartbeat)
             except Exception as e:
-                logger.error("Message handling error", error=e)
+                logger.error("websocket receive error", error=e)
                 break
-    except Exception as e:
-        logger.error("Message handler terminated", error=e)
 
-async def heartbeat(ws) -> None:
-    """Send periodic heartbeat messages to the town."""
+    async def receive_dataset() -> Dataset:
+        """
+        Receive a dataset from the WebSocket.
+        """
+        data = await websocket.receive_text()
+        msg = Dataset()
+        msg.parse(data=data, format="trig")
+        return msg
+
+    async def acknowledge_heartbeat(msg: Dataset, heartbeat: S):
+        """
+        Acknowledge a heartbeat message by adding an acknowledgment timestamp.
+        """
+        logger.info("heartbeat received", heartbeat=heartbeat)
+        # Add an acknowledgment timestamp
+        t0 = msg.value(heartbeat, PROV.generatedAtTime)
+        if not t0:
+            raise ValueError("No generatedAtTime found in heartbeat")
+        t0 = t0.toPython()
+        assert isinstance(t0, datetime)
+        t1 = datetime.now(UTC)
+        msg.add(
+            (
+                heartbeat,
+                NT.acknowledgedAtTime,
+                Literal(t1),
+            )
+        )
+        latency = t1 - t0
+        logger.info("heartbeat acknowledged", latency=latency)
+        await send_dataset(msg)
+
+    async def send_dataset(msg: Dataset):
+        await websocket.send_text(msg.serialize(format="trig"))
+
+    # Run both forwarding coroutines concurrently
     try:
-        while True:
-            await trio.sleep(5)
-            heartbeat = create_heartbeat_graph()
-            await ws.send_text(heartbeat.serialize(format="trig"))
-            logger.info("Sent heartbeat")
+        async with open_nursery() as nursery:
+            nursery.start_soon(forward_messages_to_remote_actor)
+            nursery.start_soon(forward_messages_to_town)
     except Exception as e:
-        logger.error("Heartbeat error", error=e)
-
-def create_heartbeat_graph() -> Dataset:
-    """Create a heartbeat message graph."""
-    heartbeat = Dataset()
-    hb_node = URIRef("#heartbeat")
-    heartbeat.add((hb_node, RDF.type, NT.Heartbeat))
-    heartbeat.add(
-        (hb_node, PROV.generatedAtTime, Literal(datetime.now(UTC)))
-    )
-    return heartbeat
-
-async def process_message(message: Dataset) -> None:
-    """Process an incoming message."""
-    logger.info("Received message", graph=message)
-
-    # Check if the dataset contains a heartbeat and log latency if acknowledged
-    if heartbeat := message.value(None, RDF.type, NT.Heartbeat):
-        t0 = message.value(heartbeat, PROV.generatedAtTime)
-        t1 = message.value(heartbeat, NT.acknowledgedAtTime)
-        if t0 and t1:
-            t0, t1 = t0.toPython(), t1.toPython()
-            if isinstance(t0, datetime) and isinstance(t1, datetime):
-                t2 = datetime.now(UTC)
-                latency = t1 - t0
-                roundtrip = t2 - t0
-                logger.info(
-                    "Heartbeat latency",
-                    latency=latency,
-                    roundtrip=roundtrip,
-                )
-
-
-# Example usage (if running this module directly):
-# async def main():
-#     peer = Peer.generate()
-#     await peer.connect("https://example-town-url.com/")
-#
-# if __name__ == "__main__":
-#     trio.run(main)
+        logger.error("websocket handler error (forwarders)", error=e)
+        raise
+    finally:
+        # When the connection is closed, record the ending time of the session
+        add(proc, {PROV.endedAtTime: context.clock.get()()})

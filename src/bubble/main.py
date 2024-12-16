@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import sys
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 import rdflib
 import rdflib.collection
 from swash.html import document
@@ -24,6 +24,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import box
 
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
 import swash.vars as vars
 
 from swash.prfx import NT, RDF
@@ -37,7 +39,12 @@ from bubble.town import (
 )
 from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
-from bubble.peer import Peer
+from bubble.join import (
+    handle_messages,
+    receive_datasets,
+    signed_connection,
+    anonymous_connection,
+)
 from swash.lynx import render_html
 from bubble.replicate.make import ReplicateClientActor, make_image
 from bubble.data import from_env
@@ -286,8 +293,10 @@ def town(
 
 @app.command()
 def join_simple(
-    town_url: str = Option(..., "--town", help="Town URL to join"),
-    anonymous: bool = Option(False, "--anonymous", help="Join anonymously without an identity"),
+    town: str = Option(..., "--town", help="Town URL to join"),
+    anonymous: bool = Option(
+        False, "--anonymous", help="Join anonymously without an identity"
+    ),
 ) -> None:
     """Join a remote town as a simple peer that prints incoming messages."""
     logger = configure_logging(level=get_log_level())
@@ -295,20 +304,27 @@ def join_simple(
     async def run():
         try:
             if anonymous:
-                # Connect anonymously without generating a keypair
-                peer = await Peer.connect_anonymous(town_url)
-                logger.info("connected anonymously to town")
+                async with anonymous_connection(town) as (ws, me):
+                    await handle_dataset_receiving(ws, me)
+
             else:
-                # Create a new peer with fresh keypair
-                peer = Peer.generate()
-                logger.info(
-                    "generated new peer identity",
-                    public_key=peer.get_public_key_hex(),
-                )
-                await peer.connect(town_url)
+                sec, pub = generate_key_pair()
+                async with signed_connection(town, sec, pub) as (ws, me):
+                    await handle_dataset_receiving(ws, me)
+
         except Exception as e:
             logger.error("connection failed", error=e)
             raise
+
+    async def handle_dataset_receiving(ws: WebSocket, actor_uri: URIRef):
+        logger.info("connected to town", actor_uri=actor_uri)
+        async for msg in receive_datasets(ws):
+            logger.info("Received dataset", graph=msg)
+
+    def generate_key_pair():
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        public_key = private_key.public_key()
+        return private_key, public_key
 
     trio.run(run)
 
