@@ -1,5 +1,6 @@
 import logging
 
+import traceback
 from typing import Any, Optional
 
 import trio
@@ -263,6 +264,7 @@ class RichConsoleRenderer:
             self._render_output(name, elements)
             return ""
         except Exception as e:
+            traceback.print_exception(e)
             self._console.print(f"Error rendering log entry: {e}")
             return ""
 

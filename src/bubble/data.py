@@ -75,10 +75,11 @@ def print_git_output(
 class context:
     """Manages the current graph, activity and agent context."""
 
-    graph = vars.Parameter["Graph"]("current_graph")
+    graph = vars.graph
     activity = vars.Parameter["URIRef"]("current_activity")
     agent = vars.Parameter["URIRef"]("current_agent")
     clock = vars.Parameter[Callable[[], O]]("current_clock")
+    repo = vars.Parameter["Repository"]("current_repo")
 
     @classmethod
     @contextmanager
@@ -159,7 +160,7 @@ class Git:
     async def write_file(self, path: str, content: str) -> None:
         import hashlib
 
-        logger.debug("Writing file to git", path=path)
+        logger.debug("Writing file to git", path=path, content=content)
 
         # Create temp directory if it doesn't exist
         temp_dir = os.path.join(self.workdir, ".tmp")
@@ -171,15 +172,15 @@ class Git:
 
         try:
             # Write content to temp file
-            with open(temp_path, "w") as f:
+            with open(temp_path, "x") as f:
                 f.write(content)
 
             # Ensure target directory exists
             target_path = os.path.join(self.workdir, path)
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-            # Copy to final location
-            await trio.run_process(["cp", temp_path, target_path])
+            # Move to final location
+            await trio.run_process(["mv", temp_path, target_path])
             logger.debug("File written successfully", path=path)
         finally:
             # Clean up temp file
@@ -337,15 +338,25 @@ class Repository:
                     DCTERMS.created: context.clock.get()(),
                     DCAT.downloadURL: file_uri,
                     DCAT.mediaType: Literal(media_type),
+                    NT.hasFilePath: Literal(str(file_path)),
                 },
             )
 
         return FileBlob(file_path)
 
+    def get_streams_with_blobs(
+        self,
+    ) -> Generator[FileBlob, None, None]:
+        """Get all streams that have blobs"""
+        for graph in self.graphs():
+            for stream in graph.objects(None, NT.hasFilePath):
+                yield FileBlob(Path(stream))
+
     async def save_graph(self, identifier: URIRef) -> None:
         """Save a graph to its graph.trig file"""
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
+        logger.debug("Saving graph", identifier=identifier, content=content)
         graph_file = self.graph_file(identifier)
         await graph_file.parent.mkdir(parents=True, exist_ok=True)
         await self.git.write_file(

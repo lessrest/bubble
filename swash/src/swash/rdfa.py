@@ -362,7 +362,9 @@ def render_properties(data):
         grouped_predicates[predicate].append(obj)
 
     # Render each group
-    with tag("dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2"):
+    with tag(
+        "dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
+    ):
         for predicate, objects in grouped_predicates.items():
             # Check if all objects are literals
             all_literals = all(isinstance(obj, Literal) for obj in objects)
@@ -397,6 +399,7 @@ def render_property_with_multiple_literals(predicate, literals):
 
 
 # @html.dd("flex flex-col")
+@html.div("display-contents")
 def render_property(predicate, obj):
     attr("property", str(predicate))
     if isinstance(obj, Literal):
@@ -507,19 +510,23 @@ def _render_uri(obj: URIRef) -> None:
         #     text(f"({prefix}:{name})")
     else:
         # If no label, show the CURIE as before
-        prefix, namespace, name = dataset.namespace_manager.compute_qname(
-            str(obj)
-        )
-        # Only truncate IDs from the SWA namespace
-        if prefix == "swa" and not any(c in name for c in "/."):
+        if obj in dataset.namespace_manager:
+            prefix, namespace, name = (
+                dataset.namespace_manager.compute_qname(str(obj))
+            )
+
             with tag(
                 "span",
-                classes="font-mono max-w-[18ch] truncate inline-block align-bottom",
+                classes="max-w-[18ch] truncate align-bottom inline-block",
             ):
                 text(name)
+            render_curie_prefix(prefix)
         else:
-            text(name)
-        render_curie_prefix(prefix)
+            with tag(
+                "span",
+                classes="font-mono max-w-[20ch] truncate inline-block",
+            ):
+                text(f"<{str(obj)}>")
 
 
 @html.span(

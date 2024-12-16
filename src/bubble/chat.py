@@ -14,7 +14,7 @@ from anthropic.types.tool_use_block import ToolUseBlock
 from rdflib.query import ResultRow
 
 from bubble.tool.bash import get_shell_tool_spec, handle_shell_tool
-from bubble.repo import current_bubble
+from bubble.data import context
 from bubble.slop import Claude
 from swash.util import select_rows
 from swash.vars import graph
@@ -159,7 +159,7 @@ class BubbleChat:
         assert isinstance(tool_input, dict)
         assert "sparqlQuery" in tool_input
 
-        with graph.bind(current_bubble.get().dataset):
+        with graph.bind(context.repo.get().dataset):
             self.console.print(
                 rich.panel.Panel(
                     rich.syntax.Syntax(
@@ -220,20 +220,7 @@ class BubbleChat:
 
     async def handle_user_input(self, user_message: str) -> None:
         """Process user input and special commands."""
-        if user_message == "/reason":
-            await self.discuss_reasoning_output()
-        else:
-            self.record_user_message(user_message)
-
-    async def discuss_reasoning_output(self) -> None:
-        """Handle the /reason command."""
-        conclusion = await current_bubble.get().reason()
-        serialized = conclusion.serialize(format="n3")
-        self.record_user_message(
-            "Reasoning produced the following triples:",
-            "",
-            serialized,
-        )
+        self.record_user_message(user_message)
 
     def record_user_message(self, *text: str) -> None:
         """Add a user message to the history."""

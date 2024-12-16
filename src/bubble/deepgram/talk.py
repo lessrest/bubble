@@ -107,7 +107,7 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
         },
     )
 
-    def represent_transcript(payload: DeepgramMessage):
+    def represent_transcript(message: Graph, payload: DeepgramMessage):
         def word_segment(word: Word):
             return new(
                 TALK.Transcript,
@@ -127,7 +127,7 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
             TALK.Transcript if payload.is_final else TALK.DraftTranscript,
             {
                 PROV.generatedAtTime: datetime.now(UTC),
-                PROV.wasDerivedFrom: stream,
+                PROV.wasDerivedFrom: message.identifier,
                 PROV.wasGeneratedBy: process,
                 TALK.hasTime: make_interval(
                     stream, payload.start, payload.duration
@@ -145,8 +145,8 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
 
     while True:
         message, payload = await receive_event()
-        async with txgraph():
-            transcript = represent_transcript(payload)
+        async with txgraph() as g:
+            transcript = represent_transcript(message, payload)
             if interim is not None:
                 add(transcript, {PROV.wasRevisionOf: interim})
                 add(interim, {PROV.wasInvalidatedBy: process})
@@ -157,7 +157,13 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
                 interim = transcript
 
         with in_graph(message):
-            add(message.identifier, {PROV.wasUsedBy: process})
+            add(
+                message.identifier,
+                {
+                    PROV.wasUsedBy: process,
+                    NT.resultedIn: g,
+                },
+            )
 
 
 async def receive_event():
@@ -272,7 +278,9 @@ class DeepgramClientActor(ServerActor[str]):
                     str(session).replace("https://", "wss://") + "/upload"
                 )
                 logger.info("WebSocket URL", url=ws_url)
-                add(endpoint, {NT.url: ws_url})
+                add(
+                    endpoint, {NT.url: Literal(ws_url, datatype=XSD.anyURI)}
+                )
 
             logger.info("Returning result", result=result)
             return result

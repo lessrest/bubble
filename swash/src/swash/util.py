@@ -59,22 +59,22 @@ def graph_string(graph: Graph) -> str:
     )
 
 
-def get_single_subject(predicate, object, graph=None):
-    """Get a single subject for a predicate-object pair from the current graph"""
-    graph = graph if graph is not None else vars.graph.get()
-    subjects = list(graph.subjects(predicate, object))
-    if len(subjects) != 1:
-        raise ValueError(f"Expected 1 subject, got {len(subjects)}")
-    return subjects[0]
-
-
-def get_single_object(subject, predicate, graph=None):
+def get_single_object(subject: S, predicate: P, graph=None) -> O:
     """Get a single object for a subject-predicate pair from the current graph"""
     graph = graph if graph is not None else vars.graph.get()
     objects = list(graph.objects(subject, predicate))
     if len(objects) != 1:
         raise ValueError(f"Expected 1 object, got {len(objects)}")
     return objects[0]
+
+
+def get_single_subject(predicate: P, object: O, graph=None) -> S:
+    """Get a single subject for a predicate-object pair from the current graph"""
+    graph = graph if graph is not None else vars.graph.get()
+    subjects = list(graph.subjects(predicate, object))
+    if len(subjects) != 1:
+        raise ValueError(f"Expected 1 subject, got {len(subjects)}")
+    return subjects[0]
 
 
 def get_subjects(predicate, object):

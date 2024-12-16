@@ -56,6 +56,7 @@ from swash.rdfa import (
     visited_resources,
 )
 from swash.util import S, new
+from bubble.data import Repository, context
 from bubble.mesh import (
     Vat,
     call,
@@ -72,7 +73,6 @@ from bubble.keys import (
     build_did_document,
 )
 from bubble.page import base_html, base_shell
-from bubble.repo import BubbleRepo, using_bubble, current_bubble
 from bubble.word import describe_word
 
 logger = structlog.get_logger(__name__)
@@ -169,7 +169,7 @@ class Site:
         self,
         base_url: str,
         bind: str,
-        repo: BubbleRepo,
+        repo: Repository,
     ):
         self.base_url = base_url
         self.base = URIRef(base_url)
@@ -297,8 +297,7 @@ class Site:
             return await call_next(request)
 
     async def bind_bubble(self, request, call_next):
-        with using_bubble(self.repo):
-            self.repo.dataset.bind("site", self.site)
+        with context.repo.bind(self.repo):
             return await call_next(request)
 
     # Route handlers
@@ -482,8 +481,9 @@ class Site:
     def install_context(self):
         """Install the actor system and bubble context for request handling."""
         with vat.bind(self.vat):
-            with using_bubble(self.repo):
-                yield
+            with context.repo.bind(self.repo):
+                with vars.dataset.bind(self.repo.dataset):
+                    yield
 
     async def _handle_upload_stream(
         self, actor: URIRef, stream: AsyncGenerator[bytes, None]
@@ -741,7 +741,7 @@ def in_request_graph(g: Graph):
 
 
 def town_app(
-    base_url: str, bind: str, repo: BubbleRepo, root_actor=None
+    base_url: str, bind: str, repo: Repository, root_actor=None
 ) -> FastAPI:
     """Create and return a FastAPI app for the town."""
     app = Site(base_url, bind, repo)
@@ -964,13 +964,12 @@ def render_graph_summary(graph: Graph) -> None:
 @html.div("min-h-screen bg-gray-50 dark:bg-gray-900")
 def graphs_view(request: Request):
     """Handler for viewing all graphs in the bubble."""
-    bubble = current_bubble.get()
+    repo = context.repo.get()
     with base_shell("Graphs"):
-        render_graphs_overview(bubble.dataset)
+        render_graphs_overview(repo.dataset)
         return HypermediaResponse()
 
 
-@html.div("p-4")
 def graph_view(request: Request):
     """Handler for viewing complete graphs."""
     graph_id = request.query_params.get("graph")
@@ -978,10 +977,10 @@ def graph_view(request: Request):
         raise HTTPException(status_code=400, detail="No graph ID provided")
 
     graph = None
-    bubble = current_bubble.get()
+    repo = context.repo.get()
 
     # Try to find the graph in the bubble's dataset
-    for g in bubble.dataset.graphs():
+    for g in repo.dataset.graphs():
         if str(g.identifier) == graph_id:
             graph = g
             break

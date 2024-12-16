@@ -1,10 +1,10 @@
 import os
 import tempfile
-from rdflib import URIRef, Literal, RDF, Namespace
+from rdflib import Literal, RDF, Namespace
 from rdflib.namespace import PROV
 from swash.util import new
+from trio import Path
 from bubble.data import FROTH
-import pytest
 
 from .data import Git, Repository, context
 
@@ -18,8 +18,8 @@ EX = Namespace("http://example.org/")
 
 async def test_graph_repo_basics():
     with tempfile.TemporaryDirectory() as workdir:
-        git = Git(workdir)
-        repo = Repository(git, namespace=EX)
+        git = Git(Path(workdir))
+        repo = await Repository.create(git, namespace=EX)
 
         # Create initial graph and add data
         with repo.new_graph() as graph_id:
@@ -28,7 +28,7 @@ async def test_graph_repo_basics():
             await repo.save_all()
 
         # Test loading in new repo instance
-        repo2 = Repository(git, namespace=EX)
+        repo2 = await Repository.create(git, namespace=EX)
         await repo2.load_all()
 
         # Verify loaded data
@@ -40,15 +40,15 @@ async def test_graph_repo_basics():
         await repo2.commit("Test commit")
         assert os.path.exists(os.path.join(workdir, "void.ttl"))
         assert os.path.exists(
-            os.path.join(workdir, repo.graph_filename(graph_id))
+            os.path.join(workdir, repo.graph_file(graph_id))
         )
 
 
 async def test_graph_repo_new_derived_graph():
     """Test deriving graphs with explicit and current context parameters"""
     with tempfile.TemporaryDirectory() as workdir:
-        git = Git(workdir)
-        repo = Repository(git, namespace=EX)
+        git = Git(Path(workdir))
+        repo = await Repository.create(git, namespace=EX)
 
         # Create source graph
         with repo.new_graph() as source_graph_id:
@@ -95,8 +95,8 @@ async def test_graph_repo_new_derived_graph():
 
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
-        git = Git(workdir)
-        repo = Repository(git, namespace=EX)
+        git = Git(Path(workdir))
+        repo = await Repository.create(git, namespace=EX)
 
         # Create new graph and add data
         with repo.new_graph() as graph_id:
@@ -116,8 +116,8 @@ async def test_graph_repo_new_graph():
 
 async def test_graph_repo_add_with_current_graph():
     with tempfile.TemporaryDirectory() as workdir:
-        git = Git(workdir)
-        repo = Repository(git, namespace=EX)
+        git = Git(Path(workdir))
+        repo = await Repository.create(git, namespace=EX)
 
         # Test adding with current graph
         with repo.new_graph() as graph_id:
@@ -133,7 +133,7 @@ async def test_graph_repo_add_with_current_graph():
 
         # Test persistence
         await repo.save_all()
-        repo2 = Repository(git, namespace=EX)
+        repo2 = await Repository.create(git, namespace=EX)
         await repo2.load_all()
 
         graph2 = repo2.graph(graph_id)

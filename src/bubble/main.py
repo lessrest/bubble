@@ -26,11 +26,7 @@ from swash.prfx import NT
 from swash.util import add
 from bubble.data import Git, Repository
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
-from bubble.chat import BubbleChat
-from bubble.cred import get_anthropic_credential
 from bubble.logs import configure_logging
-from bubble.repo import loading_bubble_from
-from bubble.slop import Claude
 from bubble.stat.stat import gather_system_info
 from bubble.town import (
     Site,
@@ -50,24 +46,7 @@ app = typer.Typer(
 
 home = pathlib.Path.home()
 
-BubblePath = Option(str(home / "bubble"), "--bubble", help="Bubble path")
 RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
-
-
-@app.command()
-def chat(
-    bubble_path: str = BubblePath,
-) -> None:
-    """Chat with Claude about the bubble."""
-
-    async def run():
-        async with loading_bubble_from(trio.Path(bubble_path)):
-            credential = await get_anthropic_credential()
-            claude = Claude(credential)
-            bubble_chat = BubbleChat(claude, console)
-            await bubble_chat.run()
-
-    trio.run(run)
 
 
 @app.command()
@@ -191,7 +170,7 @@ def town(
     base_url: str = Option(
         "https://localhost:2026/", "--base-url", help="Public base URL"
     ),
-    bubble_path: str = BubblePath,
+    repo_path: str = RepoPath,
     shell: bool = Option(False, "--shell", help="Start a bash subshell"),
 ) -> None:
     """Serve the Town2 JSON-LD interface."""
@@ -213,16 +192,19 @@ def town(
         async with trio.open_nursery() as nursery:
             logger.info(
                 "starting Node.Town",
-                bubble_path=bubble_path,
+                repo_path=repo_path,
                 base_url=base_url,
             )
             vars.site.set(Namespace(base_url))
-            async with loading_bubble_from(trio.Path(bubble_path)) as repo:
-                town = Site(base_url, bind, repo)
-                with town.install_context():
-                    # Create and persist the town's identity
-                    async with txgraph():
-                        town.vat.create_identity_graph()
+            repo = await Repository.create(
+                Git(trio.Path(repo_path)),
+                namespace=Namespace(base_url),
+            )
+
+            town = Site(base_url, bind, repo)
+            with town.install_context():
+                with repo.new_graph():
+                    town.vat.create_identity_graph()
 
                     supervisor = await spawn(
                         nursery,
@@ -242,8 +224,7 @@ def town(
                     )
 
                     # Link uptime actor to the town's identity
-                    async with txgraph():
-                        town.vat.link_actor_to_identity(uptime)
+                    town.vat.link_actor_to_identity(uptime)
 
                     add(URIRef(base_url), {NT.environs: supervisor})
                     add(URIRef(base_url), {NT.environs: uptime})
@@ -273,7 +254,7 @@ def town(
     def get_bash_prompt():
         return r"\[\e[1m\][\[\e[34m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
 
-    trio.run(run)
+    trio.run(run, strict_exception_groups=False)
 
 
 @app.command()

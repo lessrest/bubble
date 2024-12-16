@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import tenacity
+from bubble.data import context
 from bubble.keys import (
     create_identity_graph,
     generate_identity_uri,
@@ -32,8 +33,6 @@ from typing import (
     Optional,
     Set,
 )
-
-from bubble.repo import current_bubble
 
 
 logger = structlog.get_logger()
@@ -90,12 +89,16 @@ def create_graph(
     else:
         id = site[suffix]
 
-    g = Graph(base=base, identifier=id)
+    logger.info("creating graph", id=id, base=base)
+
+    #    g = Graph(base=base, identifier=id)
+    g = context.repo.get().dataset.graph(id, base)
     g.bind("nt", NT)
     g.bind("deepgram", DEEPGRAM)
     g.bind("site", site)
     g.bind("did", DID)
     g.bind("prov", PROV)
+
     return g
 
 
@@ -374,28 +377,36 @@ class ServerActor[State]:
         raise NotImplementedError
 
 
-async def persist(graph: Graph):
-    """Persist a graph to the current bubble."""
-    bubble = current_bubble.get()
-    before_count = len(bubble.graph)
-    bubble.graph += graph
-    after_count = len(bubble.graph)
+save_lock = trio.Lock()
 
-    await bubble.save_graph()
+
+async def persist(graph: Graph):
+    logger.info("persisting graph", graph=graph)
+    repo = context.repo.get()
+    before_count = len(repo.dataset)
+
+    repo.dataset.add_graph(graph)
+    for s, p, o in graph:
+        repo.dataset.add((s, p, o, graph))
+    after_count = len(repo.dataset)
+
+    graph_id = graph.identifier
+    assert isinstance(graph_id, URIRef)
+    async with save_lock:
+        await repo.save_graph(graph_id)
 
     logger.info(
         "persisted graph",
         before=before_count,
         after=after_count,
         added=after_count - before_count,
-        bubble_graph=bubble.graph,
+        repo=repo,
         graph=graph,
     )
 
 
 @asynccontextmanager
 async def txgraph(graph: Optional[Graph] = None):
-    """Create a new transaction with a fresh graph that will be persisted."""
     g = create_graph()
     if graph is not None:
         g += graph

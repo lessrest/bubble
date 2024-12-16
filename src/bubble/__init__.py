@@ -6,7 +6,6 @@ from . import (
     boot,
     cred,
     chat,
-    repo,
     slop,
     stat,
 )
@@ -21,7 +20,6 @@ __all__ = [
     "boot",
     "cred",
     "chat",
-    "repo",
     "slop",
     "stat",
 ]

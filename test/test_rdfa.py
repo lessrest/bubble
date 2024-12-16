@@ -2,31 +2,40 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from rdflib import Graph, Namespace
-from swash.desc import new_dataset, has, label
+from rdflib import RDFS, Dataset, Graph, Literal, Namespace
 from swash.rdfa import autoexpanding, rdf_resource
 from swash.html import document, Fragment, root
 from swash.util import new
+from swash import vars as swash_vars
+
+from bubble.data import context
 
 EX = Namespace("http://example.org/")
 
 
 def test_rdfa_roundtrip():
     # Create a simple test graph
-    with new_dataset() as g:
-        subject = new(EX.TestType)
-        label("Test Label")
-        has(EX.property, "Test Value")
+    dataset = Dataset()
+    g = dataset.default_context
+    with context.graph.bind(g):
+        subject = new(
+            EX.TestType,
+            {
+                RDFS.label: Literal("Test Label"),
+                EX.property: Literal("Test Value"),
+            },
+        )
 
         # Render the graph to HTML with RDFa
         with document():
-            with autoexpanding(4):
-                rdf_resource(subject)
+            with swash_vars.dataset.bind(dataset):
+                with autoexpanding(0):
+                    rdf_resource(subject)
 
             # Get the rendered HTML
             doc = root.get()
             assert isinstance(doc, Fragment)
-            html = doc.to_html()
+            html = doc.to_html(compact=False)
 
             print(html)
 
@@ -82,19 +91,16 @@ def test_rdfa_roundtrip():
 
                 # Print both graphs for debugging
                 print("\nOriginal graph:")
-                print(g.serialize(format="turtle"))
+                print(g)
+                print(g.serialize(format="n3"))
                 print("\nParsed RDFa graph:")
                 print(parsed.serialize(format="turtle"))
 
                 # Check for isomorphism using rdflib.compare
                 from rdflib.compare import isomorphic
 
-                # Get default graph from dataset
-                default_graph = Graph()
-                for s, p, o in g.default_context:
-                    default_graph.add((s, p, o))
                 assert isomorphic(
-                    default_graph, parsed
+                    g, parsed
                 ), "Parsed RDFa should match original graph"
 
             finally:
