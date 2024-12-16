@@ -514,7 +514,11 @@ class Site:
     async def ws_actor_join(self, websocket: WebSocket, key: str):
         """Handle a remote actor joining the town."""
         from bubble.join import handle_actor_join
-        await handle_actor_join(websocket, key, self)
+        from bubble.keys import parse_public_key_hex
+
+        # Parse the hex key string into an Ed25519PublicKey object before passing to handle_actor_join
+        public_key = parse_public_key_hex(key)
+        await handle_actor_join(websocket, public_key, self.vat)
 
     @contextmanager
     def install_context(self):
@@ -870,8 +874,6 @@ class Site:
                                             )
                                             else str(img["time"])
                                         )
-
-        return HypermediaResponse()
 
 
 @contextmanager

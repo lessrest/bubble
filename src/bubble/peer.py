@@ -127,7 +127,7 @@ class Peer:
             if signed_question:
                 # Use the handshake URI itself as the nonce
                 nonce_bytes = str(subject).encode()
-                
+
                 # Sign our response using the handshake URI as nonce
                 signed_answer = self.sign(nonce_bytes)
 
@@ -213,9 +213,13 @@ class Peer:
             if t0 and t1:
                 t0, t1 = t0.toPython(), t1.toPython()
                 if isinstance(t0, datetime) and isinstance(t1, datetime):
+                    t2 = datetime.now(UTC)
                     latency = t1 - t0
+                    roundtrip = t2 - t0
                     logger.info(
-                        "Heartbeat latency", t0=t0, t1=t1, latency=latency
+                        "Heartbeat latency",
+                        latency=latency,
+                        roundtrip=roundtrip,
                     )
 
 
