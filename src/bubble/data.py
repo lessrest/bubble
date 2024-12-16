@@ -383,6 +383,12 @@ class Repository:
 
         return FileBlob(file_path)
 
+    # I want a method that takes a bytes object and media type,
+    # and saves it but content addressed so it returns a URIRef
+    # with a hash like urn:x-bubble:file:sha256:...
+    # and that resource is a DCAT.Distribution
+    # AI!
+
     def get_streams_with_blobs(
         self,
     ) -> Generator[FileBlob, None, None]:
