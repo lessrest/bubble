@@ -214,10 +214,10 @@ def town(
 
                     supervisor = await spawn(
                         nursery,
-                        SimpleSupervisor(
-                            DeepgramClientActor("Deepgram Client"),
-                            ReplicateClientActor("Replicate Client", repo),
-                        ),
+                        SimpleSupervisor({
+                            "deepgram": lambda: DeepgramClientActor("Deepgram Client"),
+                            "replicate": lambda: ReplicateClientActor("Replicate Client", repo),
+                        }),
                     )
 
                     # Link supervisor to the town's identity
