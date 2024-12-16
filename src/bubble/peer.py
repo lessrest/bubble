@@ -10,7 +10,7 @@ import trio
 import httpx
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
-from rdflib import Graph, URIRef
+from rdflib import Graph, URIRef, RDF
 
 from bubble.keys import verify_signed_data
 from swash.prfx import NT
