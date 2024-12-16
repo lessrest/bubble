@@ -259,8 +259,8 @@ class Site:
         self.app.get("/{path:path}")(self.actor_get)
 
     async def file_get(self, path: str):
-        file = self.repo.blob(URIRef(path))
-        return Response(content=file.read())
+        file = self.repo.open_existing_file(URIRef(path))
+        return Response(content=await file.read())
 
     async def health_check(self):
         with with_transient_graph("health") as id:
@@ -761,11 +761,9 @@ class Site:
 
                 # Find the Replicate client through the supervisor
                 replicate_client = None
-                dataset = current_bubble.get().dataset
+                dataset = context.repo.get().dataset
                 identity = vat.get().get_identity_uri()
-                import pudb
 
-                #                pudb.set_trace()
                 # Find supervised actors through NT.environs
                 for supervisor in dataset.objects(identity, PROV.started):
                     # Find Replicate.Client instances among supervised actors
@@ -793,7 +791,7 @@ class Site:
 
                 # Query for all NT.Image resources
                 images = []
-                for graph in current_bubble.get().dataset.graphs():
+                for graph in dataset.graphs():
                     for subject in graph.subjects(
                         RDF.type, Schema.ImageObject
                     ):

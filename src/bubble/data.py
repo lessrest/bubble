@@ -12,6 +12,7 @@ from typing import (
     Generator,
     cast,
 )
+import rdflib.store
 import swash
 from swash.prfx import NT
 from trio import Path
@@ -39,7 +40,7 @@ from rdflib.namespace import PROV, DCAT, DCTERMS
 
 from swash import vars
 from swash.mint import fresh_uri
-from swash.util import O, P, add, new
+from swash.util import O, P, add, get_single_object, new
 from rich.console import Console
 
 FROTH = Namespace("https://node.town/ns/froth#")
@@ -163,8 +164,6 @@ class Git:
     async def write_file(self, path: str, content: str) -> None:
         import hashlib
 
-        logger.debug("Writing file to git", path=path, content=content)
-
         # Create temp directory if it doesn't exist
         temp_dir = os.path.join(self.workdir, ".tmp")
         os.makedirs(temp_dir, exist_ok=True)
@@ -213,6 +212,11 @@ class FileBlob:
         io.write(data)
         io.close()
 
+    async def read(self) -> bytes:
+        """Read data from the file"""
+        io = await self.open("rb")
+        return io.read()
+
     def close(self) -> None:
         """Close the file if open"""
         if self._file:
@@ -227,6 +231,8 @@ class FileBlob:
 
 
 class Repository:
+    dirty_graphs: set[Graph] = set()
+
     async def __init__(
         self,
         git: Git,
@@ -264,6 +270,25 @@ class Repository:
 
         # Create meta.trig symlink in repository root
         await self.create_meta_symlink()
+
+        self.dataset.store.dispatcher.subscribe(
+            rdflib.store.TripleAddedEvent, self.on_triple_added
+        )
+        self.dataset.store.dispatcher.subscribe(
+            rdflib.store.TripleRemovedEvent, self.on_triple_removed
+        )
+
+    def on_triple_added(self, event: rdflib.store.TripleAddedEvent) -> None:
+        graph = event.context  # type: ignore
+        assert isinstance(graph, Graph)
+        self.dirty_graphs.add(graph)
+
+    def on_triple_removed(
+        self, event: rdflib.store.TripleRemovedEvent
+    ) -> None:
+        graph = event.context  # type: ignore
+        assert isinstance(graph, Graph)
+        self.dirty_graphs.add(graph)
 
     @classmethod
     async def create(
@@ -311,6 +336,10 @@ class Repository:
     def graph_file(self, identifier: URIRef) -> Path:
         """Get the path to the graph.trig file for a graph"""
         return self.rdf_dir(identifier) / "graph.trig"
+
+    def open_existing_file(self, file_uri: URIRef) -> FileBlob:
+        path = get_single_object(file_uri, NT.hasFilePath)
+        return FileBlob(Path(path))
 
     async def get_file(
         self,
@@ -362,11 +391,12 @@ class Repository:
             for stream in graph.objects(None, NT.hasFilePath):
                 yield FileBlob(Path(stream))
 
-    async def save_graph(self, identifier: URIRef) -> None:
+    async def save_graph(self, identifier: IdentifiedNode) -> None:
         """Save a graph to its graph.trig file"""
+        assert isinstance(identifier, URIRef)
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
-        logger.debug("Saving graph", identifier=identifier, content=content)
+        logger.debug("Saving graph", identifier=identifier, graph=graph)
         graph_file = self.graph_file(identifier)
         await graph_file.parent.mkdir(parents=True, exist_ok=True)
         await self.git.write_file(
@@ -397,10 +427,11 @@ class Repository:
         await self.git.write_file("void.ttl", content)
 
         # Save all graphs with their full metadata
-        graphs = self.list_graphs()
-        logger.debug("Saving graphs", count=len(graphs))
-        for identifier in graphs:
-            await self.save_graph(identifier)
+        if self.dirty_graphs:
+            logger.debug("Saving graphs", count=len(self.dirty_graphs))
+            for graph in self.dirty_graphs:
+                await self.save_graph(graph.identifier)
+            self.dirty_graphs.clear()
 
     async def load_all(self) -> None:
         """Load all graphs"""
@@ -413,11 +444,8 @@ class Repository:
     async def commit(self, message: str) -> None:
         """Commit all changes including graphs and their files, but only if there are changes."""
         if await self.has_changes():
-            logger.info("Committing changes", message=message)
             await self.git.add(".")
             await self.git.commit(message)
-        else:
-            logger.debug("No changes to commit", message=message)
 
     def absolute_graph_path(self, identifier: URIRef) -> str:
         """Get the absolute path to a graph's directory"""

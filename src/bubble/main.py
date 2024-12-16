@@ -41,6 +41,8 @@ from swash.lynx import render_html
 from bubble.replicate.make import ReplicateClientActor, make_image
 from bubble.data import from_env
 
+import logging
+
 logger = configure_logging()
 
 console = Console(width=80)
@@ -55,6 +57,14 @@ home = pathlib.Path.home()
 RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
 
 
+def get_log_level() -> int:
+    """Get logging level from environment variable."""
+    debug = os.environ.get("BUBBLE_DEBUG", "").lower()
+    if debug in ("1", "true", "yes"):
+        return logging.DEBUG
+    return logging.INFO
+
+
 @app.command()
 def shell(
     repo_path: str = RepoPath,
@@ -64,7 +74,7 @@ def shell(
 ) -> None:
     """Create a new repository and start a shell session."""
 
-    configure_logging()
+    configure_logging(level=get_log_level())
 
     async def run():
         git = Git(trio.Path(repo_path))
@@ -170,7 +180,7 @@ def town(
     """Serve the Town2 JSON-LD interface."""
     config = hypercorn.Config()
     config.bind = [bind]
-    logger = configure_logging()
+    logger = configure_logging(level=get_log_level())
     config.log.error_logger = logger.bind(name="hypercorn.error")  # type: ignore
 
     assert base_url.startswith("https://")
@@ -274,6 +284,7 @@ def town(
 def info() -> None:
     """Display information about the current bubble environment and graphs."""
     console = Console(width=78)
+    configure_logging(level=get_log_level())
 
     # Check if we're in a bubble environment
     if "BUBBLE" not in os.environ:
@@ -366,6 +377,7 @@ def img(
     repo_path: str = RepoPath,
 ) -> None:
     """Generate an image using Replicate AI."""
+    configure_logging(level=get_log_level())
 
     async def run_generate_images():
         # Ensure REPLICATE_API_TOKEN is set

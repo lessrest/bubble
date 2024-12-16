@@ -290,11 +290,14 @@ class RichConsoleRenderer:
             self._console.print(content, end="\n")
 
 
-def configure_logging(colors: bool = True) -> structlog.stdlib.BoundLogger:
+def configure_logging(
+    colors: bool = True, level: int = logging.DEBUG
+) -> structlog.stdlib.BoundLogger:
     """Configure structlog to use our Rich renderer.
 
     Args:
         colors: Whether to use colors in output
+        level: Logging level (default: logging.DEBUG)
     """
     processors = [
         structlog.processors.add_log_level,
@@ -311,7 +314,7 @@ def configure_logging(colors: bool = True) -> structlog.stdlib.BoundLogger:
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
+        wrapper_class=structlog.make_filtering_bound_logger(level),
         context_class=dict,
         logger_factory=structlog.WriteLoggerFactory(),
         cache_logger_on_first_use=True,
