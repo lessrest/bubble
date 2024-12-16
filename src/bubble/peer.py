@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 from rdflib import XSD, Dataset, Graph, Literal, URIRef, RDF
 
-# External namespaces (assuming these are defined in swash.prfx)
+from bubble.connect import anonymous_connection, signed_connection
 from swash.prfx import NT, PROV
 
 logger = structlog.get_logger(__name__)
