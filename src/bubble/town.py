@@ -537,7 +537,25 @@ class Site:
             response_graph.parse(
                 data=json.dumps(response), format="json-ld"
             )
-            # verify the signature, AI!
+            
+            # Extract and verify the signature from response
+            signed_message = response_graph.value(None, NT.signedMessage)
+            if not signed_message:
+                raise ValueError("No signed message in response")
+                
+            # Convert key from hex to bytes
+            try:
+                public_key_bytes = bytes.fromhex(key)
+            except ValueError:
+                raise ValueError("Invalid public key format")
+                
+            # Verify signature using provided public key
+            if not self.vat.verify_data(
+                b"hello", 
+                signed_message.value, 
+                public_key_bytes
+            ):
+                raise ValueError("Invalid signature")
 
     @contextmanager
     def install_context(self):
