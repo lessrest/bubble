@@ -31,9 +31,10 @@ class Peer:
       - Continuously receives messages from the server and sends heartbeats.
     """
 
-    private_key: ed25519.Ed25519PrivateKey
-    public_key: ed25519.Ed25519PublicKey
+    private_key: ed25519.Ed25519PrivateKey | None
+    public_key: ed25519.Ed25519PublicKey | None
     ws: Optional[AsyncGenerator] = None
+    actor_uri: Optional[URIRef] = None  # Will be set during anonymous connection
 
     @classmethod
     def generate(cls) -> "Peer":
