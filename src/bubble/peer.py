@@ -47,7 +47,11 @@ class Peer:
     def get_public_key_hex(self) -> str:
         """
         Return the public key as a lowercase hex string.
+        Raises ValueError if no public key is available.
         """
+        if not self.public_key:
+            raise ValueError("No public key available")
+            
         return self.public_key.public_bytes(
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
@@ -56,22 +60,95 @@ class Peer:
     def sign(self, data: bytes) -> bytes:
         """
         Sign the given data with this peer's private key.
+        Raises ValueError if no private key is available.
         """
+        if not self.private_key:
+            raise ValueError("No private key available")
+            
         return self.private_key.sign(data)
+
+    @classmethod
+    async def connect_anonymous(cls, town_url: str) -> "Peer":
+        """
+        Connect to a town anonymously via WebSocket.
+        No keypair or identity is required.
+
+        :param town_url: The HTTPS URL of the town to connect to.
+        :return: A new anonymous Peer instance
+        """
+        # Create a peer without keys for anonymous connection
+        peer = cls(
+            private_key=None,  # type: ignore
+            public_key=None,  # type: ignore
+        )
+        await peer._connect_anonymous(town_url)
+        return peer
+
+    async def _connect_anonymous(self, town_url: str) -> None:
+        """
+        Connect anonymously to a town via WebSocket.
+        
+        :param town_url: The HTTPS URL of the town to connect to.
+        """
+        # Convert HTTP to WebSocket URL  
+        ws_url = self._convert_to_ws_url(town_url)
+
+        # Use the anonymous join endpoint
+        join_url = f"{ws_url}join"
+        logger.info("Connecting anonymously to town", url=join_url)
+
+        try:
+            async with httpx.AsyncClient(verify=False) as client:
+                async with aconnect_ws(join_url, client=client) as ws:
+                    # Receive the handshake with our temporary identity
+                    handshake_msg = await ws.receive_text()
+                    handshake = Graph()
+                    handshake.parse(data=handshake_msg, format="turtle")
+                    logger.info("Received anonymous handshake", graph=handshake)
+
+                    # Extract our assigned actor URI and verify protocol version
+                    for subject in handshake.subjects(RDF.type, NT.AnonymousHandshake):
+                        if handshake.value(subject, NT.protocol) != NT.Protocol_1:
+                            raise ValueError("Unsupported protocol version")
+                        
+                        self.actor_uri = handshake.value(subject, NT.actor)
+                        if not self.actor_uri:
+                            raise ValueError("No actor URI in handshake")
+
+                        # Send acknowledgment
+                        ack = Graph()
+                        ack.add((subject, NT.acknowledged, Literal(True)))
+                        await ws.send_text(ack.serialize(format="turtle"))
+                        logger.info("Sent handshake acknowledgment")
+                        break
+                    else:
+                        raise ValueError("Invalid handshake message")
+
+                    # Launch concurrent tasks for message handling and heartbeat
+                    async with trio.open_nursery() as nursery:
+                        nursery.start_soon(self._handle_messages, ws)
+                        nursery.start_soon(self._heartbeat, ws)
+
+        except Exception as e:
+            logger.error("Connection error", error=e)
+            raise
 
     async def connect(self, town_url: str) -> None:
         """
-        Connect to a town via WebSocket, perform handshake, and start
-        message handling and heartbeat loops.
+        Connect to a town via WebSocket with a signed identity, perform handshake,
+        and start message handling and heartbeat loops.
 
         :param town_url: The HTTPS URL of the town to connect to.
         """
+        if not self.private_key or not self.public_key:
+            raise ValueError("Cannot connect with signed identity - no keypair available")
+            
         # Convert HTTP to WebSocket URL
         ws_url = self._convert_to_ws_url(town_url)
 
         # Construct join endpoint with public key
         join_url = f"{ws_url}join/{self.get_public_key_hex()}"
-        logger.info("Connecting to town", url=join_url)
+        logger.info("Connecting to town with identity", url=join_url)
 
         # Create an SSL context to trust the local CA if necessary
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
