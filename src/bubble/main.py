@@ -35,8 +35,9 @@ from bubble.stat.stat import gather_system_info
 from bubble.town import (
     Site,
 )
-from bubble.mesh import UptimeActor
+from bubble.mesh import UptimeActor 
 from bubble.deepgram.talk import DeepgramClientActor
+from bubble.peer import Peer
 from swash.lynx import render_html
 from bubble.replicate.make import ReplicateClientActor, make_image
 from bubble.data import from_env
@@ -283,6 +284,30 @@ def town(
         return r"\[\e[1m\][\[\e[34m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
 
     trio_asyncio.run(run)
+
+
+@app.command()
+def join_simple(
+    town_url: str = Option(..., "--town", help="Town URL to join"),
+) -> None:
+    """Join a remote town as a simple peer that prints incoming messages."""
+    configure_logging(level=get_log_level())
+
+    async def run():
+        # Create a new peer with fresh keypair
+        peer = Peer.generate()
+        logger.info(
+            "generated new peer identity",
+            public_key=peer.get_public_key_hex()
+        )
+
+        try:
+            await peer.connect(town_url)
+        except Exception as e:
+            logger.error("connection failed", error=e)
+            raise
+
+    trio.run(run)
 
 
 @app.command()
