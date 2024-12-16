@@ -250,6 +250,8 @@ class Site:
         self.app.websocket("/{id}/upload")(self.ws_upload)
         self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
 
+        self.app.websocket("/join/{key}")(self.ws_actor_join)
+
         self.app.get("/word")(self.word_lookup)
         self.app.get("/words")(self.word_lookup_form)
 
@@ -501,6 +503,41 @@ class Site:
             if session_id in self.websocket_sessions:
                 del self.websocket_sessions[session_id]
             await websocket.close()
+
+    async def ws_actor_join(self, websocket: WebSocket, key: str):
+        # Here we let an actor join the town remotely.
+        #
+        # The key should be the hex-encoded Ed25519 public key
+        # of the actor's identity.
+        #
+        # We first send a handshake message signed by the town's
+        # Ed25519 private key. The actor then verifies the signature
+        # and sends a signed message back.
+        #
+        # If the signature is valid, we add the actor to the town
+        # and send a welcome message.
+        #
+        # Then, messages are relayed between the actor and the town.
+
+        with with_transient_graph() as outgoing_handshake:
+            new(
+                NT.Handshake,
+                {
+                    NT.signedMessage: Literal(
+                        self.vat.sign_data(b"hello"),
+                        datatype=XSD.base64Binary,
+                    ),
+                },
+                outgoing_handshake,
+            )
+            msg = vars.graph.get().serialize(format="json-ld")
+            await websocket.send_json(msg)
+            response = await websocket.receive_json()
+            response_graph = Graph()
+            response_graph.parse(
+                data=json.dumps(response), format="json-ld"
+            )
+            # verify the signature, AI!
 
     @contextmanager
     def install_context(self):
