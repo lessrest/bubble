@@ -29,6 +29,7 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
     This involves:
     - Accepting the connection
     - Assigning a temporary identity
+    - Performing a simple handshake to confirm protocol version
     - Setting up an actor context
     - Forwarding messages between the actor and town
     - Handling heartbeat messages
@@ -43,6 +44,28 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
         # Generate a temporary identity for this anonymous actor
         remote_actor_uri = fresh_uri(vat.site)
         proc = fresh_uri(vat.site)
+
+        # Send handshake with protocol version and actor URI
+        handshake = Graph()
+        handshake_id = fresh_uri(vat.site)
+        handshake.add((handshake_id, RDF.type, NT.AnonymousHandshake))
+        handshake.add((handshake_id, NT.protocol, NT.Protocol_1))
+        handshake.add((handshake_id, NT.actor, remote_actor_uri))
+        
+        await websocket.send_text(handshake.serialize(format="turtle"))
+        
+        # Wait for acknowledgment
+        try:
+            ack_msg = await websocket.receive_text()
+            ack = Graph()
+            ack.parse(data=ack_msg, format="turtle")
+            
+            if not any(ack.triples((handshake_id, NT.acknowledged, Literal(True)))):
+                raise ValueError("Invalid handshake acknowledgment")
+                
+        except Exception as e:
+            logger.error("handshake acknowledgment failed", error=e)
+            raise
         
         # Create send/receive channels for actor messages
         send, recv = open_memory_channel[Graph](8)
