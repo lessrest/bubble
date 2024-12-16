@@ -18,7 +18,7 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import BNode, Literal, URIRef, Namespace, PROV, DCAT, XSD
+from rdflib import SKOS, BNode, Literal, URIRef, Namespace, PROV, DCAT, XSD
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -26,10 +26,10 @@ from rich import box
 
 import swash.vars as vars
 
-from swash.prfx import NT
+from swash.prfx import NT, RDF
 from swash.util import add, new
 from bubble.data import Git, Repository, context
-from bubble.mesh import SimpleSupervisor, spawn, txgraph
+from bubble.mesh import SimpleSupervisor, spawn, this, txgraph
 from bubble.logs import configure_logging
 from bubble.stat.stat import gather_system_info
 from bubble.town import (
@@ -212,12 +212,28 @@ def town(
                 with repo.new_graph():
                     town.vat.create_identity_graph()
 
+                    add(
+                        this(),
+                        {
+                            RDF.type: NT.TownProcess,
+                            PROV.generated: town.vat.get_identity_uri(),
+                            SKOS.prefLabel: Literal(
+                                "root town process", lang="en"
+                            ),
+                        },
+                    )
+
                     supervisor = await spawn(
                         nursery,
-                        SimpleSupervisor({
-                            "deepgram": lambda: DeepgramClientActor(),
-                            "replicate": lambda: ReplicateClientActor(repo),
-                        }),
+                        SimpleSupervisor(
+                            {
+                                "Deepgram client": DeepgramClientActor(),
+                                "Replicate client": ReplicateClientActor(
+                                    repo
+                                ),
+                            }
+                        ),
+                        name="actor supervisor",
                     )
 
                     # Link supervisor to the town's identity

@@ -65,19 +65,23 @@ def autoexpanding(depth: int):
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
     # Get all labels with their languages
     labels = []
-    
+
     # First try SKOS prefLabel
     for s, p, o, c in dataset.quads((uri, SKOS.prefLabel, None, None)):
         if isinstance(o, Literal):
-            labels.append((o, o.language or "", 1))  # Priority 1 for prefLabel
+            labels.append(
+                (o, o.language or "", 1)
+            )  # Priority 1 for prefLabel
         else:
             labels.append((o, "", 1))
-            
+
     # Fall back to RDFS label if no prefLabel found
     if not labels:
         for s, p, o, c in dataset.quads((uri, RDFS.label, None, None)):
             if isinstance(o, Literal):
-                labels.append((o, o.language or "", 2))  # Priority 2 for label
+                labels.append(
+                    (o, o.language or "", 2)
+                )  # Priority 2 for label
             else:
                 labels.append((o, "", 2))
 
@@ -532,13 +536,13 @@ def render_property_label(predicate):
     "border border-gray-300 dark:border-slate-900",
 )
 def render_resource_header(subject, data):
+    render_value(subject)
     if data and data["type"]:
         with tag("span"):
             dataset = vars.dataset.get()
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):
                 render_value(type_label or data["type"])
-    render_value(subject)
 
 
 @html.ul(
@@ -618,14 +622,14 @@ def _render_uri(obj: URIRef) -> None:
 
             with tag(
                 "span",
-                classes="max-w-[18ch] truncate align-bottom inline-block",
+                classes="max-w-[18ch] truncate align-bottom inline",
             ):
                 text(name)
             render_curie_prefix(prefix)
         else:
             with tag(
                 "span",
-                classes="font-mono max-w-[20ch] truncate inline-block",
+                classes="font-mono max-w-[20ch] truncate block",
             ):
                 text(f"<{str(obj)}>")
 
