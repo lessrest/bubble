@@ -249,6 +249,10 @@ class Repository:
         self.metadata = self.dataset.graph(metadata_id)
 
         self.metadata.bind("home", namespace)
+        
+        # Register built-in external graphs
+        vocab_ext = URIRef("urn:x-bubble:vocab:ext")
+        self.register_external_graph(vocab_ext, "vocab/ext.ttl")
         # Base path for graphs
         self.graphs_path = Path(self.git.workdir) / "graphs"
 
@@ -440,6 +444,12 @@ class Repository:
     async def save_graph(self, identifier: IdentifiedNode) -> None:
         """Save a graph to its graph.trig file"""
         assert isinstance(identifier, URIRef)
+        
+        # Check if this is an external graph
+        is_external = (identifier, FROTH.isExternal, Literal(True)) in self.metadata
+        if is_external:
+            raise ValueError(f"Cannot save external graph {identifier}")
+            
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
         logger.debug("Saving graph", identifier=identifier, graph=graph)
@@ -510,6 +520,25 @@ class Repository:
         """Bind the specified graph as the current graph."""
         with context.bind_graph(identifier, self) as graph:
             yield graph
+
+    def register_external_graph(self, identifier: URIRef, path: str) -> Graph:
+        """Register an external graph that lives in the project source.
+        
+        Args:
+            identifier: The graph identifier
+            path: Path relative to project root
+            
+        Returns:
+            The registered graph
+        """
+        logger.debug("Registering external graph", identifier=identifier, path=path)
+        self.metadata.add((identifier, RDF.type, VOID.Dataset))
+        self.metadata.add((identifier, FROTH.isExternal, Literal(True)))
+        self.metadata.add((identifier, NT.hasFilePath, Literal(path)))
+        
+        graph = self.dataset.graph(identifier, base=self.namespace)
+        graph.parse(path, format="turtle")
+        return graph
 
     def graph(self, identifier: URIRef) -> Graph:
         if (
