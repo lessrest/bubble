@@ -22,6 +22,72 @@ from bubble.mesh import Vat, ActorContext, with_transient_graph
 logger = structlog.get_logger(__name__)
 
 
+async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
+    """
+    Handle an anonymous/transient actor joining a town via WebSocket.
+    
+    This involves:
+    - Accepting the connection
+    - Assigning a temporary identity
+    - Setting up an actor context
+    - Forwarding messages between the actor and town
+    - Handling heartbeat messages
+    
+    Args:
+        websocket: The WebSocket connection object
+        vat: The Vat instance managing the town and its actors
+    """
+    await websocket.accept()
+    
+    try:
+        # Generate a temporary identity for this anonymous actor
+        remote_actor_uri = fresh_uri(vat.site)
+        proc = fresh_uri(vat.site)
+        
+        # Create send/receive channels for actor messages
+        send, recv = open_memory_channel[Graph](8)
+        
+        # Create and register the actor context
+        remote_actor_context = ActorContext(
+            boss=vat.get_identity_uri(),
+            addr=remote_actor_uri,
+            proc=proc,
+            send=send,
+            recv=recv,
+        )
+        vat.deck[remote_actor_uri] = remote_actor_context
+        
+        # Record the anonymous actor session
+        new(
+            NT.AnonymousActor,
+            {
+                PROV.wasAssociatedWith: proc,
+                NT.affordance: create_message_prompt(remote_actor_uri),
+            },
+            remote_actor_uri,
+        )
+        
+        new(
+            NT.AnonymousActorSession,
+            {
+                NT.remoteActor: remote_actor_uri,
+                PROV.startedAtTime: context.clock.get()(),
+            },
+            proc,
+        )
+        
+        # Add the remote actor to the current process
+        add(vat.curr.get().proc, {NT.hasRemoteActor: remote_actor_uri})
+        
+        logger.info("anonymous actor joined", addr=remote_actor_uri, proc=proc)
+        
+        # Launch message forwarding tasks
+        await _run_message_forwarders(websocket, remote_actor_uri, proc, recv)
+        
+    except Exception as e:
+        logger.error("anonymous websocket handler error", error=e)
+        raise
+
 async def handle_actor_join(
     websocket: WebSocket, key: Ed25519PublicKey, vat: Vat
 ):
@@ -40,7 +106,6 @@ async def handle_actor_join(
         key: The Ed25519 public key object of the remote actor.
         vat: The Vat instance managing the town and its actors.
     """
-
     await websocket.accept()
 
     try:

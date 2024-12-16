@@ -258,6 +258,7 @@ class Site:
         self.app.websocket("/{id}/jsonld")(self.ws_jsonld)
 
         self.app.websocket("/join/{key}")(self.ws_actor_join)
+        self.app.websocket("/join")(self.ws_anonymous_join)
 
         self.app.get("/word")(self.word_lookup)
         self.app.get("/words")(self.word_lookup_form)
@@ -512,13 +513,18 @@ class Site:
             await websocket.close()
 
     async def ws_actor_join(self, websocket: WebSocket, key: str):
-        """Handle a remote actor joining the town."""
+        """Handle a remote actor joining the town with a provided identity key."""
         from bubble.join import handle_actor_join
         from bubble.keys import parse_public_key_hex
 
         # Parse the hex key string into an Ed25519PublicKey object before passing to handle_actor_join
         public_key = parse_public_key_hex(key)
         await handle_actor_join(websocket, public_key, self.vat)
+
+    async def ws_anonymous_join(self, websocket: WebSocket):
+        """Handle an anonymous/transient actor joining the town."""
+        from bubble.join import handle_anonymous_join
+        await handle_anonymous_join(websocket, self.vat)
 
     @contextmanager
     def install_context(self):
