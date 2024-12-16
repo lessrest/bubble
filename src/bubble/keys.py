@@ -37,6 +37,11 @@ def generate_identity_uri(public_key: ed25519.Ed25519PublicKey) -> URIRef:
     return URIRef(f"did:key:{get_public_key_hex(public_key)}")
 
 
+# define functions to parse a public key from a hex string
+# and to verify a signed bytes object using a public key
+# AI!
+
+
 def create_identity_graph(
     public_key: ed25519.Ed25519PublicKey, subject: URIRef
 ):
