@@ -28,7 +28,7 @@ structuring real-time audio transcriptions within a semantic framework.
 
 import os
 
-from typing import Optional
+from typing import AsyncContextManager, Optional
 from datetime import UTC, datetime
 from collections import defaultdict
 from urllib.parse import urlencode
@@ -69,7 +69,9 @@ from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage
 logger = structlog.get_logger()
 
 
-def using_deepgram_live_session(params: DeepgramParams):
+def using_deepgram_live_session(
+    params: DeepgramParams,
+) -> AsyncContextManager[WebSocketConnection]:
     """Create a websocket connection to Deepgram's streaming API"""
     query_params = params.model_dump(exclude_none=True)
     # lowercase the boolean values
