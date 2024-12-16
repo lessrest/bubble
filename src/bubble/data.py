@@ -384,27 +384,29 @@ class Repository:
         return FileBlob(file_path)
 
     # I want a method that takes a bytes object and media type,
-    async def save_blob(self, data: bytes, media_type: str = "application/octet-stream") -> URIRef:
+    async def save_blob(
+        self, data: bytes, media_type: str = "application/octet-stream"
+    ) -> URIRef:
         """Save a blob with content addressing and return its URIRef.
-        
+
         Args:
             data: The binary data to save
             media_type: MIME type of the content (default: application/octet-stream)
-            
+
         Returns:
             URIRef: A content-addressed URI like urn:x-bubble:file:sha256:...
         """
         # Generate SHA-256 hash of content
         sha256 = hashlib.sha256(data).hexdigest()
-        
+
         # Create content-addressed URI
         file_uri = URIRef(f"urn:x-bubble:file:sha256:{sha256}")
-        
+
         # Save to content-addressed location
         file_path = self.graphs_path / "blobs" / sha256[:2] / sha256[2:]
         blob = FileBlob(file_path)
         await blob.write(data)
-        
+
         # Record metadata
         with self.using_metadata():
             add(
@@ -414,10 +416,18 @@ class Repository:
                     DCTERMS.created: context.clock.get()(),
                     DCAT.mediaType: Literal(media_type),
                     NT.hasFilePath: Literal(str(file_path)),
+                    DCAT.downloadURL: self.namespace[f"blobs/{sha256}"],
                 },
             )
-            
+
+        await self.save_all()
+
         return file_uri
+
+    async def open_blob(self, sha256: str) -> FileBlob:
+        """Open a blob from its SHA-256 hash"""
+        file_path = self.graphs_path / "blobs" / sha256[:2] / sha256[2:]
+        return FileBlob(file_path)
 
     def get_streams_with_blobs(
         self,

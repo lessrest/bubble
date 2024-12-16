@@ -205,6 +205,8 @@ def town(
                 namespace=Namespace(base_url),
             )
 
+            await repo.load_all()
+
             town = Site(base_url, bind, repo)
             with town.install_context():
                 with repo.new_graph():
@@ -219,8 +221,7 @@ def town(
                     )
 
                     # Link supervisor to the town's identity
-                    async with txgraph():
-                        town.vat.link_actor_to_identity(supervisor)
+                    town.vat.link_actor_to_identity(supervisor)
 
                     # Add image gallery link to the root
                     add(
@@ -239,18 +240,6 @@ def town(
                             )
                         },
                     )
-
-                    uptime = await spawn(
-                        nursery,
-                        UptimeActor(datetime.now(UTC)),
-                        name="uptime",
-                    )
-
-                    # Link uptime actor to the town's identity
-                    town.vat.link_actor_to_identity(uptime)
-
-                    add(URIRef(base_url), {NT.environs: supervisor})
-                    add(URIRef(base_url), {NT.environs: uptime})
 
                     nursery.start_soon(
                         serve_fastapi_app, config, town.get_fastapi_app()

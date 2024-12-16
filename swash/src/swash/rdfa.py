@@ -10,6 +10,7 @@ import arrow
 import structlog
 
 from rdflib import (
+    DCAT,
     RDF,
     XSD,
     RDFS,
@@ -206,7 +207,11 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     #     graph=vars.dataset.get(),
     # )
 
-    if data["type"] == NT.Image or data["type"] == Schema.ImageObject:
+    if (
+        data["type"] == NT.Image
+        or data["type"] == Schema.ImageObject
+        or data["type"] == DCAT.Distribution
+    ):
         render_image_resource(subject, data)
     elif data["type"] == NT.VideoFile:
         render_video_resource(subject, data)
@@ -266,11 +271,17 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
 def render_image_resource(subject: S, data: Dict) -> None:
     render_resource_header(subject, data)
     href = next(
-        (obj for pred, obj in data["predicates"] if pred == NT.href),
+        (
+            obj
+            for pred, obj in data["predicates"]
+            if pred == NT.href or pred == DCAT.downloadURL
+        ),
         None,
     )
     if href:
         render_image(subject, href)
+    else:
+        render_image(subject, subject)
     render_properties(data)
 
 
@@ -442,7 +453,7 @@ def render_properties(data):
 
     # Render each group
     with tag(
-        "dl", classes="flex flex-col flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
+        "dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
     ):
         for predicate, objects in grouped_predicates.items():
             # Check if all objects are literals

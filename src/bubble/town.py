@@ -24,6 +24,7 @@ import trio
 import structlog
 
 from rdflib import (
+    DCAT,
     RDF,
     XSD,
     Graph,
@@ -253,6 +254,7 @@ class Site:
         self.app.get("/words")(self.word_lookup_form)
 
         self.app.get("/files/{path:path}")(self.file_get)
+        self.app.get("/blobs/{sha256}")(self.blob_get)
         self.app.get("/images")(self.image_gallery)
 
         # this is at the bottom because it matches too broadly
@@ -261,6 +263,10 @@ class Site:
     async def file_get(self, path: str):
         file = self.repo.open_existing_file(URIRef(path))
         return Response(content=await file.read())
+
+    async def blob_get(self, sha256: str):
+        blob = await self.repo.open_blob(sha256)
+        return Response(content=await blob.read())
 
     async def health_check(self):
         with with_transient_graph("health") as id:
@@ -793,9 +799,9 @@ class Site:
                 images = []
                 for graph in dataset.graphs():
                     for subject in graph.subjects(
-                        RDF.type, Schema.ImageObject
+                        RDF.type, DCAT.Distribution
                     ):
-                        href = graph.value(subject, NT.href)
+                        href = graph.value(subject, DCAT.downloadURL)
                         generated_time = graph.value(
                             subject, PROV.generatedAtTime
                         )

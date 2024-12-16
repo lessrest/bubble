@@ -82,8 +82,11 @@ class ReplicateClientActor(ServerActor[str]):
                 # Store the generated images and add them to the response
                 for readable in readables:
                     img = await readable.aread()
-                    entity = new(
-                        Schema.ImageObject,
+                    distribution = await self.store.save_blob(
+                        img, "image/webp"
+                    )
+                    add(
+                        distribution,
                         {
                             PROV.wasGeneratedBy: this(),
                             PROV.generatedAtTime: Literal(
@@ -91,26 +94,7 @@ class ReplicateClientActor(ServerActor[str]):
                             ),
                         },
                     )
-                    href = Literal(
-                        vars.site.get()[f"files/{entity}"],
-                        datatype=XSD.anyURI,
-                    )
-                    add(
-                        entity,
-                        {
-                            NT.href: href,
-                            Schema.contentUrl: Literal(
-                                vars.site.get()[f"files/{entity}"],
-                                datatype=XSD.anyURI,
-                            ),
-                        },
-                    )
-                    add(result.identifier, {PROV.generated: entity})
-                    # self.store.append_blob(str(entity), 0, img)
-                    blob = await self.store.get_file(
-                        entity, "image.webp", "image/webp"
-                    )
-                    await blob.write(img)
+                    add(result.identifier, {PROV.generated: distribution})
 
             return result
 

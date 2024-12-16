@@ -234,9 +234,8 @@ class Vat:
         new(
             NT.ActorProcess,
             {
-                PROV.wasStartedBy: parent_proc,
                 PROV.startedAtTime: now,
-                PROV.wasAssociatedWith: actor_proc,
+                PROV.wasAssociatedWith: parent_proc,
             },
             actor_proc,
         )
@@ -247,6 +246,7 @@ class Vat:
                 RDFS.label: Literal(name, lang="en"),
                 PROV.wasGeneratedBy: parent_proc,
                 PROV.generatedAtTime: now,
+                PROV.wasAssociatedWith: actor_proc,
             },
             actor,
         )
