@@ -526,11 +526,14 @@ class Site:
         await websocket.accept()
         try:
             with with_transient_graph() as outgoing_handshake:
+                # Generate a random 32-byte nonce
+                nonce = base64.b64encode(os.urandom(32))
                 new(
                     NT.Handshake,
                     {
+                        NT.nonce: Literal(nonce, datatype=XSD.base64Binary),
                         NT.signedQuestion: Literal(
-                            base64.b64encode(self.vat.sign_data(b"hello")),
+                            base64.b64encode(self.vat.sign_data(nonce)),
                             datatype=XSD.base64Binary,
                         )
                     },
@@ -561,8 +564,16 @@ class Site:
                 assert isinstance(signed_message_bytes, bytes)
 
                 # Verify signature using provided public key
+                # Get the nonce from the handshake
+                nonce = response_graph.value(outgoing_handshake, NT.nonce)
+                if not nonce:
+                    raise ValueError("No nonce found in handshake")
+                
+                nonce_bytes = nonce.toPython()
+                assert isinstance(nonce_bytes, bytes)
+
                 if not verify_signed_data(
-                    b"hello", signed_message_bytes, public_key
+                    nonce_bytes, signed_message_bytes, public_key
                 ):
                     raise ValueError("Invalid signature")
 
