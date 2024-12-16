@@ -64,12 +64,12 @@ def autoexpanding(depth: int):
 def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
     # Get all labels with their languages
     labels = []
-    for s, p, o, c in dataset.quads((None, RDFS.label, None, None)):
-        if s == uri:
-            if isinstance(o, Literal):
-                labels.append((o, o.language or ""))
-            else:
-                labels.append((o, ""))
+    # this should prefer SKOS.prefLabel over RDFS.label, AI!
+    for s, p, o, c in dataset.quads((uri, RDFS.label, None, None)):
+        if isinstance(o, Literal):
+            labels.append((o, o.language or ""))
+        else:
+            labels.append((o, ""))
 
     if not labels:
         return None
@@ -578,7 +578,7 @@ def _render_quoted_graph(obj: QuotedGraph) -> None:
 
 
 @html.a(
-    "text-blue-600 dark:text-blue-400 whitespace-nowrap",
+    "text-blue-600 dark:text-slate-400 whitespace-nowrap",
     hx_swap="outerHTML",
 )
 def _render_uri(obj: URIRef) -> None:
@@ -591,7 +591,8 @@ def _render_uri(obj: URIRef) -> None:
 
     if label:
         # If we have a label, show it
-        text(label)
+        with tag("span", classes="font-serif font-bold"):
+            text(label)
         # # Add the CURIE in a smaller, dimmer font
         # prefix, namespace, name = (
         #     dataset.namespace_manager.compute_qname(str(obj))
@@ -620,7 +621,7 @@ def _render_uri(obj: URIRef) -> None:
 
 
 @html.span(
-    "text-blue-600 dark:text-blue-500",
+    # "text-blue-600 dark:text-blue-500",
     "opacity-70 pl-1 text-sm small-caps",
 )
 def render_curie_prefix(prefix):
