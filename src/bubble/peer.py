@@ -68,81 +68,75 @@ class Peer:
             # Create WebSocket connection using httpx-ws
             async with httpx.AsyncClient() as client:
                 async with aconnect_ws(join_url, client=client, verify=ssl_context) as ws:
-                    self.ws = ws
-                    
                     # Receive initial handshake
-                    handshake_msg = await self.ws.receive_text()
-            handshake = Graph()
-            handshake.parse(data=handshake_msg, format="json-ld")
+                    handshake_msg = await ws.receive_text()
+                    handshake = Graph()
+                    handshake.parse(data=handshake_msg, format="json-ld")
 
-            logger.info("received handshake", graph=handshake)
+                    logger.info("received handshake", graph=handshake)
 
-            # Extract and verify the signed question
-            for subject in handshake.subjects(None, NT.Handshake):
-                signed_question = handshake.value(
-                    subject, NT.signedQuestion
-                )
-                if signed_question:
-                    # Sign our response
-                    signed_answer = self.sign(b"hello")
-
-                    # Create response graph
-                    response = Graph()
-                    response.add(
-                        (
-                            subject,
-                            NT.signedAnswer,
-                            URIRef(
-                                base64.b64encode(signed_answer).decode()
-                            ),
+                    # Extract and verify the signed question
+                    for subject in handshake.subjects(None, NT.Handshake):
+                        signed_question = handshake.value(
+                            subject, NT.signedQuestion
                         )
-                    )
+                        if signed_question:
+                            # Sign our response
+                            signed_answer = self.sign(b"hello")
 
-                    logger.info("sending response", graph=response)
+                            # Create response graph
+                            response = Graph()
+                            response.add(
+                                (
+                                    subject,
+                                    NT.signedAnswer,
+                                    URIRef(
+                                        base64.b64encode(signed_answer).decode()
+                                    ),
+                                )
+                            )
 
-                    # Send response
-                    await self.ws.send_text(
-                        response.serialize(format="json-ld")
-                    )
+                            logger.info("sending response", graph=response)
 
-                    logger.info("handshake complete")
+                            # Send response
+                            await ws.send_text(
+                                response.serialize(format="json-ld")
+                            )
 
-                    # Start message handling loop
-                    async with trio.open_nursery() as nursery:
-                        nursery.start_soon(self._handle_messages)
-                        nursery.start_soon(self._heartbeat)
+                            logger.info("handshake complete")
+
+                            # Start message handling loop
+                            async with trio.open_nursery() as nursery:
+                                nursery.start_soon(self._handle_messages, ws)
+                                nursery.start_soon(self._heartbeat, ws)
 
         except Exception as e:
             logger.error("connection error", error=e)
-            if self.ws:
-                await self.ws.close()
             raise
 
-    async def _handle_messages(self) -> None:
+    async def _handle_messages(self, ws) -> None:
         """Handle incoming WebSocket messages."""
         try:
-            while self.ws:
+            while True:
                 try:
-                    message = await self.ws.receive_text()
+                    message = await ws.receive_text()
                     msg_graph = Graph()
                     msg_graph.parse(data=message, format="json-ld")
                     await self.handle_message(msg_graph)
                 except Exception as e:
                     logger.error("message handling error", error=e)
                     break
+        except Exception as e:
+            logger.error("message handler error", error=e)
 
-        finally:
-            if self.ws:
-                await self.ws.close()
-
-    async def _heartbeat(self) -> None:
+    async def _heartbeat(self, ws) -> None:
         """Send periodic heartbeat messages."""
         try:
-            while self.ws:
+            while True:
                 await trio.sleep(30)
                 heartbeat = Graph()
                 heartbeat.add((URIRef("#heartbeat"), RDF.type, NT.Heartbeat))
-                await self.ws.send_text(
+                await ws.send_text(
                     heartbeat.serialize(format="json-ld")
                 )
         except Exception as e:
@@ -152,8 +146,3 @@ class Peer:
         """Handle an incoming message. Override this in subclasses."""
         logger.info("received message", graph=message)
 
-    async def close(self) -> None:
-        """Close the WebSocket connection."""
-        if self.ws:
-            await self.ws.close()
-            self.ws = None
