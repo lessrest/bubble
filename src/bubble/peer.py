@@ -23,282 +23,242 @@ logger = structlog.get_logger(__name__)
 class Peer:
     """
     A peer that can connect to a Bubble Town service via WebSocket.
-
-    This class:
-      - Generates a new Ed25519 keypair for secure identification and signing.
-      - Connects to a "town" endpoint over WebSocket (wss://).
-      - Handles a handshake process with a signed question/answer exchange.
-      - Continuously receives messages from the server and sends heartbeats.
+    
+    This class represents an established connection to a town,
+    either with a signed identity or anonymously.
     """
-
-    private_key: ed25519.Ed25519PrivateKey | None
-    public_key: ed25519.Ed25519PublicKey | None
-    ws: Optional[AsyncGenerator] = None
-    actor_uri: Optional[URIRef] = None  # Will be set during anonymous connection
-
-    @classmethod
-    def generate(cls) -> "Peer":
-        """
-        Generate a new peer with a fresh Ed25519 keypair.
-        """
-        private_key = ed25519.Ed25519PrivateKey.generate()
-        public_key = private_key.public_key()
-        return cls(private_key=private_key, public_key=public_key)
-
-    def get_public_key_hex(self) -> str:
-        """
-        Return the public key as a lowercase hex string.
-        Raises ValueError if no public key is available.
-        """
-        if not self.public_key:
-            raise ValueError("No public key available")
-            
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        ).hex()
-
-    def sign(self, data: bytes) -> bytes:
-        """
-        Sign the given data with this peer's private key.
-        Raises ValueError if no private key is available.
-        """
-        if not self.private_key:
-            raise ValueError("No private key available")
-            
-        return self.private_key.sign(data)
+    ws: AsyncGenerator  # The WebSocket connection
+    actor_uri: URIRef  # The peer's identity URI in the town
 
     @classmethod
     async def connect_anonymous(cls, town_url: str) -> "Peer":
-        """
-        Connect to a town anonymously via WebSocket.
-        No keypair or identity is required.
+        """Connect to a town anonymously via WebSocket."""
+        ws, actor_uri = await establish_anonymous_connection(town_url)
+        return cls(ws=ws, actor_uri=actor_uri)
 
-        :param town_url: The HTTPS URL of the town to connect to.
-        :return: A new anonymous Peer instance
-        """
-        # Create a peer without keys for anonymous connection
-        peer = cls(
-            private_key=None,  # type: ignore
-            public_key=None,  # type: ignore
-        )
-        await peer._connect_anonymous(town_url)
-        return peer
+    @classmethod
+    async def connect_with_identity(cls, town_url: str) -> "Peer":
+        """Connect to a town with a signed identity via WebSocket."""
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        public_key = private_key.public_key()
+        ws, actor_uri = await establish_signed_connection(town_url, private_key, public_key)
+        return cls(ws=ws, actor_uri=actor_uri)
 
-    async def _connect_anonymous(self, town_url: str) -> None:
-        """
-        Connect anonymously to a town via WebSocket.
-        
-        :param town_url: The HTTPS URL of the town to connect to.
-        """
-        # Convert HTTP to WebSocket URL  
-        ws_url = self._convert_to_ws_url(town_url)
+async def establish_anonymous_connection(town_url: str) -> tuple[AsyncGenerator, URIRef]:
+    """
+    Establish an anonymous connection to a town.
+    
+    Args:
+        town_url: The HTTPS URL of the town to connect to.
+    
+    Returns:
+        A tuple of (websocket, actor_uri) for the established connection.
+    """
+    ws_url = convert_to_ws_url(town_url)
+    join_url = f"{ws_url}join"
+    logger.info("Connecting anonymously to town", url=join_url)
 
-        # Use the anonymous join endpoint
-        join_url = f"{ws_url}join"
-        logger.info("Connecting anonymously to town", url=join_url)
+    try:
+        async with httpx.AsyncClient(verify=False) as client:
+            async with aconnect_ws(join_url, client=client) as ws:
+                # Receive the handshake with our temporary identity
+                handshake_msg = await ws.receive_text()
+                handshake = Graph()
+                handshake.parse(data=handshake_msg, format="turtle")
+                logger.info("Received anonymous handshake", graph=handshake)
 
-        try:
-            async with httpx.AsyncClient(verify=False) as client:
-                async with aconnect_ws(join_url, client=client) as ws:
-                    # Receive the handshake with our temporary identity
-                    handshake_msg = await ws.receive_text()
-                    handshake = Graph()
-                    handshake.parse(data=handshake_msg, format="turtle")
-                    logger.info("Received anonymous handshake", graph=handshake)
+                # Extract our assigned actor URI and verify protocol version
+                for subject in handshake.subjects(RDF.type, NT.AnonymousHandshake):
+                    if handshake.value(subject, NT.protocol) != NT.Protocol_1:
+                        raise ValueError("Unsupported protocol version")
+                    
+                    actor_uri = handshake.value(subject, NT.actor)
+                    if not actor_uri:
+                        raise ValueError("No actor URI in handshake")
 
-                    # Extract our assigned actor URI and verify protocol version
-                    for subject in handshake.subjects(RDF.type, NT.AnonymousHandshake):
-                        if handshake.value(subject, NT.protocol) != NT.Protocol_1:
-                            raise ValueError("Unsupported protocol version")
-                        
-                        self.actor_uri = handshake.value(subject, NT.actor)
-                        if not self.actor_uri:
-                            raise ValueError("No actor URI in handshake")
-
-                        # Send acknowledgment
-                        ack = Graph()
-                        ack.add((subject, NT.acknowledged, Literal(True)))
-                        await ws.send_text(ack.serialize(format="turtle"))
-                        logger.info("Sent handshake acknowledgment")
-                        break
-                    else:
-                        raise ValueError("Invalid handshake message")
-
-                    # Launch concurrent tasks for message handling and heartbeat
-                    async with trio.open_nursery() as nursery:
-                        nursery.start_soon(self._handle_messages, ws)
-                        nursery.start_soon(self._heartbeat, ws)
-
-        except Exception as e:
-            logger.error("Connection error", error=e)
-            raise
-
-    async def connect(self, town_url: str) -> None:
-        """
-        Connect to a town via WebSocket with a signed identity, perform handshake,
-        and start message handling and heartbeat loops.
-
-        :param town_url: The HTTPS URL of the town to connect to.
-        """
-        if not self.private_key or not self.public_key:
-            raise ValueError("Cannot connect with signed identity - no keypair available")
-            
-        # Convert HTTP to WebSocket URL
-        ws_url = self._convert_to_ws_url(town_url)
-
-        # Construct join endpoint with public key
-        join_url = f"{ws_url}join/{self.get_public_key_hex()}"
-        logger.info("Connecting to town with identity", url=join_url)
-
-        # Create an SSL context to trust the local CA if necessary
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        cert_path = (
-            pathlib.Path(__file__).parent.parent.parent
-            / "priv"
-            / "localhost.pem"
-        )
-        ssl_context.load_verify_locations(cafile=cert_path)
-
-        try:
-            async with httpx.AsyncClient(verify=False) as client:
-                async with aconnect_ws(join_url, client=client) as ws:
-                    # Perform the handshake
-                    await self._perform_handshake(ws)
-
-                    # Launch concurrent tasks for message handling and heartbeat
-                    async with trio.open_nursery() as nursery:
-                        nursery.start_soon(self._handle_messages, ws)
-                        nursery.start_soon(self._heartbeat, ws)
-
-        except Exception as e:
-            logger.error("Connection error", error=e)
-            raise
-
-    def _convert_to_ws_url(self, town_url: str) -> str:
-        """
-        Convert an HTTPS town URL to a WSS URL, ensuring a trailing slash.
-
-        :param town_url: The HTTPS URL of the town.
-        :return: The corresponding WSS URL.
-        """
-        ws_url = town_url.replace("https://", "wss://")
-        if not ws_url.endswith("/"):
-            ws_url += "/"
-        return ws_url
-
-    async def _perform_handshake(self, ws) -> None:
-        """
-        Perform the initial handshake with the remote town via the WebSocket.
-
-        :param ws: The WebSocket connection.
-        """
-        # Receive the initial handshake message from the server
-        handshake_msg = await ws.receive_text()
-        handshake = Graph()
-        handshake.parse(data=handshake_msg, format="turtle")
-        logger.info("Received handshake", graph=handshake)
-
-        # Locate the handshake subject and extract the signed question
-        for subject in handshake.subjects(None, NT.Handshake):
-            signed_question = handshake.value(subject, NT.signedQuestion)
-            if signed_question:
-                # Use the handshake URI itself as the nonce
-                nonce_bytes = str(subject).encode()
-
-                # Sign our response using the handshake URI as nonce
-                signed_answer = self.sign(nonce_bytes)
-
-                # Build a response graph
-                response = Graph()
-                response.add(
-                    (
-                        subject,
-                        NT.signedAnswer,
-                        Literal(
-                            base64.b64encode(signed_answer),
-                            datatype=XSD.base64Binary,
-                        ),
-                    )
-                )
-                logger.info("Sending handshake response", graph=response)
-
-                # Send the response to complete the handshake
-                await ws.send_text(response.serialize(format="turtle"))
-                logger.info("Handshake complete")
-
-    async def _handle_messages(self, ws) -> None:
-        """
-        Continuously receive and process messages from the WebSocket.
-
-        :param ws: The WebSocket connection.
-        """
-        try:
-            while True:
-                try:
-                    message = await ws.receive_text()
-                    msg_graph = Dataset()
-                    msg_graph.parse(data=message, format="trig")
-                    await self.handle_message(msg_graph)
-                except Exception as e:
-                    logger.error("Message handling error", error=e)
+                    # Send acknowledgment
+                    ack = Graph()
+                    ack.add((subject, NT.acknowledged, Literal(True)))
+                    await ws.send_text(ack.serialize(format="turtle"))
+                    logger.info("Sent handshake acknowledgment")
                     break
-        except Exception as e:
-            logger.error("Message handler terminated", error=e)
+                else:
+                    raise ValueError("Invalid handshake message")
 
-    async def _heartbeat(self, ws) -> None:
-        """
-        Send periodic heartbeat messages to the town.
+                # Launch concurrent tasks for message handling and heartbeat
+                async with trio.open_nursery() as nursery:
+                    nursery.start_soon(handle_messages, ws)
+                    nursery.start_soon(heartbeat, ws)
 
-        :param ws: The WebSocket connection.
-        """
-        try:
-            while True:
-                await trio.sleep(5)
-                heartbeat = self._create_heartbeat_graph()
-                await ws.send_text(heartbeat.serialize(format="trig"))
-                logger.info("Sent heartbeat")
-        except Exception as e:
-            logger.error("Heartbeat error", error=e)
+                return ws, actor_uri
 
-    def _create_heartbeat_graph(self) -> Dataset:
-        """
-        Create a heartbeat message graph.
+    except Exception as e:
+        logger.error("Connection error", error=e)
+        raise
 
-        :return: A Dataset containing a heartbeat message.
-        """
-        heartbeat = Dataset()
-        hb_node = URIRef("#heartbeat")
-        heartbeat.add((hb_node, RDF.type, NT.Heartbeat))
-        heartbeat.add(
-            (hb_node, PROV.generatedAtTime, Literal(datetime.now(UTC)))
-        )
-        return heartbeat
+async def establish_signed_connection(
+    town_url: str,
+    private_key: ed25519.Ed25519PrivateKey,
+    public_key: ed25519.Ed25519PublicKey,
+) -> tuple[AsyncGenerator, URIRef]:
+    """
+    Establish a signed connection to a town.
+    
+    Args:
+        town_url: The HTTPS URL of the town to connect to.
+        private_key: The Ed25519 private key for signing.
+        public_key: The corresponding public key.
+    
+    Returns:
+        A tuple of (websocket, actor_uri) for the established connection.
+    """
+    ws_url = convert_to_ws_url(town_url)
+    public_key_hex = public_key.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    ).hex()
+    
+    join_url = f"{ws_url}join/{public_key_hex}"
+    logger.info("Connecting to town with identity", url=join_url)
 
-    async def handle_message(self, message: Dataset) -> None:
-        """
-        Handle an incoming message. Override this method in subclasses
-        for custom behavior.
+    # Create an SSL context to trust the local CA if necessary
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    cert_path = (
+        pathlib.Path(__file__).parent.parent.parent
+        / "priv"
+        / "localhost.pem"
+    )
+    ssl_context.load_verify_locations(cafile=cert_path)
 
-        :param message: An RDF Dataset containing the incoming message.
-        """
-        logger.info("Received message", graph=message)
+    try:
+        async with httpx.AsyncClient(verify=False) as client:
+            async with aconnect_ws(join_url, client=client) as ws:
+                # Perform the handshake
+                actor_uri = await perform_handshake(ws, private_key)
 
-        # Check if the dataset contains a heartbeat and log latency if acknowledged
-        if heartbeat := message.value(None, RDF.type, NT.Heartbeat):
-            t0 = message.value(heartbeat, PROV.generatedAtTime)
-            t1 = message.value(heartbeat, NT.acknowledgedAtTime)
-            if t0 and t1:
-                t0, t1 = t0.toPython(), t1.toPython()
-                if isinstance(t0, datetime) and isinstance(t1, datetime):
-                    t2 = datetime.now(UTC)
-                    latency = t1 - t0
-                    roundtrip = t2 - t0
-                    logger.info(
-                        "Heartbeat latency",
-                        latency=latency,
-                        roundtrip=roundtrip,
-                    )
+                # Launch concurrent tasks for message handling and heartbeat
+                async with trio.open_nursery() as nursery:
+                    nursery.start_soon(handle_messages, ws)
+                    nursery.start_soon(heartbeat, ws)
+
+                return ws, actor_uri
+
+    except Exception as e:
+        logger.error("Connection error", error=e)
+        raise
+
+def convert_to_ws_url(town_url: str) -> str:
+    """Convert an HTTPS town URL to a WSS URL, ensuring a trailing slash."""
+    ws_url = town_url.replace("https://", "wss://")
+    if not ws_url.endswith("/"):
+        ws_url += "/"
+    return ws_url
+
+async def perform_handshake(
+    ws,
+    private_key: ed25519.Ed25519PrivateKey,
+) -> URIRef:
+    """
+    Perform the initial handshake with the remote town via the WebSocket.
+    Returns the actor URI assigned by the town.
+    """
+    # Receive the initial handshake message from the server
+    handshake_msg = await ws.receive_text()
+    handshake = Graph()
+    handshake.parse(data=handshake_msg, format="turtle")
+    logger.info("Received handshake", graph=handshake)
+
+    # Locate the handshake subject and extract the signed question
+    for subject in handshake.subjects(None, NT.Handshake):
+        signed_question = handshake.value(subject, NT.signedQuestion)
+        if signed_question:
+            # Use the handshake URI itself as the nonce
+            nonce_bytes = str(subject).encode()
+
+            # Sign our response using the handshake URI as nonce
+            signed_answer = private_key.sign(nonce_bytes)
+
+            # Build a response graph
+            response = Graph()
+            response.add(
+                (
+                    subject,
+                    NT.signedAnswer,
+                    Literal(
+                        base64.b64encode(signed_answer),
+                        datatype=XSD.base64Binary,
+                    ),
+                )
+            )
+            logger.info("Sending handshake response", graph=response)
+
+            # Send the response to complete the handshake
+            await ws.send_text(response.serialize(format="turtle"))
+            logger.info("Handshake complete")
+            
+            # Return the actor URI from the handshake
+            actor_uri = handshake.value(subject, NT.actor)
+            if not actor_uri:
+                raise ValueError("No actor URI in handshake response")
+            return actor_uri
+
+    raise ValueError("Invalid handshake message")
+
+async def handle_messages(ws) -> None:
+    """Continuously receive and process messages from the WebSocket."""
+    try:
+        while True:
+            try:
+                message = await ws.receive_text()
+                msg_graph = Dataset()
+                msg_graph.parse(data=message, format="trig")
+                await process_message(msg_graph)
+            except Exception as e:
+                logger.error("Message handling error", error=e)
+                break
+    except Exception as e:
+        logger.error("Message handler terminated", error=e)
+
+async def heartbeat(ws) -> None:
+    """Send periodic heartbeat messages to the town."""
+    try:
+        while True:
+            await trio.sleep(5)
+            heartbeat = create_heartbeat_graph()
+            await ws.send_text(heartbeat.serialize(format="trig"))
+            logger.info("Sent heartbeat")
+    except Exception as e:
+        logger.error("Heartbeat error", error=e)
+
+def create_heartbeat_graph() -> Dataset:
+    """Create a heartbeat message graph."""
+    heartbeat = Dataset()
+    hb_node = URIRef("#heartbeat")
+    heartbeat.add((hb_node, RDF.type, NT.Heartbeat))
+    heartbeat.add(
+        (hb_node, PROV.generatedAtTime, Literal(datetime.now(UTC)))
+    )
+    return heartbeat
+
+async def process_message(message: Dataset) -> None:
+    """Process an incoming message."""
+    logger.info("Received message", graph=message)
+
+    # Check if the dataset contains a heartbeat and log latency if acknowledged
+    if heartbeat := message.value(None, RDF.type, NT.Heartbeat):
+        t0 = message.value(heartbeat, PROV.generatedAtTime)
+        t1 = message.value(heartbeat, NT.acknowledgedAtTime)
+        if t0 and t1:
+            t0, t1 = t0.toPython(), t1.toPython()
+            if isinstance(t0, datetime) and isinstance(t1, datetime):
+                t2 = datetime.now(UTC)
+                latency = t1 - t0
+                roundtrip = t2 - t0
+                logger.info(
+                    "Heartbeat latency",
+                    latency=latency,
+                    roundtrip=roundtrip,
+                )
 
 
 # Example usage (if running this module directly):
