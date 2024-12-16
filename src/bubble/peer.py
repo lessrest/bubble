@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import trio
 import httpx
+from httpx_ws import aconnect_ws
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 from rdflib import Graph, URIRef, RDF
@@ -24,7 +25,7 @@ class Peer:
 
     private_key: ed25519.Ed25519PrivateKey
     public_key: ed25519.Ed25519PublicKey
-    ws: Optional[httpx.WebSocketClient] = None
+    ws: Optional[AsyncGenerator] = None
 
     @classmethod
     def generate(cls) -> "Peer":
@@ -64,14 +65,13 @@ class Peer:
                 / "priv/localhost.pem",
             )
 
-            # Create WebSocket connection
-            self.ws = await httpx.AsyncClient().websocket_connect(
-                join_url,
-                verify=ssl_context,
-            )
-
-            # Receive initial handshake
-            handshake_msg = await self.ws.receive_text()
+            # Create WebSocket connection using httpx-ws
+            async with httpx.AsyncClient() as client:
+                async with aconnect_ws(join_url, client=client, verify=ssl_context) as ws:
+                    self.ws = ws
+                    
+                    # Receive initial handshake
+                    handshake_msg = await self.ws.receive_text()
             handshake = Graph()
             handshake.parse(data=handshake_msg, format="json-ld")
 
@@ -121,34 +121,30 @@ class Peer:
     async def _handle_messages(self) -> None:
         """Handle incoming WebSocket messages."""
         try:
-            while True:
-                if not self.ws:
+            while self.ws:
+                try:
+                    message = await self.ws.receive_text()
+                    msg_graph = Graph()
+                    msg_graph.parse(data=message, format="json-ld")
+                    await self.handle_message(msg_graph)
+                except Exception as e:
+                    logger.error("message handling error", error=e)
                     break
 
-                message = await self.ws.receive_text()
-                msg_graph = Graph()
-                msg_graph.parse(data=message, format="json-ld")
-                await self.handle_message(msg_graph)
-
-        except Exception as e:
-            logger.error("message handling error", error=e)
+        finally:
             if self.ws:
                 await self.ws.close()
 
     async def _heartbeat(self) -> None:
         """Send periodic heartbeat messages."""
         try:
-            while True:
-                if not self.ws:
-                    break
-
+            while self.ws:
                 await trio.sleep(30)
                 heartbeat = Graph()
                 heartbeat.add((URIRef("#heartbeat"), RDF.type, NT.Heartbeat))
                 await self.ws.send_text(
                     heartbeat.serialize(format="json-ld")
                 )
-
         except Exception as e:
             logger.error("heartbeat error", error=e)
 
