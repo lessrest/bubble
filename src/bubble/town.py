@@ -2,9 +2,10 @@ import base64
 import io
 import json
 import os
-import secrets
 import uuid
 import pathlib
+
+from swash.mint import Mint
 from datetime import UTC, datetime
 
 from io import BytesIO
@@ -528,8 +529,8 @@ class Site:
         await websocket.accept()
         try:
             with with_transient_graph() as outgoing_handshake:
-                # Generate a cryptographically secure random 32-byte nonce
-                nonce = base64.b64encode(secrets.token_bytes(32))
+                # Generate a cryptographically secure random nonce
+                nonce = base64.b64encode(Mint().fresh_token().encode())
                 new(
                     NT.Handshake,
                     {
