@@ -239,8 +239,8 @@ async def deepgram_session(results: URIRef):
 
 
 class DeepgramClientActor(ServerActor[str]):
-    def __init__(self, name: str):
-        super().__init__(os.environ["DEEPGRAM_API_KEY"], name=name)
+    def __init__(self):
+        super().__init__(os.environ["DEEPGRAM_API_KEY"])
 
     async def init(self):
         await super().init()

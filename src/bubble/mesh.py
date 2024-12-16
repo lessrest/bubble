@@ -422,9 +422,9 @@ async def receive() -> Graph:
 
 
 class ServerActor[State]:
-    def __init__(self, state: State, name: Optional[str] = None):
+    def __init__(self, state: State):
         self.state = state
-        self.name = name or self.__class__.__name__
+        self.name = self.__class__.__name__
         self.stop = False
 
     async def __call__(self):
