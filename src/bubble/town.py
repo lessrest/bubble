@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import secrets
 import uuid
 import pathlib
 from datetime import UTC, datetime
@@ -527,8 +528,8 @@ class Site:
         await websocket.accept()
         try:
             with with_transient_graph() as outgoing_handshake:
-                # Generate a random 32-byte nonce
-                nonce = base64.b64encode(os.urandom(32))
+                # Generate a cryptographically secure random 32-byte nonce
+                nonce = base64.b64encode(secrets.token_bytes(32))
                 new(
                     NT.Handshake,
                     {
