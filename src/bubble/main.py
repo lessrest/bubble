@@ -2,9 +2,12 @@ import pathlib
 import os
 
 from datetime import UTC, datetime
+import sys
 from urllib.parse import urlparse
 
 from fastapi import FastAPI
+import rdflib
+import rdflib.collection
 import swash
 from swash.html import document
 from swash.rdfa import autoexpanding, rdf_resource
@@ -15,7 +18,7 @@ import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import Literal, URIRef, Namespace, PROV, DCAT, XSD
+from rdflib import BNode, Literal, URIRef, Namespace, PROV, DCAT, XSD
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -25,7 +28,7 @@ import swash.vars as vars
 
 from swash.prfx import NT
 from swash.util import add, new
-from bubble.data import Git, Repository
+from bubble.data import Git, Repository, context
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.logs import configure_logging
 from bubble.stat.stat import gather_system_info
@@ -37,6 +40,7 @@ from bubble.deepgram.talk import DeepgramClientActor
 from swash.lynx import render_html
 from bubble.replicate.make import ReplicateClientActor, make_image
 from bubble.blob import BlobStore
+from bubble.data import from_env
 
 logger = configure_logging()
 
@@ -54,6 +58,7 @@ RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
 
 @app.command()
 def shell(
+    ctx: typer.Context,
     repo_path: str = RepoPath,
     namespace: str = Option(
         "https://example.com/", "--namespace", help="Namespace"
@@ -80,9 +85,24 @@ def shell(
                     NT.owner: user.pw_gecos,
                 },
             ) as agent:
+                arguments = BNode()
+                rdflib.collection.Collection(
+                    context.graph.get(),
+                    arguments,
+                    [Literal(arg) for arg in sys.argv[1:]],
+                )
                 # Start a new shell session activity
                 with repo.new_activity(
-                    NT.InteractiveShellSession
+                    NT.InteractiveShellSession,
+                    {
+                        PROV.wasStartedBy: new(
+                            NT.Command,
+                            {
+                                NT.programPath: Literal(sys.argv[0]),
+                                NT.arguments: arguments,
+                            },
+                        )
+                    },
                 ) as activity:
                     # Create a derived graph for the shell session
                     with repo.new_derived_graph(
@@ -130,33 +150,6 @@ def shell(
                         await repo.commit("Update after shell session")
 
     trio.run(run)
-
-
-# @app.command()
-# def server(
-#     bubble_path: str = BubblePath,
-#     bind: str = Option("127.0.0.1:2024", "--bind", help="Bind address"),
-#     base_url: str = Option(
-#         "https://localhost:2024", "--base-url", help="Public base URL"
-#     ),
-# ) -> None:
-#     """Serve the Bubble web interface."""
-
-#     config = hypercorn.Config()
-#     config.bind = [bind]
-
-#     if base_url.startswith("https://"):
-#         hostname = urlparse(base_url).hostname
-#         if hostname:
-#             cert_path, key_path = generate_self_signed_cert(hostname)
-#             config.certfile = cert_path
-#             config.keyfile = key_path
-
-#     async def run():
-#         with bubble.http.bubble_path.bind(bubble_path):
-#             await bubble.http.serve(config)
-
-#     trio.run(run)
 
 
 async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
@@ -284,20 +277,8 @@ def info() -> None:
     """Display information about the current bubble environment and graphs."""
     console = Console(width=78)
 
-    # Get environment variables
-    bubble_path = os.environ.get("BUBBLE")
-    bubble_graph = os.environ.get("BUBBLE_GRAPH")
-    bubble_graph_dir = os.environ.get("BUBBLE_GRAPH_DIR")
-    bubble_activity = os.environ.get("BUBBLE_ACTIVITY")
-    bubble_agent = os.environ.get("BUBBLE_AGENT")
-
-    assert bubble_graph
-    assert bubble_graph_dir
-    assert bubble_activity
-    assert bubble_agent
-
-    # If no bubble environment variables are set
-    if not bubble_path:
+    # Check if we're in a bubble environment
+    if "BUBBLE" not in os.environ:
         console.print(
             Panel(
                 "No bubble environment detected. Use [bold]bubble shell[/] to create one.",
@@ -307,82 +288,72 @@ def info() -> None:
         )
         return
 
-    async def show_info():
-        # Load the repository
-        git = Git(trio.Path(bubble_path))
-        repo = await Repository.create(
-            git, namespace=Namespace("file://" + bubble_path + "/")
-        )
-        await repo.load_all()
+    try:
+        with from_env() as repo:
+            # Create environment info table
+            env_table = Table(box=box.ROUNDED, title="Environment")
+            env_table.add_column("Key", style="bold blue")
+            env_table.add_column("Value")
 
-        # Create environment info table
-        env_table = Table(box=box.ROUNDED, title="Environment")
-        env_table.add_column("Key", style="bold blue")
-        env_table.add_column("Value")
-
-        env_table.add_row("Bubble Path", bubble_path)
-        if bubble_graph:
-            env_table.add_row("Current Graph", bubble_graph)
-        if bubble_graph_dir:
-            env_table.add_row("Graph Directory", bubble_graph_dir)
-
-        console.print(env_table)
-
-        # Create graphs info table
-        graphs_table = Table(box=box.ROUNDED, title="Graphs")
-        graphs_table.add_column("Graph", style="bold")
-        graphs_table.add_column("Type")
-        graphs_table.add_column("Created")
-        graphs_table.add_column("Files")
-
-        for graph_id in repo.list_graphs():
-            graph = repo.metadata
-
-            # Get graph type
-            graph_type = "Dataset"
-
-            # Get creation time
-            created = graph.value(graph_id, PROV.generatedAtTime)
-            if created and isinstance(created, Literal):
-                try:
-                    # Parse the datetime from the Literal value
-                    dt = datetime.fromisoformat(str(created))
-                    created_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except (ValueError, TypeError):
-                    created_str = str(created)
-            else:
-                created_str = "-"
-
-            # Count distributions (files)
-            file_count = len(
-                list(graph.objects(graph_id, DCAT.distribution))
+            env_table.add_row("Bubble Path", os.environ["BUBBLE"])
+            env_table.add_row("Current Graph", os.environ["BUBBLE_GRAPH"])
+            env_table.add_row(
+                "Graph Directory", os.environ.get("BUBBLE_GRAPH_DIR", "-")
             )
 
-            graphs_table.add_row(
-                graph_id.n3(graph.namespace_manager),
-                graph_type,
-                created_str,
-                str(file_count),
-            )
+            console.print(env_table)
 
-        console.print(graphs_table)
+            # Create graphs info table
+            graphs_table = Table(box=box.ROUNDED, title="Graphs")
+            graphs_table.add_column("Graph", style="bold")
+            graphs_table.add_column("Type")
+            graphs_table.add_column("Created")
+            graphs_table.add_column("Files")
 
-        # Show the current activity using the lynx renderer
-        activity_uri = URIRef(bubble_activity)
-        with document() as doc:
-            with swash.vars.dataset.bind(repo.dataset):
+            for graph_id in repo.list_graphs():
+                graph = repo.metadata
+
+                # Get graph type
+                graph_type = "Dataset"
+
+                # Get creation time
+                created = graph.value(graph_id, PROV.generatedAtTime)
+                if created and isinstance(created, Literal):
+                    try:
+                        # Parse the datetime from the Literal value
+                        dt = datetime.fromisoformat(str(created))
+                        created_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    except (ValueError, TypeError):
+                        created_str = str(created)
+                else:
+                    created_str = "-"
+
+                # Count distributions (files)
+                file_count = len(
+                    list(graph.objects(graph_id, DCAT.distribution))
+                )
+
+                graphs_table.add_row(
+                    graph_id.n3(graph.namespace_manager),
+                    graph_type,
+                    created_str,
+                    str(file_count),
+                )
+
+            console.print(graphs_table)
+
+            # Show the current activity using the lynx renderer
+            activity_uri = URIRef(os.environ["BUBBLE_ACTIVITY"])
+            with document() as doc:
                 with autoexpanding(3):
                     rdf_resource(activity_uri)
+                    print(doc.to_html(compact=False))
                     render_html(doc.element, console)
 
-        # # Show the current agent using the lynx renderer
-        # agent_uri = URIRef(bubble_agent)
-        # with document() as doc:
-        #     with swash.vars.dataset.bind(repo.dataset):
-        #         rdf_resource(agent_uri)
-        #         render_html(doc.element, console)
-
-    trio.run(show_info)
+    except ValueError as e:
+        # Handle missing environment variables
+        console.print(f"[red]Error:[/] {str(e)}")
+        return
 
 
 @app.command()
@@ -402,13 +373,25 @@ def img(
 
         console.print(f"[green]Generating image for prompt:[/] {prompt}")
 
-        git = Git(trio.Path(repo_path))
-        repo = await Repository.create(
-            git, namespace=Namespace("file://" + repo_path + "/")
-        )
-        await repo.load_all()
+        # Try to use bubble environment if available
+        if "BUBBLE" in os.environ:
+            try:
+                with from_env() as repo:
+                    await generate_images(repo, prompt)
+            except ValueError as e:
+                console.print(f"[red]Error:[/] {str(e)}")
+                return
+        else:
+            # Fall back to creating repo from path
+            git = Git(trio.Path(repo_path))
+            repo = await Repository.create(
+                git, namespace=Namespace("file://" + repo_path + "/")
+            )
+            await repo.load_all()
+            await generate_images(repo, prompt)
 
-        # Create temporary blob store for the image
+    async def generate_images(repo: Repository, prompt: str):
+        """Generate and save images for the given prompt."""
         try:
             readables = await make_image(prompt)
 

@@ -11,6 +11,7 @@ from typing import (
     Generator,
     cast,
 )
+import swash
 from swash.prfx import NT
 from trio import Path
 from contextlib import contextmanager
@@ -524,7 +525,7 @@ class Repository:
 
     @contextmanager
     def new_activity(
-        self, activity_type: URIRef
+        self, activity_type: URIRef, props: dict[P, Any] = {}
     ) -> Generator[URIRef, None, None]:
         """Create a new activity and set it as the current activity.
 
@@ -535,7 +536,8 @@ class Repository:
             activity_type,
             {
                 PROV.startedAtTime: context.clock.get()(),
-                PROV.wasStartedBy: context.agent.get(),
+                PROV.wasAssociatedWith: context.agent.get(),
+                **props,
             },
         )
 
@@ -590,3 +592,59 @@ class Repository:
             return bool(result.stdout.strip())
         except subprocess.CalledProcessError:
             return False
+
+
+@contextmanager
+def from_env() -> Generator["Repository", None, None]:
+    """Load repository and context from environment variables.
+
+    Requires the following environment variables:
+    - BUBBLE: Path to the repository
+    - BUBBLE_GRAPH: Current graph URI
+    - BUBBLE_ACTIVITY: Current activity URI
+    - BUBBLE_AGENT: Current agent URI
+
+    Yields:
+        Repository: The loaded repository
+
+    Raises:
+        ValueError: If required environment variables are missing
+    """
+    bubble_path = os.environ.get("BUBBLE")
+    bubble_graph = os.environ.get("BUBBLE_GRAPH")
+    bubble_activity = os.environ.get("BUBBLE_ACTIVITY")
+    bubble_agent = os.environ.get("BUBBLE_AGENT")
+
+    if not bubble_path:
+        raise ValueError("BUBBLE environment variable not set")
+    if not bubble_graph:
+        raise ValueError("BUBBLE_GRAPH environment variable not set")
+    if not bubble_activity:
+        raise ValueError("BUBBLE_ACTIVITY environment variable not set")
+    if not bubble_agent:
+        raise ValueError("BUBBLE_AGENT environment variable not set")
+
+    async def init_repo() -> Repository:
+        git = Git(trio.Path(bubble_path))
+        repo = await Repository.create(
+            git, namespace=Namespace("file://" + bubble_path + "/")
+        )
+        await repo.load_all()
+        return repo
+
+    # Run async init in sync context
+    repo = trio.run(init_repo)
+
+    graph_uri = URIRef(bubble_graph)
+    activity_uri = URIRef(bubble_activity)
+    agent_uri = URIRef(bubble_agent)
+
+    # Bind all context parameters
+    with (
+        context.repo.bind(repo),
+        context.graph.bind(repo.graph(graph_uri)),
+        context.activity.bind(activity_uri),
+        context.agent.bind(agent_uri),
+        swash.vars.dataset.bind(repo.dataset),
+    ):
+        yield repo

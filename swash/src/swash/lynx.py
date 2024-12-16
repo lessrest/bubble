@@ -58,7 +58,7 @@ def to_node(element: HTMLElement) -> Node:
 #
 @dataclass
 class Style:
-    display: Optional[Literal["block", "flex", "inline"]] = None
+    display: Optional[Literal["block", "flex", "inline", "contents"]] = None
     flex_direction: Optional[Literal["row", "column"]] = None
     gap: tuple[int, int] = (0, 0)
     padding: tuple[int, int, int, int] = (0, 0, 0, 0)
@@ -110,6 +110,7 @@ class StyleSheet:
             "py-2": Style(padding=(2, 0, 2, 0)),
             "border": Style(border=True),
             "justify-between": Style(justify="between"),
+            "display-contents": Style(display="contents"),
             # ...
         }
     )
@@ -228,7 +229,7 @@ def node_to_box(
 # We just translate this into Rich objects. No more style computation, just mechanical translation.
 
 
-def box_to_rich(node: BoxNode) -> ConsoleRenderable:
+def box_to_rich(node: BoxNode) -> list[ConsoleRenderable]:
     if isinstance(node, BoxTextNode):
         # Render text with the given style
         node_text = node.text
@@ -241,11 +242,16 @@ def box_to_rich(node: BoxNode) -> ConsoleRenderable:
             # If text_color is set, apply it
             if node.style.text_color:
                 text.stylize(node.style.text_color)
-        return text
+        return [text]
 
     if isinstance(node, BoxContainerNode):
         # Render children according to style
-        child_renderables = [box_to_rich(ch) for ch in node.children]
+        child_renderables = [
+            subch for ch in node.children for subch in box_to_rich(ch)
+        ]
+
+        if node.style.display == "contents":
+            return child_renderables
 
         renderable = layout_box_container(node.style, child_renderables)
 
@@ -263,7 +269,7 @@ def box_to_rich(node: BoxNode) -> ConsoleRenderable:
             else:
                 renderable = Padding(renderable, node.style.padding)
 
-        return renderable
+        return [renderable]
 
 
 def layout_box_container(
@@ -304,17 +310,16 @@ def layout_box_container(
                 if len(children) == 1:
                     return children[0]
                 # column layout
-                if style.gap[0] > 0:
-                    spaced = []
-                    for i, ch in enumerate(children):
-                        if i > 0:
-                            ch = Padding(ch, (style.gap[0], 0, 0, 0))
-                        spaced.append(ch)
-                    return Group(*spaced)
-                else:
-                    return Group(*children)
+                spaced = []
+                for i, ch in enumerate(children):
+                    if i > 0:
+                        ch = Padding(ch, (style.gap[0], 0, 0, 0))
+                    spaced.append(ch)
+                return Group(*spaced)
         case "inline":
             return layout_inline(children)
+        case "contents":
+            raise ValueError("contents display type should not be rendered")
 
 
 def layout_inline(children: List[ConsoleRenderable]) -> ConsoleRenderable:
@@ -330,7 +335,7 @@ def layout_inline(children: List[ConsoleRenderable]) -> ConsoleRenderable:
         return texts
 
     texts = flatten(children)
-    text = Text(end="")
+    text = Text(end="\n")
     for t in texts:
         text.append_text(t)
     return text
@@ -358,10 +363,11 @@ def render_html(
     # inspect(box_tree)
 
     # Step 3: Box Tree -> Rich Renderable
-    renderable = box_to_rich(box_tree)
+    renderables = box_to_rich(box_tree)
 
     #    pudb.set_trace()
-    console.print(renderable)
+    for renderable in renderables:
+        console.print(renderable)
 
     # if stylesheet.unknown_classes:
     #     logger.warning(

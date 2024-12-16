@@ -442,7 +442,7 @@ def render_properties(data):
 
     # Render each group
     with tag(
-        "dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
+        "dl", classes="flex flex-col flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
     ):
         for predicate, objects in grouped_predicates.items():
             # Check if all objects are literals
@@ -478,7 +478,7 @@ def render_property_with_multiple_literals(predicate, literals):
 
 
 # @html.dd("flex flex-col")
-@html.div("display-contents")
+@html.div("flex flex-col")
 def render_property(predicate, obj):
     attr("property", str(predicate))
     if isinstance(obj, Literal):
