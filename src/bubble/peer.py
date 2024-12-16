@@ -33,16 +33,18 @@ class Peer:
     @classmethod
     async def connect_anonymous(cls, town_url: str) -> "Peer":
         """Connect to a town anonymously via WebSocket."""
-        ws, actor_uri = await establish_anonymous_connection(town_url)
-        return cls(ws=ws, actor_uri=actor_uri)
+        ws_url = convert_to_ws_url(town_url)
+        async with anonymous_connection(ws_url) as (ws, actor_uri):
+            return cls(ws=ws, actor_uri=actor_uri)
 
     @classmethod
     async def connect_with_identity(cls, town_url: str) -> "Peer":
         """Connect to a town with a signed identity via WebSocket."""
         private_key = ed25519.Ed25519PrivateKey.generate()
         public_key = private_key.public_key()
-        ws, actor_uri = await establish_signed_connection(town_url, private_key, public_key)
-        return cls(ws=ws, actor_uri=actor_uri)
+        ws_url = convert_to_ws_url(town_url)
+        async with signed_connection(ws_url, private_key, public_key) as (ws, actor_uri):
+            return cls(ws=ws, actor_uri=actor_uri)
 
 async def establish_anonymous_connection(town_url: str) -> tuple[AsyncGenerator, URIRef]:
     """
