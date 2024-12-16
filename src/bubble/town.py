@@ -2,10 +2,12 @@ import io
 import json
 import uuid
 import pathlib
+from datetime import datetime
 
 from io import BytesIO
 from base64 import b64encode
 from typing import (
+    Any,
     Dict,
     List,
     Optional,
@@ -29,6 +31,7 @@ from rdflib import (
     Dataset,
     Literal,
     Namespace,
+    PROV,
 )
 from fastapi import (
     Body,
@@ -48,14 +51,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from swash import mint, rdfa, vars
 from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
-from swash.prfx import NT, DID
+from swash.prfx import NT, DID, Schema
 from swash.rdfa import (
     rdf_resource,
     autoexpanding,
     get_subject_data,
     visited_resources,
 )
-from swash.util import S, new
+from swash.util import P, S, new
 from bubble.data import Repository, context
 from bubble.mesh import (
     Vat,
@@ -74,6 +77,7 @@ from bubble.keys import (
 )
 from bubble.page import base_html, base_shell
 from bubble.word import describe_word
+from bubble.replicate.make import Replicate
 
 logger = structlog.get_logger(__name__)
 
@@ -248,8 +252,15 @@ class Site:
         self.app.get("/word")(self.word_lookup)
         self.app.get("/words")(self.word_lookup_form)
 
+        self.app.get("/files/{path:path}")(self.file_get)
+        self.app.get("/images")(self.image_gallery)
+
         # this is at the bottom because it matches too broadly
-        self.app.get("/{id}")(self.actor_get)
+        self.app.get("/{path:path}")(self.actor_get)
+
+    async def file_get(self, path: str):
+        file = self.repo.blob(URIRef(path))
+        return Response(content=file.read())
 
     async def health_check(self):
         with with_transient_graph("health") as id:
@@ -280,10 +291,18 @@ class Site:
                     render_graph_view(vars.graph.get())
         return HypermediaResponse()
 
-    async def actor_message(self, id: str, type: str = Form(...)):
-        actor = self.site[id]
-        async with txgraph() as g:
-            record_message(type, actor, g)
+    async def actor_message(self, id: str, request: Request):
+        async with request.form() as form:
+            type = form.get("type")
+            assert isinstance(type, str)
+            actor = self.site[id]
+            properties: Dict[P, Any] = {
+                URIRef(k): Literal(v)
+                for k, v in form.items()
+                if isinstance(v, str) and k != "type"
+            }
+            async with txgraph() as g:
+                record_message(type, actor, g, properties=properties)
             result = await call(actor, g)
             return LinkedDataResponse(result)
 
@@ -733,6 +752,109 @@ class Site:
 
             return HypermediaResponse()
 
+    async def image_gallery(self):
+        """Display a gallery of all NT.Image resources and the prompt affordance."""
+        with base_shell("Image Gallery"):
+            with tag("div", classes="p-4"):
+                with tag("h1", classes="text-2xl font-bold mb-4"):
+                    text("Image Gallery")
+
+                # Find the Replicate client through the supervisor
+                replicate_client = None
+                dataset = current_bubble.get().dataset
+                identity = vat.get().get_identity_uri()
+                import pudb
+
+                #                pudb.set_trace()
+                # Find supervised actors through NT.environs
+                for supervisor in dataset.objects(identity, PROV.started):
+                    # Find Replicate.Client instances among supervised actors
+                    for actor in dataset.objects(supervisor, NT.supervises):
+                        if (
+                            actor,
+                            RDF.type,
+                            Replicate.Client,
+                        ) in dataset:
+                            replicate_client = actor
+                            break
+                    if replicate_client:
+                        break
+
+                # Show the prompt affordance if we found the client
+                if replicate_client:
+                    with tag(
+                        "div",
+                        classes="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm",
+                    ):
+                        rdf_resource(replicate_client)
+                else:
+                    with tag("div", classes="p-4"):
+                        text("No Replicate client found")
+
+                # Query for all NT.Image resources
+                images = []
+                for graph in current_bubble.get().dataset.graphs():
+                    for subject in graph.subjects(
+                        RDF.type, Schema.ImageObject
+                    ):
+                        href = graph.value(subject, NT.href)
+                        generated_time = graph.value(
+                            subject, PROV.generatedAtTime
+                        )
+                        if href:
+                            images.append(
+                                {
+                                    "id": subject,
+                                    "href": str(href),
+                                    "time": generated_time,
+                                }
+                            )
+
+                # Sort images by generation time (newest first)
+                images.sort(
+                    key=lambda x: x["time"] if x["time"] else "",
+                    reverse=True,
+                )
+
+                # Display images in a grid
+                with tag(
+                    "div",
+                    classes="flex flex-row flex-wrap gap-2",
+                ):
+                    for img in images:
+                        with tag(
+                            "div",
+                            classes="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow",
+                        ):
+                            # Image container with fixed aspect ratio
+                            with tag("div", classes="relative pt-[100%]"):
+                                with tag(
+                                    "img",
+                                    src=img["href"],
+                                    alt="Generated image",
+                                ):
+                                    pass
+
+                            # Image metadata
+                            with tag(
+                                "div",
+                                classes="p-3 bg-white dark:bg-gray-800",
+                            ):
+                                with tag(
+                                    "div",
+                                    classes="text-sm text-gray-600 dark:text-gray-400",
+                                ):
+                                    if img["time"]:
+                                        text(
+                                            f"Generated: {img['time'].strftime('%Y-%m-%d %H:%M:%S')}"
+                                            if isinstance(
+                                                img["time"], datetime
+                                            )
+                                            else str(img["time"])
+                                        )
+
+        return HypermediaResponse()
+
 
 @contextmanager
 def in_request_graph(g: Graph):
@@ -818,7 +940,7 @@ def get_node_classes(graph: Graph, node: S) -> str:
         if is_current:
             classes += "border-blue-500"
         else:
-            classes += "border-gray-300 opacity-50"
+            classes += "border-gray-300 opacity-50 hidden"
     else:
         classes += "border-blue-500"
 
@@ -827,14 +949,8 @@ def get_node_classes(graph: Graph, node: S) -> str:
 
 def render_node(graph: Graph, node: S) -> None:
     """Render a single node with appropriate styling."""
-    logger.info("rendering node", node=node)
     visited = visited_resources.get()
     if node in visited:
-        logger.info(
-            "node already visited",
-            node=node,
-            visited=visited,
-        )
         return
 
     with vars.in_graph(graph):
@@ -865,7 +981,7 @@ def render_graph_view(graph: Graph) -> None:
         untyped_nodes=untyped_nodes,
     )
 
-    with autoexpanding(2):
+    with autoexpanding(3):
         with tag("div", classes="flex flex-col gap-4"):
             # First pass - render typed nodes
             for node in typed_nodes:

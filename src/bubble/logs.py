@@ -182,8 +182,8 @@ class RichConsoleRenderer:
                                 exc_type=type(exc),
                                 exc_value=exc,
                                 traceback=exc.__traceback__,
-                                show_locals=False,
-                                max_frames=1,
+                                show_locals=True,
+                                max_frames=10,
                                 suppress=[
                                     structlog,
                                     trio,
@@ -205,8 +205,8 @@ class RichConsoleRenderer:
                             exc_type=type(value),
                             exc_value=value,
                             traceback=value.__traceback__,
-                            show_locals=False,
-                            max_frames=1,
+                            show_locals=True,
+                            max_frames=10,
                             suppress=[
                                 structlog,
                                 trio,

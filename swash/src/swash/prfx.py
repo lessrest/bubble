@@ -13,5 +13,6 @@ DID = Namespace("https://www.w3.org/ns/did#")
 DEEPGRAM = Namespace("https://node.town/2024/deepgram/#")
 TALK = Namespace("https://swa.sh/2024/vox#")
 Deepgram = Namespace("https://node.town/2024/deepgram/#")
+Schema = Namespace("https://schema.org/")
 
 PROV = ns.PROV

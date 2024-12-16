@@ -16,10 +16,20 @@ from bubble.keys import (
 import structlog
 import trio
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from rdflib import PROV, RDF, XSD, Graph, Literal, Namespace, URIRef
+from rdflib import (
+    OWL,
+    PROV,
+    RDF,
+    RDFS,
+    XSD,
+    Graph,
+    Literal,
+    Namespace,
+    URIRef,
+)
 from swash import Parameter, mint, vars
 from swash.prfx import DEEPGRAM, DID, NT
-from swash.util import add, new
+from swash.util import P, add, new, blank
 
 
 from collections import defaultdict
@@ -42,6 +52,7 @@ logger = structlog.get_logger()
 class ActorContext:
     boss: URIRef
     addr: URIRef
+    proc: URIRef
     send: trio.MemorySendChannel
     recv: trio.MemoryReceiveChannel
     trap: bool = False
@@ -57,14 +68,14 @@ def fresh_uri(site: Optional[Namespace] = None) -> URIRef:
 def new_context(parent: URIRef, name: str = "unnamed") -> ActorContext:
     chan_send, chan_recv = trio.open_memory_channel(8)
     return ActorContext(
-        parent, fresh_uri(), chan_send, chan_recv, name=name
+        parent, fresh_uri(), fresh_uri(), chan_send, chan_recv, name=name
     )
 
 
 def root_context(site: Namespace, name: str = "root") -> ActorContext:
     uri = fresh_uri(site)
     chan_send, chan_recv = trio.open_memory_channel(8)
-    return ActorContext(uri, uri, chan_send, chan_recv, name=name)
+    return ActorContext(uri, uri, uri, chan_send, chan_recv, name=name)
 
 
 def get_site() -> Namespace:
@@ -188,17 +199,61 @@ class Vat:
 
         parent_ctx = self.curr.get()
         context = new_context(parent_ctx.addr, name=name)
+        parent = parent_ctx.addr
+        parent_proc = parent_ctx.proc
+        actor = context.addr
+        actor_proc = context.proc
         self.deck[context.addr] = context
 
         self.yell.info(
             "spawning",
-            actor=context.addr,
+            actor=actor,
             actor_name=name,
-            parent=parent_ctx.addr,
+            parent=parent,
+        )
+
+        new(
+            OWL.Class,
+            {
+                RDFS.label: Literal("actor process", lang="en"),
+                RDFS.subClassOf: PROV.Activity,
+            },
+            subject=NT.ActorProcess,
+        )
+        new(
+            OWL.Class,
+            {
+                RDFS.label: Literal("actor", lang="en"),
+                RDFS.subClassOf: [PROV.Entity, PROV.SoftwareAgent],
+            },
+            subject=NT.Actor,
+        )
+
+        now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
+
+        new(
+            NT.ActorProcess,
+            {
+                PROV.wasStartedBy: parent_proc,
+                PROV.startedAtTime: now,
+                PROV.wasAssociatedWith: actor_proc,
+            },
+            actor_proc,
+        )
+
+        new(
+            NT.ActorIdentity,
+            {
+                RDFS.label: Literal(name, lang="en"),
+                PROV.wasGeneratedBy: parent_proc,
+                PROV.generatedAtTime: now,
+            },
+            actor,
         )
 
         async def task():
             with self.curr.bind(context):
+                ending = blank(NT.Success)
                 try:
                     await code(*args)
                     self.yell.info(
@@ -206,6 +261,7 @@ class Vat:
                         actor=context.addr,
                         actor_name=name,
                     )
+
                 except BaseException as e:
                     logger.error(
                         "actor crashed",
@@ -214,6 +270,8 @@ class Vat:
                         error=e,
                         parent=context.boss,
                     )
+
+                    ending = blank(NT.Failure)
 
                     if parent_ctx and parent_ctx.trap:
                         self.yell.info(
@@ -230,6 +288,22 @@ class Vat:
                     self.yell.info(
                         "deleting actor", actor=(context.addr, name)
                     )
+
+                    now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
+                    add(ending, {PROV.atTime: now})
+                    add(actor_proc, {PROV.wasEndedBy: ending})
+
+                    # Since our actors have no permanent identity, we mark it as
+                    # invalidated by the ending of the process.
+                    #
+                    # When we implement permanent identities, an actor will be
+                    # realized in multiple processes, so exiting a process will
+                    # not invalidate the actor itself.
+                    #
+                    # Also when a supervisor restarts an actor, maybe we should
+                    # not invalidate the actor...
+
+                    add(actor, {PROV.wasInvalidatedBy: ending})
                     del self.deck[context.addr]
                     self.print_actor_tree()
 
@@ -418,8 +492,8 @@ async def txgraph(graph: Optional[Graph] = None):
 
 
 class SimpleSupervisor:
-    def __init__(self, actor: Callable):
-        self.actor = actor
+    def __init__(self, *actors: Callable):
+        self.actors = actors
 
     async def __call__(self):
         async with txgraph():
@@ -431,20 +505,21 @@ class SimpleSupervisor:
                 retrying=retry_state,
             )
 
-        retry = tenacity.AsyncRetrying(
-            wait=tenacity.wait_exponential(multiplier=1, max=60),
-            retry=tenacity.retry_if_exception_type(
-                (trio.Cancelled, BaseExceptionGroup)
-            ),
-            before_sleep=retry_sleep,
-        )
+        async with trio.open_nursery() as nursery:
+            for actor in self.actors:
+                # retry = tenacity.AsyncRetrying(
+                #     wait=tenacity.wait_exponential(multiplier=1, max=60),
+                #     retry=tenacity.retry_if_exception_type(
+                #         (trio.Cancelled, BaseExceptionGroup)
+                #     ),
+                #     before_sleep=retry_sleep,
+                # )
 
-        async for attempt in retry:
-            with attempt:
-                async with trio.open_nursery() as nursery:
-                    logger.info("starting supervised actor tree")
-                    child = await spawn(nursery, self.actor)
-                    add(this(), {NT.supervises: child})
+                #                async for attempt in retry:
+                #                   with attempt:
+                logger.info("starting supervised actor", actor=actor)
+                child = await spawn(nursery, actor)
+                add(this(), {NT.supervises: child})
 
 
 async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
@@ -455,7 +530,11 @@ async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
 
     tmp = fresh_uri()
     vat.get().deck[tmp] = ActorContext(
-        boss=this(), addr=tmp, send=sendchan, recv=recvchan
+        boss=this(),
+        proc=this(),
+        addr=tmp,
+        send=sendchan,
+        recv=recvchan,
     )
 
     payload.add((payload.identifier, NT.replyTo, tmp))
@@ -471,7 +550,12 @@ async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
     return await recvchan.receive()
 
 
-def record_message(type: str, actor: URIRef, g: Graph):
+def record_message(
+    type: str,
+    actor: URIRef,
+    g: Graph,
+    properties: Dict[P, Any] = {},
+):
     """Record a message in the graph."""
     assert isinstance(g.identifier, URIRef)
     new(
@@ -481,6 +565,7 @@ def record_message(type: str, actor: URIRef, g: Graph):
                 datetime.now(UTC).isoformat(), datatype=XSD.dateTime
             ),
             NT.target: actor,
+            **properties,
         },
         g.identifier,
     )

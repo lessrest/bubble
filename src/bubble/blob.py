@@ -67,7 +67,13 @@ class BlobStream:
         self.blob_store.append_blob(str(self.stream_id), self.seq, data)
         self.seq += 1
 
-    def get_parts(self, start_seq: int, end_seq: int):
+    def read(self) -> bytes:
+        """Read the stream"""
+        return b"".join(self.get_parts(0, self.get_last_sequence()))
+
+    def get_parts(
+        self, start_seq: int, end_seq: int
+    ) -> Generator[bytes, None, None]:
         """Get parts from the stream within a sequence range"""
         return self.blob_store.get_parts(
             str(self.stream_id), start_seq, end_seq

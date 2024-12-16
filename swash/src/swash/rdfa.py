@@ -33,7 +33,7 @@ from swash.html import (
     text,
     classes,
 )
-from swash.prfx import NT
+from swash.prfx import NT, Schema
 from swash.util import P, S
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
@@ -206,7 +206,7 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     #     graph=vars.dataset.get(),
     # )
 
-    if data["type"] == NT.Image:
+    if data["type"] == NT.Image or data["type"] == Schema.ImageObject:
         render_image_resource(subject, data)
     elif data["type"] == NT.VideoFile:
         render_video_resource(subject, data)
@@ -216,6 +216,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_upload_capability_resource(subject, data)
     elif data["type"] == NT.Button:
         render_button_resource(subject, data)
+    elif data["type"] == NT.Prompt:
+        render_prompt_resource(subject, data)
     else:
         render_default_resource(subject, data)
     visited_resources.get().add(subject)
@@ -327,9 +329,6 @@ def render_button_resource(subject, data):
         (obj for pred, obj in data["predicates"] if pred == NT.target), None
     )
 
-    attr("hx-post", str(target) + "/message")
-    attr("hx-swap", "afterend")
-
     message_uri = next(
         (obj for pred, obj in data["predicates"] if pred == NT.message),
         None,
@@ -338,13 +337,93 @@ def render_button_resource(subject, data):
     if message_uri is None:
         raise ValueError("Button resource has no message")
 
+    attr("hx-post", str(target) + "/message")
+    attr("hx-swap", "afterend")
+
+    # Check if this is a prompt
+    if any(t == NT.Prompt for t in data.get("type", [])):
+        placeholder = next(
+            (
+                obj
+                for pred, obj in data["predicates"]
+                if pred == NT.placeholder
+            ),
+            "Enter text...",
+        )
+        with tag("div", classes="flex flex-col gap-2"):
+            with tag(
+                "input",
+                type="text",
+                name="prompt",
+                classes="border p-2 rounded dark:bg-gray-800/50 dark:text-white",
+            ):
+                attr("placeholder", str(placeholder))
+            with tag(
+                "input", type="hidden", name="type", value=str(message_uri)
+            ):
+                pass
+            with tag(
+                "button",
+                classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 py-2",
+            ):
+                text(label)
+    else:
+        # Regular button rendering
+        with tag(
+            "input", type="hidden", name="type", value=str(message_uri)
+        ):
+            pass
+        with tag(
+            "button",
+            classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1",
+        ):
+            text(label)
+
+
+@html.form(classes="flex flex-col gap-2")
+def render_prompt_resource(subject, data):
+    label = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.label), None
+    )
+    if label is None:
+        label = "Prompt"
+
+    target = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.target), None
+    )
+
+    message_uri = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.message),
+        None,
+    )
+
+    if message_uri is None:
+        raise ValueError("Prompt resource has no message")
+
+    placeholder = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.placeholder),
+        "Enter text...",
+    )
+
+    attr("hx-post", str(target) + "/message")
+    attr("hx-swap", "afterend")
+
+    with tag("div", classes="htmx-indicator"):
+        text("💭")
+
+    with tag(
+        "input",
+        type="text",
+        name="https://node.town/2024/prompt",
+        classes="border p-2 dark:bg-slate-800 dark:text-white",
+    ):
+        attr("placeholder", str(placeholder))
     with tag("input", type="hidden", name="type", value=str(message_uri)):
         pass
-
-    with tag("button"):
-        classes(
-            "bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1"
-        )
+    with tag(
+        "button",
+        classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1",
+    ):
         text(label)
 
 
@@ -378,7 +457,7 @@ def render_properties(data):
                     render_property(predicate, obj)
 
 
-# @html.dd("flex flex-col")
+@html.div("flex flex-col")
 def render_property_with_multiple_literals(predicate, literals):
     render_property_label(predicate)
     with tag("dd"):

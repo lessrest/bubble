@@ -85,9 +85,7 @@ class StyleSheet:
             "ul": Style(
                 display="flex", flex_direction="column", list_style="bullet"
             ),
-            "dl": Style(
-                display="flex", flex_direction="column", panel=True
-            ),
+            "dl": Style(display="flex", flex_direction="column"),
             "details": Style(display="flex", flex_direction="column"),
             "summary": Style(display="inline", is_bold=True),
             "li": Style(display="flex", flex_direction="row"),
@@ -258,12 +256,12 @@ def box_to_rich(node: BoxNode) -> ConsoleRenderable:
             )
 
         # Apply padding
-        # if node.style.padding != (0, 0, 0, 0):
-        #     if isinstance(renderable, Text):
-        #         renderable.pad_left(node.style.padding[3])
-        #         renderable.pad_right(node.style.padding[1])
-        #     else:
-        #         renderable = Padding(renderable, node.style.padding)
+        if node.style.padding != (0, 0, 0, 0):
+            if isinstance(renderable, Text):
+                renderable.pad_left(node.style.padding[3])
+                renderable.pad_right(node.style.padding[1])
+            else:
+                renderable = Padding(renderable, node.style.padding)
 
         return renderable
 
@@ -294,7 +292,6 @@ def layout_box_container(
                         equal=True,
                         padding=(0, style.gap[1]),
                         align=None,
-                        title="columns",
                     )
                 else:
                     return Columns(
@@ -315,13 +312,13 @@ def layout_box_container(
                         spaced.append(ch)
                     return Group(*spaced)
                 else:
-                    return Panel(Group(*children))
+                    return Group(*children)
         case "inline":
             return layout_inline(children)
 
 
 def layout_inline(children: List[ConsoleRenderable]) -> ConsoleRenderable:
-    rich.inspect(children)
+    # rich.inspect(children)
 
     def flatten(children: List[ConsoleRenderable]) -> List[Text]:
         texts = []
@@ -333,10 +330,9 @@ def layout_inline(children: List[ConsoleRenderable]) -> ConsoleRenderable:
         return texts
 
     texts = flatten(children)
-    text = Text("[", end="")
+    text = Text(end="")
     for t in texts:
         text.append_text(t)
-    text.append_text(Text("]", end=""))
     return text
 
 
@@ -359,7 +355,7 @@ def render_html(
     # Step 2: Node -> Box Tree
     box_tree = node_to_box(node_tree, stylesheet, None)
 
-    inspect(box_tree)
+    # inspect(box_tree)
 
     # Step 3: Box Tree -> Rich Renderable
     renderable = box_to_rich(box_tree)
@@ -367,8 +363,8 @@ def render_html(
     #    pudb.set_trace()
     console.print(renderable)
 
-    if stylesheet.unknown_classes:
-        logger.warning(
-            "Unknown classes",
-            classes=sorted(list(stylesheet.unknown_classes)),
-        )
+    # if stylesheet.unknown_classes:
+    #     logger.warning(
+    #         "Unknown classes",
+    #         classes=sorted(list(stylesheet.unknown_classes)),
+    #     )

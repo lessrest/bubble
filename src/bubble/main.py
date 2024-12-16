@@ -9,12 +9,13 @@ import swash
 from swash.html import document
 from swash.rdfa import autoexpanding, rdf_resource
 import trio
+import trio_asyncio
 import typer
 import hypercorn
 import hypercorn.trio
 
 from typer import Option
-from rdflib import Literal, URIRef, Namespace, PROV, DCAT
+from rdflib import Literal, URIRef, Namespace, PROV, DCAT, XSD
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -23,7 +24,7 @@ from rich import box
 import swash.vars as vars
 
 from swash.prfx import NT
-from swash.util import add
+from swash.util import add, new
 from bubble.data import Git, Repository
 from bubble.mesh import SimpleSupervisor, spawn, txgraph
 from bubble.logs import configure_logging
@@ -34,6 +35,8 @@ from bubble.town import (
 from bubble.mesh import UptimeActor
 from bubble.deepgram.talk import DeepgramClientActor
 from swash.lynx import render_html
+from bubble.replicate.make import ReplicateClientActor, make_image
+from bubble.blob import BlobStore
 
 logger = configure_logging()
 
@@ -209,13 +212,34 @@ def town(
                     supervisor = await spawn(
                         nursery,
                         SimpleSupervisor(
-                            DeepgramClientActor("Deepgram Client")
+                            DeepgramClientActor("Deepgram Client"),
+                            ReplicateClientActor(
+                                "Replicate Client", repo.blobs
+                            ),
                         ),
                     )
 
                     # Link supervisor to the town's identity
                     async with txgraph():
                         town.vat.link_actor_to_identity(supervisor)
+
+                    # Add image gallery link to the root
+                    add(
+                        URIRef(base_url),
+                        {
+                            NT.affordance: new(
+                                NT.Link,
+                                {
+                                    NT.label: Literal(
+                                        "Image Gallery", "en"
+                                    ),
+                                    NT.href: Literal(
+                                        "/images", datatype=XSD.anyURI
+                                    ),
+                                },
+                            )
+                        },
+                    )
 
                     uptime = await spawn(
                         nursery,
@@ -254,7 +278,7 @@ def town(
     def get_bash_prompt():
         return r"\[\e[1m\][\[\e[34m\]town\[\e[0m\]\[\e[1m\]]\[\e[0m\] $ "
 
-    trio.run(run, strict_exception_groups=False)
+    trio_asyncio.run(run)
 
 
 @app.command()
@@ -346,14 +370,12 @@ def info() -> None:
         console.print(graphs_table)
 
         # Show the current activity using the lynx renderer
-        #        activity_uri = URIRef(bubble_activity)
-        # with document() as doc:
-        #     with swash.vars.dataset.bind(repo.dataset):
-        #         rdf_resource(activity_uri)
-        #         #                from pudb import set_trace
-
-        #         #               set_trace()
-        #         render_html(doc.element, console)
+        activity_uri = URIRef(bubble_activity)
+        with document() as doc:
+            with swash.vars.dataset.bind(repo.dataset):
+                with autoexpanding(3):
+                    rdf_resource(activity_uri)
+                    render_html(doc.element, console)
 
         # # Show the current agent using the lynx renderer
         # agent_uri = URIRef(bubble_agent)
@@ -362,25 +384,49 @@ def info() -> None:
         #         rdf_resource(agent_uri)
         #         render_html(doc.element, console)
 
-        # Show the current graph using the lynx renderer
-        graph_uri = URIRef(bubble_graph)
-        with document() as doc:
-            with swash.vars.dataset.bind(repo.dataset):
-                with autoexpanding(0):
-                    rdf_resource(graph_uri)
-                #                print(doc.to_html(compact=False))
-                render_html(doc.element, console)
-
-        # with document() as doc:
-        #     with swash.vars.dataset.bind(repo.dataset):
-        #         with tag("a"):
-        #             with tag("span"):
-        #                 text("Hello")
-        #             with tag("span"):
-        #                 text("World")
-        #         render_html(doc.element, console)
-
     trio.run(show_info)
+
+
+@app.command()
+def img(
+    prompt: str,
+    bubble_path: str = BubblePath,
+) -> None:
+    """Generate an image using Replicate AI."""
+
+    async def run():
+        # Ensure REPLICATE_API_TOKEN is set
+        if "REPLICATE_API_TOKEN" not in os.environ:
+            console.print(
+                "[red]Error:[/] REPLICATE_API_TOKEN environment variable is not set"
+            )
+            return
+
+        console.print(f"[green]Generating image for prompt:[/] {prompt}")
+
+        async with loading_bubble_from(trio.Path(bubble_path)) as repo:
+            # Create temporary blob store for the image
+            store = BlobStore(repo.git.path / "blobs")
+
+            try:
+                readables = await make_image(prompt)
+
+                for i, readable in enumerate(readables):
+                    img_data = await readable.aread()
+                    output_path = repo.git.path / f"image_{i}.png"
+
+                    # Save the image
+                    async with await trio.open_file(output_path, "wb") as f:
+                        await f.write(img_data)
+
+                    console.print(
+                        f"[green]Image saved to:[/] {output_path}"
+                    )
+
+            except Exception as e:
+                console.print(f"[red]Error generating image:[/] {str(e)}")
+
+    trio_asyncio.run(run)
 
 
 if __name__ == "__main__":
