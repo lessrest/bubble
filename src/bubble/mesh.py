@@ -492,8 +492,14 @@ async def txgraph(graph: Optional[Graph] = None):
 
 
 class SimpleSupervisor:
-    # actors here should be a dict of name -> actor AI!
-    def __init__(self, *actors: Callable):
+    """A simple supervisor that manages named actors."""
+    
+    def __init__(self, actors: dict[str, Callable]):
+        """Initialize with a dictionary mapping names to actor constructors.
+        
+        Args:
+            actors: Dictionary mapping actor names to their constructor callables
+        """
         self.actors = actors
 
     async def __call__(self):
@@ -507,7 +513,7 @@ class SimpleSupervisor:
             )
 
         async with trio.open_nursery() as nursery:
-            for actor in self.actors:
+            for name, actor in self.actors.items():
                 # retry = tenacity.AsyncRetrying(
                 #     wait=tenacity.wait_exponential(multiplier=1, max=60),
                 #     retry=tenacity.retry_if_exception_type(
