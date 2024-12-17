@@ -240,6 +240,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_button_resource(subject, data)
     elif data["type"] == NT.Prompt:
         render_prompt_resource(subject, data)
+    elif data["type"] == NT.TextEditor:
+        render_text_editor_resource(subject, data)
     else:
         render_default_resource(subject, data)
     visited_resources.get().add(subject)
@@ -441,10 +443,54 @@ def render_prompt_resource(subject, data):
         text(label)
 
 
-# implement a text editor affordance renderer ai!
+@html.div("flex flex-col gap-2")
+def render_text_editor_resource(subject: S, data: Dict) -> None:
+    """Render a text editor affordance."""
+    render_resource_header(subject, data)
+    
+    # Get properties from data
+    placeholder = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.placeholder),
+        "Type something...",
+    )
+    target = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.target),
+        None,
+    )
+    message_uri = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.message),
+        None,
+    )
+
+    if not target or not message_uri:
+        logger.warning("Text editor missing target or message URI")
+        return
+
+    with tag(
+        "textarea",
+        name=str(NT.text),
+        placeholder=str(placeholder),
+        classes=[
+            "w-full min-h-[200px] p-4",
+            "bg-white/50 dark:bg-slate-800/30", 
+            "border border-gray-300/30 dark:border-slate-600/30",
+            "text-gray-900 dark:text-gray-100",
+            "placeholder-gray-500 dark:placeholder-gray-400",
+            "focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
+            "focus:border-blue-500 dark:focus:border-blue-400",
+            "prose prose-sm dark:prose-invert",
+            "font-serif",
+        ],
+        hx_post=f"{target}/message",
+        hx_trigger="keyup changed delay:500ms",
+        hx_swap="none",
+    ):
+        pass
+
+    render_properties(data)
 
 
-# @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
+# @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1") 
 def render_properties(data):
     if not data["predicates"]:
         classes("contents")
