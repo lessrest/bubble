@@ -13,6 +13,7 @@ from typing import (
     List,
     Optional,
     AsyncGenerator,
+    cast,
 )
 from contextlib import (
     contextmanager,
@@ -27,6 +28,7 @@ import structlog
 from rdflib import (
     DCAT,
     RDF,
+    SKOS,
     XSD,
     Graph,
     URIRef,
@@ -51,7 +53,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from swash import mint, rdfa, vars
-from swash.html import HypermediaResponse, tag, html, text, document
+from swash.html import (
+    HypermediaResponse,
+    attr,
+    classes,
+    tag,
+    html,
+    text,
+    document,
+)
 from swash.json import pyld
 from swash.prfx import NT, DID
 from swash.rdfa import (
@@ -60,12 +70,13 @@ from swash.rdfa import (
     get_subject_data,
     visited_resources,
 )
-from swash.util import P, S, new
-from bubble.data import Repository, context
+from swash.util import P, S, add, new
+from bubble.data import Repository, context, timestamp
 from bubble.mesh import (
     Vat,
     call,
     create_graph,
+    persist,
     record_message,
     send,
     this,
@@ -78,7 +89,13 @@ from bubble.keys import (
     build_did_document,
     parse_public_key_hex,
 )
-from bubble.page import base_html, base_shell
+from bubble.page import (
+    action_button,
+    base_html,
+    base_shell,
+    render_note_textarea,
+)
+from bubble.type import TextTypingActor
 from bubble.word import describe_word
 from bubble.replicate.make import Replicate
 
@@ -244,6 +261,9 @@ class Site:
         self.app.get("/eval")(self.eval_form)
         self.app.post("/eval")(self.eval_code)
         self.app.get("/")(self.root)
+
+        self.app.post("/create")(self.create_graph)
+        self.app.post("/type")(self.type_view)
 
         self.app.post("/{id}/message")(self.actor_message)
         self.app.post("/{id}")(self.actor_post)
@@ -423,8 +443,7 @@ class Site:
     # Add uptime actor URI to the HTML template
     async def root(self):
         with base_shell("Bubble"):
-            with tag("main", classes="flex flex-col gap-4 p-4"):
-                render_graph_view(vars.graph.get())
+            render_graph_view(vars.graph.get())
         return HypermediaResponse()
 
     def get_websocket_base(self):
@@ -777,6 +796,24 @@ class Site:
 
             return HypermediaResponse()
 
+    async def create_graph(self):
+        """Create a new graph."""
+        async with txgraph() as g:
+            assert isinstance(g.identifier, URIRef)
+            new(
+                NT.Graph,
+                {
+                    PROV.generatedAtTime: timestamp(),
+                },
+                g.identifier,
+            )
+            return HypermediaResponse()
+
+    def render_editor(self, graph: Graph):
+        """Render the editor for a graph."""
+        id = graph.identifier
+        assert isinstance(id, URIRef)
+
     async def image_gallery(self):
         """Display a gallery of all NT.Image resources and the prompt affordance."""
         with base_shell("Image Gallery"):
@@ -875,6 +912,28 @@ class Site:
                                             )
                                             else str(img["time"])
                                         )
+
+    async def type_view(self, id: str):
+        """Add a note to the specified sheet and render a textarea."""
+        sheet_id = URIRef(id)
+        with self.repo.using_graph(sheet_id) as graph:
+            note = new(
+                NT.Note,
+                {NT.text: Literal("", lang="en")},
+            )
+
+            add(
+                sheet_id,
+                {
+                    PROV.hadMember: note,
+                },
+            )
+
+            await persist(graph)
+
+            render_note_textarea(note)
+
+            return HypermediaResponse()
 
 
 @contextmanager
@@ -982,41 +1041,17 @@ def render_graph_view(graph: Graph) -> None:
     """Render a complete view of a graph with smart traversal ordering."""
     nodes = get_traversal_order(graph)
     typed_nodes = []
-    untyped_nodes = []
 
-    # Sort nodes into typed and untyped
     for node in nodes:
         if list(graph.objects(node, RDF.type)):
             typed_nodes.append(node)
-        else:
-            untyped_nodes.append(node)
 
-    logger.info(
-        "rendering graph",
-        graph=graph,
-        typed_nodes=typed_nodes,
-        untyped_nodes=untyped_nodes,
-    )
+    logger.info("rendering graph", graph=graph, typed_nodes=typed_nodes)
 
     with autoexpanding(3):
         with tag("div", classes="flex flex-col gap-4"):
-            # First pass - render typed nodes
             for node in typed_nodes:
                 render_node(graph, node)
-
-            # Second pass - render untyped nodes
-            if untyped_nodes:
-                with tag(
-                    "div",
-                    classes="mt-4 border-t border-gray-300 dark:border-gray-700 pt-4",
-                ):
-                    with tag(
-                        "h3",
-                        classes="text-lg font-semibold mb-2 text-gray-600 dark:text-gray-400",
-                    ):
-                        text("Additional Resources")
-                    for node in untyped_nodes:
-                        render_node(graph, node)
 
 
 def render_graphs_overview(dataset: Dataset) -> None:
