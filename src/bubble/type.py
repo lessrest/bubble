@@ -13,7 +13,13 @@ from rdflib import Graph, URIRef, Literal, PROV
 
 from swash.prfx import NT
 from swash.util import add, get_single_object, is_a, new
-from bubble.mesh import ServerActor, persist, with_transient_graph, spawn, txgraph
+from bubble.mesh import (
+    ServerActor,
+    persist,
+    with_transient_graph,
+    spawn,
+    txgraph,
+)
 from bubble.data import context, timestamp
 
 logger = structlog.get_logger()
@@ -77,6 +83,7 @@ class SheetEditingActor(ServerActor[None]):
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet actor handling message", graph=graph)
+        # this should accept NT.AddNote messages, create a new note and spawn new text typing actors, ai!
         return graph
 
 
@@ -107,9 +114,9 @@ class SheetCreatingActor(ServerActor[None]):
             editor = await spawn(
                 nursery,
                 SheetEditingActor(sheet_graph.identifier),
-                name=f"Sheet editor for {sheet_graph.identifier}"
+                name=f"Sheet editor for {sheet_graph.identifier}",
             )
-            
+
             # Return success response with editor reference and sheet id
             with with_transient_graph() as result:
                 add(
@@ -118,7 +125,7 @@ class SheetCreatingActor(ServerActor[None]):
                         NT.isResponseTo: request_id,
                         NT.status: NT.Success,
                         NT.editor: editor,
-                        NT.sheet: sheet_graph.identifier
-                    }
+                        NT.sheet: sheet_graph.identifier,
+                    },
                 )
                 return context.graph.get()
