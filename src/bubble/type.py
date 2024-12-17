@@ -92,22 +92,33 @@ class SheetCreatingActor(ServerActor[None]):
         if not is_a(request_id, NT.CreateSheet, graph):
             raise ValueError(f"Unexpected message type: {request_id}")
 
-        # Create response graph
-        with with_transient_graph() as result:
-            # Spawn new sheet editing actor
+        # Create a new sheet graph
+        async with txgraph() as sheet_graph:
+            assert isinstance(sheet_graph.identifier, URIRef)
+            new(
+                NT.Sheet,
+                {
+                    PROV.generatedAtTime: timestamp(),
+                },
+                sheet_graph.identifier,
+            )
+
+            # Spawn new sheet editing actor for this sheet
             editor = await spawn(
                 nursery,
-                SheetEditingActor(self.graph_id),
-                name=f"Sheet editor for {self.graph_id}"
+                SheetEditingActor(sheet_graph.identifier),
+                name=f"Sheet editor for {sheet_graph.identifier}"
             )
             
-            # Return success response with editor reference
-            add(
-                result,
-                {
-                    NT.isResponseTo: request_id,
-                    NT.status: NT.Success,
-                    NT.editor: editor
-                }
-            )
-            return context.graph.get()
+            # Return success response with editor reference and sheet id
+            with with_transient_graph() as result:
+                add(
+                    result,
+                    {
+                        NT.isResponseTo: request_id,
+                        NT.status: NT.Success,
+                        NT.editor: editor,
+                        NT.sheet: sheet_graph.identifier
+                    }
+                )
+                return context.graph.get()

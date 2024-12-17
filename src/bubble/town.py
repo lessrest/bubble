@@ -801,7 +801,7 @@ class Site:
         async with txgraph() as g:
             assert isinstance(g.identifier, URIRef)
             new(
-                NT.Graph,
+                NT.Sheet,
                 {
                     PROV.generatedAtTime: timestamp(),
                 },
