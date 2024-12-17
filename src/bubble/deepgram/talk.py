@@ -233,9 +233,8 @@ class DeepgramClientActor(ServerActor[str]):
     def __init__(self):
         super().__init__(os.environ["DEEPGRAM_API_KEY"])
 
-    async def init(self):
-        await super().init()
-        create_affordance_button(this())
+    async def setup(self, actor_uri: URIRef):
+        create_affordance_button(actor_uri)
 
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         logger.info("Deepgram client actor handling message", graph=graph)

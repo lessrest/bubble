@@ -20,6 +20,7 @@ from rdflib import PROV, Graph, URIRef, Literal
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
 from bubble.data import context, timestamp
+from bubble.deepgram.talk import DeepgramClientActor
 from bubble.mesh import (
     ServerActor,
     boss,
@@ -321,19 +322,25 @@ class SheetEditor(DispatchingActor):
             {
                 NT.affordance: {
                     create_button(
-                        "Make Note",
+                        "New Note",
                         icon="✏️",
                         message_type=NT.AddNote,
                         target=actor_uri,
                     ),
                     create_button(
-                        "Make Image",
+                        "New Speech",
+                        icon="🎤",
+                        message_type=NT.RecordVoice,
+                        target=actor_uri,
+                    ),
+                    create_button(
+                        "New Image",
                         icon="🖼️",
                         message_type=NT.MakeImage,
                         target=actor_uri,
                     ),
                     create_button(
-                        "Make Video",
+                        "New Video",
                         icon="🎥",
                         message_type=NT.MakeVideo,
                         target=actor_uri,
@@ -367,6 +374,16 @@ class SheetEditor(DispatchingActor):
     async def handle_make_video(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
             ctx.nursery, VideoGenerator, "video generator"
+        )
+        await add_affordance_to_sheet(this(), actor_uri)
+        with with_transient_graph() as graph:
+            add(graph, {PROV.generated: actor_uri})
+            return context.graph.get()
+
+    @handler(NT.RecordVoice)
+    async def handle_record_voice(self, ctx: DispatchContext):
+        actor_uri = await spawn_actor(
+            ctx.nursery, DeepgramClientActor, "voice recorder"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:

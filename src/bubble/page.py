@@ -7,7 +7,8 @@ from swash.html import tag, text
 import json
 from contextlib import contextmanager
 
-from swash.rdfa import action_button
+from swash.prfx import NT, RDF
+from swash.rdfa import action_button, rdf_resource
 
 from bubble.mesh import vat
 from swash.html import html
@@ -80,17 +81,8 @@ def base_shell(title: str):
                     "border-b border-cyan-200 dark:border-cyan-800/40",
                 ],
             ):
-                id = vars.graph.get().identifier
-                # Left section with Create button only
                 with tag("div", classes="flex items-center"):
-                    action_button(
-                        "New sheet",
-                        icon="📝",
-                        hx_post="/create",
-                        hx_target="#main",
-                        hx_swap="innerHTML",
-                        classes="mr-4",
-                    )
+                    pass
 
                 # Right section with Node ID and Site info
                 with tag("div", classes="flex items-center gap-6"):

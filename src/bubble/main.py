@@ -45,7 +45,7 @@ from bubble.town import (
 from bubble.stat.stat import gather_system_info
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import ReplicateClientActor, make_image
-from bubble.type import SheetCreator
+from bubble.type import SheetCreator, SheetEditor
 
 console = Console(width=80)
 
@@ -229,7 +229,7 @@ def town(
                         nursery,
                         SimpleSupervisor(
                             {
-                                "sheet creator": SheetCreator(this()),
+                                "sheet editor": SheetEditor(this()),
                             }
                         ),
                         name="actor supervisor",
@@ -237,24 +237,6 @@ def town(
 
                     # Link supervisor to the town's identity
                     town.vat.link_actor_to_identity(supervisor)
-
-                    # Add image gallery link to the root
-                    add(
-                        URIRef(base_url),
-                        {
-                            NT.affordance: new(
-                                NT.Link,
-                                {
-                                    NT.label: Literal(
-                                        "Image Gallery", "en"
-                                    ),
-                                    NT.href: Literal(
-                                        "/images", datatype=XSD.anyURI
-                                    ),
-                                },
-                            )
-                        },
-                    )
 
                     nursery.start_soon(
                         serve_fastapi_app, config, town.get_fastapi_app()
