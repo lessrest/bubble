@@ -121,12 +121,52 @@ class SheetEditingActor(ServerActor[None]):
         logger.info("Sheet actor handling message", graph=graph)
         request_id = graph.identifier
 
-        # TODO: Handle MakeImage message ai!
-        if not is_a(request_id, NT.AddNote, graph):
-            raise ValueError(f"Unexpected message type: {request_id}")
+        if is_a(request_id, NT.AddNote, graph):
+            # Create a new note in the sheet graph
+            with context.bind_graph(self.graph_id) as sheet:
+                add(
+                    self.graph_id,
+                    {
+                        NT.affordance: await spawn(
+                            nursery,
+                            TextTypingActor(self.graph_id),
+                            name="note editor",
+                        ),
+                    },
+                )
 
-        # Create a new note in the sheet graph
-        with context.bind_graph(self.graph_id) as sheet:
+                await persist(sheet)
+                return context.graph.get()
+
+        elif is_a(request_id, NT.MakeImage, graph):
+            # Find the Replicate client through the supervisor
+            replicate_client = None
+            dataset = context.repo.get().dataset
+            identity = vat.get().get_identity_uri()
+
+            # Find supervised actors through NT.environs
+            for supervisor in dataset.objects(identity, PROV.started):
+                for actor in dataset.objects(supervisor, NT.supervises):
+                    if (actor, RDF.type, Replicate.Client) in dataset:
+                        replicate_client = actor
+                        break
+                if replicate_client:
+                    break
+
+            if not replicate_client:
+                raise ValueError("Replicate client actor not found")
+
+            # Forward the message to the Replicate client
+            result = await call(replicate_client, graph)
+            
+            # Add the generated images to the sheet
+            with context.bind_graph(self.graph_id) as sheet:
+                for distribution in result.objects(result.identifier, PROV.generated):
+                    add(self.graph_id, {PROV.hadMember: distribution})
+                await persist(sheet)
+                return context.graph.get()
+        else:
+            raise ValueError(f"Unexpected message type: {request_id}")
             add(
                 self.graph_id,
                 {
