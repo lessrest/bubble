@@ -132,6 +132,11 @@ class SheetCreatingActor(ServerActor[None]):
     def __init__(self, graph_id: URIRef):
         super().__init__(None)
         self.graph_id = graph_id
+        
+    async def init(self):
+        """Initialize the actor by marking it as a SheetCreator."""
+        async with txgraph():
+            new(NT.SheetCreator, {}, this())
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet creating actor handling message", graph=graph)

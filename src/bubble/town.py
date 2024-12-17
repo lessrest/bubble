@@ -797,16 +797,42 @@ class Site:
             return HypermediaResponse()
 
     async def create_graph(self):
-        """Create a new graph."""
+        """Create a new sheet by calling the sheet creating actor."""
+        # Find the sheet creator actor through the supervisor
+        sheet_creator = None
+        dataset = context.repo.get().dataset
+        identity = vat.get().get_identity_uri()
+
+        # Find supervised actors
+        for supervisor in dataset.objects(identity, PROV.started):
+            for actor in dataset.objects(supervisor, NT.supervises):
+                if (actor, RDF.type, NT.SheetCreator) in dataset:
+                    sheet_creator = actor
+                    break
+            if sheet_creator:
+                break
+
+        if not sheet_creator:
+            raise ValueError("Sheet creator actor not found")
+
+        # Call the sheet creator actor
         async with txgraph() as g:
-            assert isinstance(g.identifier, URIRef)
             new(
-                NT.Sheet,
-                {
-                    PROV.generatedAtTime: timestamp(),
-                },
+                NT.CreateSheet,
+                {},
                 g.identifier,
             )
+            result = await call(sheet_creator, g)
+            
+            # Get the sheet ID and editor from the response
+            sheet_id = get_single_object(result.identifier, NT.sheet, result)
+            
+            # Render the sheet view
+            with tag("div", classes="flex flex-col gap-4"):
+                # Container for notes with affordance for adding new ones
+                with tag("div", id="notes", classes="flex flex-col gap-4"):
+                    rdf_resource(sheet_id)
+
             return HypermediaResponse()
 
     def render_editor(self, graph: Graph):

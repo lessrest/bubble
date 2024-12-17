@@ -111,7 +111,7 @@ def base_shell(title: str):
                 ],
             ):
                 id = vars.graph.get().identifier
-                # Left section with Create button
+                # Left section with Create button only
                 with tag("div", classes="flex items-center"):
                     action_button(
                         "New sheet",
@@ -121,16 +121,6 @@ def base_shell(title: str):
                         hx_swap="innerHTML",
                         classes="mr-4",
                     )
-                    with tag("div", classes="flex flex-row gap-1"):
-                        actions = {"🖋️": "type", "🎙️": "talk", "🎨": "tool"}
-                        for emoji, path in actions.items():
-                            action_button(
-                                label=path.capitalize(),
-                                icon=emoji,
-                                hx_post=f"/{path}?id={urlquote(id)}",
-                                hx_target="#main",
-                                hx_swap="beforeend",
-                            )
 
                 # Right section with Node ID and Site info
                 with tag("div", classes="flex items-center gap-6"):

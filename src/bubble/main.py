@@ -232,6 +232,7 @@ def town(
                                 "Replicate client": ReplicateClientActor(
                                     repo
                                 ),
+                                "Sheet creator": SheetCreatingActor(this()),
                             }
                         ),
                         name="actor supervisor",
