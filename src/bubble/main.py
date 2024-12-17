@@ -45,7 +45,7 @@ from bubble.town import (
 from bubble.stat.stat import gather_system_info
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import ReplicateClientActor, make_image
-from bubble.type import SheetCreatingActor
+from bubble.type import SheetCreator
 
 console = Console(width=80)
 
@@ -229,11 +229,7 @@ def town(
                         nursery,
                         SimpleSupervisor(
                             {
-                                "Deepgram client": DeepgramClientActor(),
-                                "Replicate client": ReplicateClientActor(
-                                    repo
-                                ),
-                                "Sheet creator": SheetCreatingActor(this()),
+                                "sheet creator": SheetCreator(this()),
                             }
                         ),
                         name="actor supervisor",

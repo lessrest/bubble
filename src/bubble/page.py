@@ -7,6 +7,8 @@ from swash.html import tag, text
 import json
 from contextlib import contextmanager
 
+from swash.rdfa import action_button
+
 from bubble.mesh import vat
 from swash.html import html
 from swash import vars
@@ -55,38 +57,6 @@ def base_html(title: str):
                 src="/static/voice-recorder-writer.js",
             )
             tag("script", type="module", src="/static/jsonld-socket.js")
-
-
-def action_button(
-    label: Optional[str] = None, icon: Optional[str] = None, **attrs
-):
-    """Create a styled action button with consistent Tailwind classes"""
-    default_classes = [
-        "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
-        "px-4 py-1",
-        "bg-cyan-900 rounded-sm border border-cyan-600",
-        "hover:bg-cyan-600 dark:hover:bg-cyan-700/80",
-        "text-white font-bold",
-        "dark:border-cyan-700/60 dark:bg-cyan-700/40",
-        "transition-colors duration-150 ease-in-out",
-    ]
-
-    # Merge provided classes with default classes if any
-    if "classes" in attrs:
-        if isinstance(attrs["classes"], list):
-            attrs["classes"].extend(default_classes)
-        else:
-            attrs["classes"] = [attrs["classes"]] + default_classes
-    else:
-        attrs["classes"] = default_classes
-
-    with tag("button", **attrs):
-        if icon:
-            with tag("span"):
-                text(icon)
-        if label:
-            with tag("span", classes="font-medium"):
-                text(label)
 
 
 def urlquote(id: str):
@@ -167,28 +137,3 @@ def base_shell(title: str):
             # Main content area
             with tag("main", id="main", classes="flex-1 p-4 flex"):
                 yield
-
-
-@html.div("flex flex-col gap-2 p-4")
-def render_note_textarea(note_id: URIRef):
-    """Render a textarea for editing notes with auto-save functionality."""
-    with tag(
-        "textarea",
-        name="text",
-        placeholder="Write your note here...",
-        classes=[
-            "w-full min-h-[200px] p-4",
-            "bg-white/50 dark:bg-slate-800/30",
-            "border border-gray-300/30 dark:border-slate-600/30",
-            "text-gray-900 dark:text-gray-100",
-            "placeholder-gray-500 dark:placeholder-gray-400",
-            "focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
-            "focus:border-blue-500 dark:focus:border-blue-400",
-            "prose prose-sm dark:prose-invert",
-            "font-serif",
-        ],
-        hx_post=f"{note_id}/message",
-        hx_trigger="keyup changed delay:500ms",
-        hx_swap="none",
-    ):
-        pass

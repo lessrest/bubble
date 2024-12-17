@@ -55,7 +55,9 @@ nt:Supervisor skos:prefLabel "actor supervisor"@en .
 nt:TownProcess skos:prefLabel "town server process"@en .
 nt:ActorIdentity skos:prefLabel "actor identity"@en .
 nt:Graph skos:prefLabel "graph"@en .
-
+nt:SheetCreator skos:prefLabel "sheet creator"@en .
+nt:ActorProcess skos:prefLabel "actor process"@en .
+nt:SheetEditor skos:prefLabel "sheet editor"@en .
 
 # DID terms
 did:Ed25519VerificationKey2020 skos:prefLabel "Ed25519 key"@en .

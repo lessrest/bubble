@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing_extensions import runtime_checkable
 
 import tenacity
 from bubble.data import context
@@ -40,6 +41,7 @@ from typing import (
     Generator,
     MutableMapping,
     Optional,
+    Protocol,
     Set,
 )
 
@@ -80,6 +82,11 @@ def root_context(site: Namespace, name: str = "root") -> ActorContext:
 def get_site() -> Namespace:
     """Get the site namespace from the current actor system."""
     return vat.get().site
+
+
+@runtime_checkable
+class SetupableActor(Protocol):
+    async def setup(self, actor_uri: URIRef): ...
 
 
 class Vat:
@@ -198,16 +205,19 @@ class Vat:
             actor_proc,
         )
 
-        new(
-            NT.ActorIdentity,
+        add(
+            actor,
             {
                 RDFS.label: Literal(name, lang="en"),
                 PROV.wasGeneratedBy: parent_proc,
                 PROV.generatedAtTime: now,
                 PROV.wasAssociatedWith: actor_proc,
             },
-            actor,
         )
+
+        if isinstance(code, SetupableActor):
+            logger.info("setting up actor", actor=actor, code=code)
+            await code.setup(actor)
 
         async def task():
             with self.curr.bind(context):
@@ -364,6 +374,10 @@ async def spawn(
 
 def this() -> URIRef:
     return vat.get().this()
+
+
+def boss() -> URIRef:
+    return vat.get().curr.get().boss
 
 
 async def send(actor: URIRef, message: Optional[Graph] = None):

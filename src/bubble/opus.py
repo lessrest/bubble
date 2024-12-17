@@ -7,10 +7,10 @@ from trio_websocket import open_websocket_url
 
 from swash.html import tag
 from swash.prfx import NT
-from swash.rdfa import rdf_resource
+from swash.rdfa import action_button, rdf_resource
 from swash.util import select_rows
 from bubble.data import context
-from bubble.page import base_html, action_button
+from bubble.page import base_html
 
 logger = structlog.get_logger()
 

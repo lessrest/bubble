@@ -377,6 +377,9 @@ def render_button_resource(subject, data):
     target = next(
         (obj for pred, obj in data["predicates"] if pred == NT.target), None
     )
+    icon = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.icon), None
+    )
 
     message_uri = next(
         (obj for pred, obj in data["predicates"] if pred == NT.message),
@@ -392,12 +395,8 @@ def render_button_resource(subject, data):
     # Regular button rendering
     with tag("input", type="hidden", name="type", value=str(message_uri)):
         pass
-    with tag(
-        "button",
-        classes="bg-cyan-900 border border-cyan-600 hover:bg-cyan-600 text-white font-bold px-4 mt-1 ml-1",
-    ):
-        classes("dark:border-cyan-700/40 dark:bg-cyan-700/40 rounded-sm")
-        text(label)
+
+    action_button(label, icon)
 
 
 @html.form(
@@ -464,7 +463,7 @@ def render_text_editor_resource(subject: S, data: Dict) -> None:
     )
     target = next(
         (obj for pred, obj in data["predicates"] if pred == NT.target),
-        None,
+        subject,
     )
     message_uri = next(
         (obj for pred, obj in data["predicates"] if pred == NT.message),
@@ -478,7 +477,7 @@ def render_text_editor_resource(subject: S, data: Dict) -> None:
 
     assert isinstance(existing_text, Literal)
 
-    if not target or not message_uri:
+    if not message_uri:
         logger.warning("Text editor missing target or message URI")
         return
 
@@ -506,8 +505,7 @@ def render_text_editor_resource(subject: S, data: Dict) -> None:
         ):
             text(str(existing_text))
 
-        with tag("button", classes="bg-blue-900"):
-            text("Save")
+        action_button("Save", "✍️")
 
     render_properties(data)
 
@@ -1076,3 +1074,35 @@ def render_json_symbol_string(value: str) -> None:
 def render_json_link_string(value: str) -> None:
     attr("href", value)
     text(value)
+
+
+def action_button(
+    label: Optional[str] = None, icon: Optional[str] = None, **attrs
+):
+    """Create a styled action button with consistent Tailwind classes"""
+    default_classes = [
+        "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
+        "px-4 py-1",
+        "bg-cyan-900 rounded-sm border border-cyan-600",
+        "hover:bg-cyan-600 dark:hover:bg-cyan-700/80",
+        "text-white font-bold",
+        "dark:border-cyan-700/60 dark:bg-cyan-700/40",
+        "transition-colors duration-150 ease-in-out",
+    ]
+
+    # Merge provided classes with default classes if any
+    if "classes" in attrs:
+        if isinstance(attrs["classes"], list):
+            attrs["classes"].extend(default_classes)
+        else:
+            attrs["classes"] = [attrs["classes"]] + default_classes
+    else:
+        attrs["classes"] = default_classes
+
+    with tag("button", **attrs):
+        if icon:
+            with tag("span"):
+                text(icon)
+        if label:
+            with tag("span", classes="font-medium"):
+                text(label)

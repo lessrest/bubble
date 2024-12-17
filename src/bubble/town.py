@@ -3,8 +3,6 @@ import json
 import uuid
 import pathlib
 
-from datetime import datetime
-
 from io import BytesIO
 from base64 import b64encode
 from typing import (
@@ -13,7 +11,6 @@ from typing import (
     List,
     Optional,
     AsyncGenerator,
-    cast,
 )
 from contextlib import (
     contextmanager,
@@ -26,16 +23,13 @@ import trio
 import structlog
 
 from rdflib import (
-    DCAT,
     RDF,
-    SKOS,
     XSD,
     Graph,
     URIRef,
     Dataset,
     Literal,
     Namespace,
-    PROV,
 )
 from fastapi import (
     Body,
@@ -55,8 +49,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from swash import mint, rdfa, vars
 from swash.html import (
     HypermediaResponse,
-    attr,
-    classes,
     tag,
     html,
     text,
@@ -70,34 +62,29 @@ from swash.rdfa import (
     get_subject_data,
     visited_resources,
 )
-from swash.util import P, S, add, new, get_single_object
-from bubble.data import Repository, context, timestamp
-from bubble.mesh import (
-    Vat,
-    call,
-    create_graph,
-    persist,
-    record_message,
-    send,
-    this,
-    txgraph,
-    vat,
-    with_transient_graph,
-)
+from swash.util import P, S, new
+from bubble.data import Repository, context
 from bubble.icon import favicon
 from bubble.keys import (
     build_did_document,
     parse_public_key_hex,
 )
+from bubble.mesh import (
+    Vat,
+    vat,
+    call,
+    send,
+    this,
+    txgraph,
+    create_graph,
+    record_message,
+    with_transient_graph,
+)
 from bubble.page import (
-    action_button,
     base_html,
     base_shell,
-    render_note_textarea,
 )
-from bubble.type import TextTypingActor
 from bubble.word import describe_word
-from bubble.replicate.make import Replicate
 
 logger = structlog.get_logger(__name__)
 
@@ -262,8 +249,6 @@ class Site:
         self.app.post("/eval")(self.eval_code)
         self.app.get("/")(self.root)
         self.app.get("/sheets")(self.sheets)
-        self.app.post("/create")(self.create_graph)
-        self.app.post("/type")(self.type_view)
 
         self.app.post("/{id}/message")(self.actor_message)
         self.app.post("/{id}")(self.actor_post)
@@ -280,7 +265,6 @@ class Site:
 
         self.app.get("/files/{path:path}")(self.file_get)
         self.app.get("/blobs/{sha256}")(self.blob_get)
-        self.app.get("/images")(self.image_gallery)
 
         # this is at the bottom because it matches too broadly
         self.app.get("/{path:path}")(self.actor_get)
@@ -803,176 +787,6 @@ class Site:
 
             render_graph_view(vars.graph.get())
             logger.info("word lookup", graph=vars.graph.get())
-
-            return HypermediaResponse()
-
-    async def create_graph(self):
-        """Create a new sheet by calling the sheet creating actor."""
-        # Find the sheet creator actor through the supervisor
-        sheet_creator = None
-        dataset = context.repo.get().dataset
-        identity = vat.get().get_identity_uri()
-
-        # Find supervised actors
-        for supervisor in dataset.objects(identity, PROV.started):
-            for actor in dataset.objects(supervisor, NT.supervises):
-                if (actor, RDF.type, NT.SheetCreator) in dataset:
-                    sheet_creator = actor
-                    break
-            if sheet_creator:
-                break
-
-        if not sheet_creator:
-            raise ValueError("Sheet creator actor not found")
-
-        assert isinstance(sheet_creator, URIRef)
-
-        # Call the sheet creator actor
-        async with txgraph() as g:
-            assert isinstance(g.identifier, URIRef)
-            new(
-                NT.CreateSheet,
-                {},
-                g.identifier,
-            )
-            result = await call(sheet_creator, g)
-
-            # Get the sheet ID and editor from the response
-            sheet_id = get_single_object(
-                result.identifier, NT.sheet, result
-            )
-
-            # Render the sheet view
-            with tag("div", classes="flex flex-col gap-4"):
-                # Container for notes with affordance for adding new ones
-                with tag("div", id="notes", classes="flex flex-col gap-4"):
-                    rdf_resource(sheet_id)
-
-            return HypermediaResponse()
-
-    def render_editor(self, graph: Graph):
-        """Render the editor for a graph."""
-        id = graph.identifier
-        assert isinstance(id, URIRef)
-
-    async def image_gallery(self):
-        """Display a gallery of all NT.Image resources and the prompt affordance."""
-        with base_shell("Image Gallery"):
-            with tag("div", classes="p-4"):
-                with tag("h1", classes="text-2xl font-bold mb-4"):
-                    text("Image Gallery")
-
-                # Find the Replicate client through the supervisor
-                replicate_client = None
-                dataset = context.repo.get().dataset
-                identity = vat.get().get_identity_uri()
-
-                # Find supervised actors through NT.environs
-                for supervisor in dataset.objects(identity, PROV.started):
-                    # Find Replicate.Client instances among supervised actors
-                    for actor in dataset.objects(supervisor, NT.supervises):
-                        if (
-                            actor,
-                            RDF.type,
-                            Replicate.Client,
-                        ) in dataset:
-                            replicate_client = actor
-                            break
-                    if replicate_client:
-                        break
-
-                # Show the prompt affordance if we found the client
-                if replicate_client:
-                    with tag(
-                        "div",
-                        classes="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm",
-                    ):
-                        rdf_resource(replicate_client)
-                else:
-                    with tag("div", classes="p-4"):
-                        text("No Replicate client found")
-
-                # Query for all NT.Image resources
-                images = []
-                for graph in dataset.graphs():
-                    for subject in graph.subjects(
-                        RDF.type, DCAT.Distribution
-                    ):
-                        href = graph.value(subject, DCAT.downloadURL)
-                        generated_time = graph.value(
-                            subject, PROV.generatedAtTime
-                        )
-                        if href:
-                            images.append(
-                                {
-                                    "id": subject,
-                                    "href": str(href),
-                                    "time": generated_time,
-                                }
-                            )
-
-                # Sort images by generation time (newest first)
-                images.sort(
-                    key=lambda x: x["time"] if x["time"] else "",
-                    reverse=True,
-                )
-
-                # Display images in a grid
-                with tag(
-                    "div",
-                    classes="flex flex-row flex-wrap gap-2",
-                ):
-                    for img in images:
-                        with tag(
-                            "div",
-                            classes="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow",
-                        ):
-                            # Image container with fixed aspect ratio
-                            with tag("div", classes="relative pt-[100%]"):
-                                with tag(
-                                    "img",
-                                    src=img["href"],
-                                    alt="Generated image",
-                                ):
-                                    pass
-
-                            # Image metadata
-                            with tag(
-                                "div",
-                                classes="p-3 bg-white dark:bg-gray-800",
-                            ):
-                                with tag(
-                                    "div",
-                                    classes="text-sm text-gray-600 dark:text-gray-400",
-                                ):
-                                    if img["time"]:
-                                        text(
-                                            f"Generated: {img['time'].strftime('%Y-%m-%d %H:%M:%S')}"
-                                            if isinstance(
-                                                img["time"], datetime
-                                            )
-                                            else str(img["time"])
-                                        )
-
-    async def type_view(self, id: str):
-        """Add a note to the specified sheet and render a textarea."""
-        sheet_id = URIRef(id)
-        with self.repo.using_graph(sheet_id) as graph:
-            note = new(
-                NT.Note,
-                {NT.text: Literal("", lang="en")},
-            )
-
-            add(
-                sheet_id,
-                {
-                    PROV.hadMember: note,
-                },
-            )
-
-            await persist(graph)
-
-            render_note_textarea(note)
 
             return HypermediaResponse()
 
