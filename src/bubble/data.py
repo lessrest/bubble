@@ -88,9 +88,10 @@ class context:
     @classmethod
     @contextmanager
     def bind_graph(
-        cls, graph_id: URIRef, repo: "Repository"
+        cls, graph_id: URIRef, repo: Optional["Repository"] = None
     ) -> Generator[Graph, None, None]:
         """Bind both the context graph and the legacy vars graph parameter."""
+        repo = repo or context.repo.get()
         graph = repo.graph(graph_id)
         with cls.graph.bind(graph), vars.in_graph(graph):
             yield graph

@@ -261,7 +261,7 @@ class Site:
         self.app.get("/eval")(self.eval_form)
         self.app.post("/eval")(self.eval_code)
         self.app.get("/")(self.root)
-
+        self.app.get("/sheets")(self.sheets)
         self.app.post("/create")(self.create_graph)
         self.app.post("/type")(self.type_view)
 
@@ -332,10 +332,11 @@ class Site:
                 for k, v in form.items()
                 if isinstance(v, str) and k != "type"
             }
-            async with txgraph() as g:
+            with with_transient_graph():
+                g = vars.graph.get()
                 record_message(type, actor, g, properties=properties)
-            result = await call(actor, g)
-            return LinkedDataResponse(result)
+                result = await call(actor, g)
+                return LinkedDataResponse(result)
 
     # Middleware
     async def bind_document(self, request, call_next):
@@ -444,6 +445,15 @@ class Site:
     async def root(self):
         with base_shell("Bubble"):
             render_graph_view(vars.graph.get())
+        return HypermediaResponse()
+
+    async def sheets(self):
+        with base_shell("Sheets"):
+            with tag("div", classes="p-4"):
+                for sheet in vars.dataset.get().subjects(
+                    RDF.type, NT.Sheet
+                ):
+                    render_graph_view(vars.dataset.get().graph(sheet))
         return HypermediaResponse()
 
     def get_websocket_base(self):
@@ -815,18 +825,23 @@ class Site:
         if not sheet_creator:
             raise ValueError("Sheet creator actor not found")
 
+        assert isinstance(sheet_creator, URIRef)
+
         # Call the sheet creator actor
         async with txgraph() as g:
+            assert isinstance(g.identifier, URIRef)
             new(
                 NT.CreateSheet,
                 {},
                 g.identifier,
             )
             result = await call(sheet_creator, g)
-            
+
             # Get the sheet ID and editor from the response
-            sheet_id = get_single_object(result.identifier, NT.sheet, result)
-            
+            sheet_id = get_single_object(
+                result.identifier, NT.sheet, result
+            )
+
             # Render the sheet view
             with tag("div", classes="flex flex-col gap-4"):
                 # Container for notes with affordance for adding new ones

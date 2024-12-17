@@ -446,8 +446,7 @@ def render_prompt_resource(subject, data):
 @html.div("flex flex-col gap-2")
 def render_text_editor_resource(subject: S, data: Dict) -> None:
     """Render a text editor affordance."""
-    render_resource_header(subject, data)
-    
+
     # Get properties from data
     placeholder = next(
         (obj for pred, obj in data["predicates"] if pred == NT.placeholder),
@@ -462,35 +461,48 @@ def render_text_editor_resource(subject: S, data: Dict) -> None:
         None,
     )
 
+    existing_text = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.text),
+        None,
+    )
+
+    assert isinstance(existing_text, Literal)
+
     if not target or not message_uri:
         logger.warning("Text editor missing target or message URI")
         return
 
-    with tag(
-        "textarea",
-        name=str(NT.text),
-        placeholder=str(placeholder),
-        classes=[
-            "w-full min-h-[200px] p-4",
-            "bg-white/50 dark:bg-slate-800/30", 
-            "border border-gray-300/30 dark:border-slate-600/30",
-            "text-gray-900 dark:text-gray-100",
-            "placeholder-gray-500 dark:placeholder-gray-400",
-            "focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
-            "focus:border-blue-500 dark:focus:border-blue-400",
-            "prose prose-sm dark:prose-invert",
-            "font-serif",
-        ],
-        hx_post=f"{target}/message",
-        hx_trigger="keyup changed delay:500ms",
-        hx_swap="none",
-    ):
-        pass
+    with tag("form", hx_post=str(target) + "/message", hx_swap="none"):
+        with tag(
+            "input", type="hidden", name="type", value=str(message_uri)
+        ):
+            pass
+
+        with tag(
+            "textarea",
+            name=str(NT.text),
+            placeholder=str(placeholder),
+            classes=[
+                "w-full min-h-[200px] p-4",
+                "bg-white/50 dark:bg-slate-800/30",
+                "border border-gray-300/30 dark:border-slate-600/30",
+                "text-gray-900 dark:text-gray-100",
+                "placeholder-gray-500 dark:placeholder-gray-400",
+                "focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
+                "focus:border-blue-500 dark:focus:border-blue-400",
+                "prose prose-sm dark:prose-invert",
+                "font-serif",
+            ],
+        ):
+            text(str(existing_text))
+
+        with tag("button", classes="bg-blue-900"):
+            text("Save")
 
     render_properties(data)
 
 
-# @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1") 
+# @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
 def render_properties(data):
     if not data["predicates"]:
         classes("contents")

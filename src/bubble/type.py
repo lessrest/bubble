@@ -29,18 +29,32 @@ logger = structlog.get_logger()
 class TextTypingActor(ServerActor[None]):
     """Actor that handles text typing events for a specific note."""
 
-    note_id: URIRef
     graph_id: URIRef
 
-    def __init__(self, note_id: URIRef, graph_id: URIRef):
+    def __init__(self, graph_id: URIRef):
         """Initialize the actor with the ID of the note to update.
 
         Args:
             note_id: URIRef identifying the note this actor will update
         """
         super().__init__(None)
-        self.note_id = note_id
         self.graph_id = graph_id
+
+    async def init(self):
+        """Initialize the actor by marking it as a TextTypingActor."""
+        with context.bind_graph(self.graph_id) as sheet:
+            new(
+                NT.TextEditor,
+                {
+                    NT.placeholder: Literal("Type something...", "en"),
+                    NT.message: URIRef(NT.TextUpdate),
+                    NT.target: this(),
+                    NT.text: Literal("", "en"),
+                },
+                this(),
+            )
+
+            await persist(sheet)
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         """Handle incoming text update messages.
@@ -61,17 +75,10 @@ class TextTypingActor(ServerActor[None]):
         if is_a(request_id, NT.TextUpdate, graph):
             new_text = get_single_object(request_id, NT.text, graph)
             with context.bind_graph(self.graph_id) as sheet:
-                sheet.set(
-                    (self.note_id, NT.text, Literal(new_text, lang="en"))
-                )
-                sheet.set((self.note_id, NT.modifiedAt, timestamp()))
+                sheet.set((this(), NT.text, Literal(new_text, lang="en")))
+                sheet.set((this(), NT.modifiedAt, timestamp()))
                 await persist(sheet)
 
-            with with_transient_graph() as result:
-                add(
-                    result,
-                    {NT.isResponseTo: request_id, NT.status: NT.Success},
-                )
                 return context.graph.get()
         else:
             raise ValueError(f"Unexpected message type: {request_id}")
@@ -82,6 +89,24 @@ class SheetEditingActor(ServerActor[None]):
         super().__init__(None)
         self.graph_id = graph_id
 
+    async def init(self):
+        """Initialize the actor by marking it as a SheetEditor."""
+        async with txgraph():
+            new(
+                NT.SheetEditor,
+                {
+                    NT.affordance: new(
+                        NT.Button,
+                        {
+                            NT.label: Literal("Type", "en"),
+                            NT.message: URIRef(NT.AddNote),
+                            NT.target: this(),
+                        },
+                    )
+                },
+                this(),
+            )
+
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet actor handling message", graph=graph)
         request_id = graph.identifier
@@ -91,53 +116,43 @@ class SheetEditingActor(ServerActor[None]):
 
         # Create a new note in the sheet graph
         with context.bind_graph(self.graph_id) as sheet:
-            note = new(
-                NT.Note,
-                {
-                    NT.text: Literal("", lang="en"),
-                    NT.createdAt: timestamp(),
-                }
-            )
-            
-            # Add the note to the sheet
             add(
                 self.graph_id,
                 {
-                    PROV.hadMember: note,
-                }
+                    NT.affordance: await spawn(
+                        nursery,
+                        TextTypingActor(self.graph_id),
+                        name="note editor",
+                    ),
+                },
             )
+
             await persist(sheet)
-
-            # Spawn a text typing actor for the new note
-            typing_actor = await spawn(
-                nursery,
-                TextTypingActor(note, self.graph_id),
-                name=f"Text typing actor for {note}",
-            )
-
-            # Return success response with note and actor references
-            with with_transient_graph() as result:
-                add(
-                    result,
-                    {
-                        NT.isResponseTo: request_id,
-                        NT.status: NT.Success,
-                        NT.note: note,
-                        NT.editor: typing_actor,
-                    },
-                )
-                return context.graph.get()
+            return context.graph.get()
 
 
 class SheetCreatingActor(ServerActor[None]):
     def __init__(self, graph_id: URIRef):
         super().__init__(None)
         self.graph_id = graph_id
-        
+
     async def init(self):
         """Initialize the actor by marking it as a SheetCreator."""
         async with txgraph():
-            new(NT.SheetCreator, {}, this())
+            new(
+                NT.SheetCreator,
+                {
+                    NT.affordance: new(
+                        NT.Button,
+                        {
+                            NT.label: Literal("New Sheet", "en"),
+                            NT.message: URIRef(NT.CreateSheet),
+                            NT.target: this(),
+                        },
+                    )
+                },
+                this(),
+            )
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet creating actor handling message", graph=graph)
@@ -149,13 +164,6 @@ class SheetCreatingActor(ServerActor[None]):
         # Create a new sheet graph
         async with txgraph() as sheet_graph:
             assert isinstance(sheet_graph.identifier, URIRef)
-            new(
-                NT.Sheet,
-                {
-                    PROV.generatedAtTime: timestamp(),
-                },
-                sheet_graph.identifier,
-            )
 
             # Spawn new sheet editing actor for this sheet
             editor = await spawn(
@@ -164,15 +172,13 @@ class SheetCreatingActor(ServerActor[None]):
                 name=f"Sheet editor for {sheet_graph.identifier}",
             )
 
-            # Return success response with editor reference and sheet id
-            with with_transient_graph() as result:
-                add(
-                    result,
-                    {
-                        NT.isResponseTo: request_id,
-                        NT.status: NT.Success,
-                        NT.editor: editor,
-                        NT.sheet: sheet_graph.identifier,
-                    },
-                )
-                return context.graph.get()
+            new(
+                NT.Sheet,
+                {
+                    PROV.generatedAtTime: timestamp(),
+                    NT.affordance: editor,
+                },
+                sheet_graph.identifier,
+            )
+
+            return context.graph.get()
