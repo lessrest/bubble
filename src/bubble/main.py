@@ -45,6 +45,7 @@ from bubble.town import (
 from bubble.stat.stat import gather_system_info
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import ReplicateClientActor, make_image
+from bubble.type import SheetCreatingActor
 
 console = Console(width=80)
 

@@ -19,6 +19,7 @@ from bubble.mesh import (
     with_transient_graph,
     spawn,
     txgraph,
+    this,
 )
 from bubble.data import context, timestamp
 

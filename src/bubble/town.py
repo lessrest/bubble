@@ -70,7 +70,7 @@ from swash.rdfa import (
     get_subject_data,
     visited_resources,
 )
-from swash.util import P, S, add, new
+from swash.util import P, S, add, new, get_single_object
 from bubble.data import Repository, context, timestamp
 from bubble.mesh import (
     Vat,
