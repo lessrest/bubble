@@ -83,8 +83,49 @@ class SheetEditingActor(ServerActor[None]):
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet actor handling message", graph=graph)
-        # this should accept NT.AddNote messages, create a new note and spawn new text typing actors, ai!
-        return graph
+        request_id = graph.identifier
+
+        if not is_a(request_id, NT.AddNote, graph):
+            raise ValueError(f"Unexpected message type: {request_id}")
+
+        # Create a new note in the sheet graph
+        with context.bind_graph(self.graph_id) as sheet:
+            note = new(
+                NT.Note,
+                {
+                    NT.text: Literal("", lang="en"),
+                    NT.createdAt: timestamp(),
+                }
+            )
+            
+            # Add the note to the sheet
+            add(
+                self.graph_id,
+                {
+                    PROV.hadMember: note,
+                }
+            )
+            await persist(sheet)
+
+            # Spawn a text typing actor for the new note
+            typing_actor = await spawn(
+                nursery,
+                TextTypingActor(note, self.graph_id),
+                name=f"Text typing actor for {note}",
+            )
+
+            # Return success response with note and actor references
+            with with_transient_graph() as result:
+                add(
+                    result,
+                    {
+                        NT.isResponseTo: request_id,
+                        NT.status: NT.Success,
+                        NT.note: note,
+                        NT.editor: typing_actor,
+                    },
+                )
+                return context.graph.get()
 
 
 class SheetCreatingActor(ServerActor[None]):
