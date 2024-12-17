@@ -1,13 +1,13 @@
 @prefix did: <https://www.w3.org/ns/did#> .
 @prefix nt: <https://node.town/2024/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix time: <http://www.w3.org/2006/time#> .
 @prefix talk: <https://swa.sh/2024/vox#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # OWL terms
 owl:Class skos:prefLabel "class"@en .
@@ -54,6 +54,7 @@ nt:affordance skos:prefLabel "has affordance"@en .
 nt:Supervisor skos:prefLabel "actor supervisor"@en .
 nt:TownProcess skos:prefLabel "town server process"@en .
 nt:ActorIdentity skos:prefLabel "actor identity"@en .
+nt:Graph skos:prefLabel "graph"@en .
 
 
 # DID terms

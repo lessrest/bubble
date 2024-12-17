@@ -1,10 +1,16 @@
 from base64 import b64encode
+from html import escape
+from typing import Optional
+from urllib.parse import quote
 from swash.html import tag, text
 
 import json
 from contextlib import contextmanager
 
 from bubble.mesh import vat
+from swash.html import html
+from swash import vars
+from rdflib import URIRef
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
@@ -51,21 +57,18 @@ def base_html(title: str):
             tag("script", type="module", src="/static/jsonld-socket.js")
 
 
-def action_button(label: str, **attrs):
+def action_button(
+    label: Optional[str] = None, icon: Optional[str] = None, **attrs
+):
     """Create a styled action button with consistent Tailwind classes"""
     default_classes = [
         "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
-        "px-2 py-1",
-        "border border-gray-300 text-center",
-        "shadow-md shadow-slate-300 dark:shadow-slate-800/50",
-        "hover:border-gray-400 hover:bg-gray-50",
-        "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:border-indigo-500",
-        "active:bg-gray-100 active:border-gray-500",
+        "px-4 py-1",
+        "bg-cyan-900 rounded-sm border border-cyan-600",
+        "hover:bg-cyan-600 dark:hover:bg-cyan-700/80",
+        "text-white font-bold",
+        "dark:border-cyan-700/60 dark:bg-cyan-700/40",
         "transition-colors duration-150 ease-in-out",
-        "dark:border-slate-900 dark:bg-slate-900/50",
-        "dark:hover:bg-slate-900 dark:hover:border-slate-800",
-        "dark:focus:ring-indigo-600 dark:focus:border-indigo-600",
-        "dark:active:bg-slate-800 dark:text-slate-200",
     ]
 
     # Merge provided classes with default classes if any
@@ -78,8 +81,17 @@ def action_button(label: str, **attrs):
         attrs["classes"] = default_classes
 
     with tag("button", **attrs):
-        with tag("span", classes="font-medium"):
-            text(label)
+        if icon:
+            with tag("span"):
+                text(icon)
+        if label:
+            with tag("span", classes="font-medium"):
+                text(label)
+
+
+def urlquote(id: str):
+    """URL-encode a string."""
+    return quote(id, safe="")
 
 
 @contextmanager
@@ -91,13 +103,36 @@ def base_shell(title: str):
             with tag(
                 "div",
                 classes=[
-                    "bg-white dark:bg-gray-900",
+                    "bg-white dark:bg-cyan-900/30",
                     "text-gray-900 dark:text-white",
                     "px-4 py-2",
                     "flex items-center justify-between",
-                    "border-b border-gray-200 dark:border-gray-800",
+                    "border-b border-cyan-200 dark:border-cyan-800/40",
                 ],
             ):
+                id = vars.graph.get().identifier
+                # Left section with Create button
+                with tag("div", classes="flex items-center"):
+                    action_button(
+                        "New sheet",
+                        icon="📝",
+                        hx_post="/create",
+                        hx_target="#main",
+                        hx_swap="innerHTML",
+                        classes="mr-4",
+                    )
+                    with tag("div", classes="flex flex-row gap-1"):
+                        actions = {"🖋️": "type", "🎙️": "talk", "🎨": "tool"}
+                        for emoji, path in actions.items():
+                            action_button(
+                                label=path.capitalize(),
+                                icon=emoji,
+                                hx_post=f"/{path}?id={urlquote(id)}",
+                                hx_target="#main",
+                                hx_swap="beforeend",
+                            )
+
+                # Right section with Node ID and Site info
                 with tag("div", classes="flex items-center gap-6"):
                     # Node ID
                     with tag("div", classes="flex flex-col"):
@@ -140,5 +175,30 @@ def base_shell(title: str):
                             text(vat.get().get_base_url())
 
             # Main content area
-            with tag("div", classes="flex-1"):
+            with tag("main", id="main", classes="flex-1 p-4 flex"):
                 yield
+
+
+@html.div("flex flex-col gap-2 p-4")
+def render_note_textarea(note_id: URIRef):
+    """Render a textarea for editing notes with auto-save functionality."""
+    with tag(
+        "textarea",
+        name="text",
+        placeholder="Write your note here...",
+        classes=[
+            "w-full min-h-[200px] p-4",
+            "bg-white/50 dark:bg-slate-800/30",
+            "border border-gray-300/30 dark:border-slate-600/30",
+            "text-gray-900 dark:text-gray-100",
+            "placeholder-gray-500 dark:placeholder-gray-400",
+            "focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
+            "focus:border-blue-500 dark:focus:border-blue-400",
+            "prose prose-sm dark:prose-invert",
+            "font-serif",
+        ],
+        hx_post=f"{note_id}/message",
+        hx_trigger="keyup changed delay:500ms",
+        hx_swap="none",
+    ):
+        pass
