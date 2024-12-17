@@ -9,11 +9,11 @@ text editing functionality within the semantic graph structure.
 
 import structlog
 from typing import Optional
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal, PROV
 
 from swash.prfx import NT
-from swash.util import add, get_single_object, is_a
-from bubble.mesh import ServerActor, persist, with_transient_graph, spawn
+from swash.util import add, get_single_object, is_a, new
+from bubble.mesh import ServerActor, persist, with_transient_graph, spawn, txgraph
 from bubble.data import context, timestamp
 
 logger = structlog.get_logger()
