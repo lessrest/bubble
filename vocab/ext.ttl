@@ -90,3 +90,7 @@ talk:Transcript skos:prefLabel "transcript"@en .
 talk:WordTranscript skos:prefLabel "word transcript"@en .
 talk:hasBareWord skos:prefLabel "has bare word"@en .
 talk:TranscriptionProcess skos:prefLabel "transcription process"@en .
+talk:LiveTranscriptionProcess skos:prefLabel "live transcription process"@en .
+talk:AudioStream skos:prefLabel "audio stream"@en .
+talk:Deepgram a prov:Agent ;
+    skos:prefLabel "Deepgram, Inc."@en .
