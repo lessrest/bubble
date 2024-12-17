@@ -1,13 +1,12 @@
 from typing import (
-    AsyncGenerator,
     Dict,
-    Generator,
-    Optional,
     Self,
     Callable,
     ClassVar,
     Iterable,
+    Optional,
     Awaitable,
+    AsyncGenerator,
 )
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -20,7 +19,6 @@ from rdflib import PROV, Graph, URIRef, Literal
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
 from bubble.data import context, timestamp
-from bubble.deepgram.talk import DeepgramClientActor
 from bubble.mesh import (
     ServerActor,
     boss,
@@ -30,6 +28,7 @@ from bubble.mesh import (
     txgraph,
     with_transient_graph,
 )
+from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import AsyncReadable, make_image, make_video
 
 logger = structlog.get_logger()
@@ -121,7 +120,7 @@ async def store_generated_assets(
     graph_id: URIRef, readables: Iterable[AsyncReadable], mime_type: str
 ):
     """Store binary assets in the repository and link them to the graph."""
-    async with persist_graph_changes(graph_id) as graph:
+    async with persist_graph_changes(graph_id):
         distributions = []
         for readable in readables:
             data = await readable.aread()

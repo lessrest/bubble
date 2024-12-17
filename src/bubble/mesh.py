@@ -221,7 +221,7 @@ class Vat:
 
         async def task():
             with self.curr.bind(context):
-                ending = blank(NT.Success)
+                ending = NT.Success
                 try:
                     await code(*args)
                     self.yell.info(
@@ -239,7 +239,7 @@ class Vat:
                         parent=context.boss,
                     )
 
-                    ending = blank(NT.Failure)
+                    ending = NT.Failure
 
                     if parent_ctx and parent_ctx.trap:
                         self.yell.info(
@@ -256,7 +256,7 @@ class Vat:
                     self.yell.info(
                         "deleting actor", actor=(context.addr, name)
                     )
-
+                    ending = blank(ending)
                     now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
                     add(ending, {PROV.atTime: now})
                     add(actor_proc, {PROV.wasEndedBy: ending})

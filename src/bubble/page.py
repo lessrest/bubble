@@ -1,19 +1,16 @@
 from base64 import b64encode
-from html import escape
-from typing import Optional
 from urllib.parse import quote
 from swash.html import tag, text
 
 import json
 from contextlib import contextmanager
 
-from swash.prfx import NT, RDF
-from swash.rdfa import action_button, rdf_resource
+from swash.prfx import NT
+from swash.rdfa import rdf_resource
 
 from bubble.mesh import vat
-from swash.html import html
 from swash import vars
-from rdflib import URIRef
+from rdflib import PROV
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
@@ -82,7 +79,16 @@ def base_shell(title: str):
                 ],
             ):
                 with tag("div", classes="flex items-center"):
-                    pass
+                    # find the editor actor which is started by the town's identity
+                    editors = vars.dataset.get().objects(
+                        vat.get().get_identity_uri(), PROV.started
+                    )
+                    for editor in editors:
+                        affordances = vars.dataset.get().objects(
+                            editor, NT.affordance
+                        )
+                        for affordance in affordances:
+                            rdf_resource(affordance)
 
                 # Right section with Node ID and Site info
                 with tag("div", classes="flex items-center gap-6"):

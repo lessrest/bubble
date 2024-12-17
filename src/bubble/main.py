@@ -16,7 +16,7 @@ import rdflib.collection
 
 from rich import box
 from typer import Option
-from rdflib import XSD, DCAT, PROV, SKOS, BNode, URIRef, Literal, Namespace
+from rdflib import DCAT, PROV, SKOS, BNode, URIRef, Literal, Namespace
 from fastapi import FastAPI, WebSocket
 from rich.panel import Panel
 from rich.table import Table
@@ -38,14 +38,13 @@ from bubble.join import (
     anonymous_connection,
 )
 from bubble.logs import configure_logging
-from bubble.mesh import SimpleSupervisor, this, spawn
+from bubble.mesh import this, spawn
 from bubble.town import (
     Site,
 )
 from bubble.stat.stat import gather_system_info
-from bubble.deepgram.talk import DeepgramClientActor
-from bubble.replicate.make import ReplicateClientActor, make_image
-from bubble.type import SheetCreator, SheetEditor
+from bubble.replicate.make import make_image
+from bubble.type import SheetEditor
 
 console = Console(width=80)
 
@@ -225,18 +224,14 @@ def town(
                         },
                     )
 
-                    supervisor = await spawn(
+                    editor = await spawn(
                         nursery,
-                        SimpleSupervisor(
-                            {
-                                "sheet editor": SheetEditor(this()),
-                            }
-                        ),
-                        name="actor supervisor",
+                        SheetEditor(this()),
+                        name="sheet editor",
                     )
 
                     # Link supervisor to the town's identity
-                    town.vat.link_actor_to_identity(supervisor)
+                    town.vat.link_actor_to_identity(editor)
 
                     nursery.start_soon(
                         serve_fastapi_app, config, town.get_fastapi_app()

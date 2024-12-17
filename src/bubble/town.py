@@ -23,6 +23,7 @@ import trio
 import structlog
 
 from rdflib import (
+    DCTERMS,
     RDF,
     XSD,
     Graph,
@@ -61,6 +62,7 @@ from swash.rdfa import (
     autoexpanding,
     get_subject_data,
     visited_resources,
+    render_affordance_resource,
 )
 from swash.util import P, S, new
 from bubble.data import Repository, context
@@ -250,6 +252,8 @@ class Site:
         self.app.get("/")(self.root)
         self.app.get("/sheets")(self.sheets)
 
+        self.app.get("/timeline")(self.get_timeline)
+
         self.app.post("/{id}/message")(self.actor_message)
         self.app.post("/{id}")(self.actor_post)
         self.app.put("/{id}")(self.actor_put)
@@ -428,7 +432,25 @@ class Site:
     # Add uptime actor URI to the HTML template
     async def root(self):
         with base_shell("Bubble"):
-            render_graph_view(vars.graph.get())
+            with tag("div", classes="p-4"):
+                # Find resources with affordances
+                graph = vars.graph.get()
+                resources_with_affordances = set(
+                    graph.subjects(NT.affordance, None)
+                )
+
+                with autoexpanding(depth=2):
+                    if resources_with_affordances:
+                        with tag("div", classes="flex flex-col gap-4"):
+                            for subject in resources_with_affordances:
+                                data = get_subject_data(
+                                    vars.dataset.get(), subject
+                                )
+                                render_affordance_resource(subject, data)
+                    else:
+                        # Fall back to default graph view if no affordances found
+                        render_graph_view(graph)
+
         return HypermediaResponse()
 
     async def sheets(self):
@@ -438,6 +460,21 @@ class Site:
                     RDF.type, NT.Sheet
                 ):
                     render_graph_view(vars.dataset.get().graph(sheet))
+        return HypermediaResponse()
+
+    async def get_timeline(self):
+        with base_shell("Timeline"):
+            with tag("div", classes="p-4 flex flex-col gap-4"):
+                entries = vars.dataset.get().subjects(DCTERMS.created, None)
+                times = {}
+                for entry in entries:
+                    times[entry] = vars.dataset.get().value(
+                        entry, DCTERMS.created
+                    )
+                sorted_times = sorted(times.items(), key=lambda x: x[1])
+                for entry, time in sorted_times:
+                    with rdfa.frameless.bind(True):
+                        rdf_resource(entry)
         return HypermediaResponse()
 
     def get_websocket_base(self):

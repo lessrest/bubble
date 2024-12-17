@@ -213,6 +213,9 @@ def get_rdf_resource(subject: str) -> None:
     rdf_resource(subject)
 
 
+frameless = vars.Parameter("frameless", default=False)
+
+
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
         data = get_subject_data(vars.dataset.get(), subject)
@@ -282,7 +285,7 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
         attr("resource", str(subject))
     if data and data["type"]:
         attr("typeof", str(data["type"]))
-    with tag("details", open=True):
+    with tag("details", open=False):
         with tag("summary"):
             classes(
                 "pl-2",
@@ -295,9 +298,26 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
         render_properties(data)
 
 
-@html.div("flex", "flex-col", "items-start", "gap-2")
-def render_image_resource(subject: S, data: Dict) -> None:
+@html.div("flex flex-col gap-2")
+def render_affordance_resource(subject: S, data: Dict) -> None:
+    """Render a resource focusing on its affordances."""
     render_resource_header(subject, data)
+
+    # Get affordances from the graph
+    dataset = vars.dataset.get()
+    affordances = list(dataset.objects(subject, NT.affordance))
+
+    if affordances:
+        with tag("div", classes="flex flex-col gap-2 pl-4"):
+            for affordance in affordances:
+                render_subresource(affordance)
+    else:
+        # If no affordances, fall back to default rendering
+        render_properties(data)
+
+
+@html.div("flex", "flex-row", "items-start", "gap-2")
+def render_image_resource(subject: S, data: Dict) -> None:
     href = next(
         (
             obj
@@ -320,10 +340,12 @@ def render_image_resource(subject: S, data: Dict) -> None:
             render_image(subject, href)
     else:
         render_image(subject, subject)
-    render_properties(data)
+    with tag("div", classes="flex flex-col items-start gap-2"):
+        # render_resource_header(subject, data)
+        render_properties(data)
 
 
-@html.img("max-h-96 rounded-lg shadow-lg")
+@html.img("max-h-[600px]")
 def render_image(subject, href):
     attr("src", href)
     attr("alt", f"Image {subject}")
@@ -547,23 +569,30 @@ def render_properties(data):
     # Render each group
     with tag(
         "dl",
-        classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 py-2 mb-1 border",
+        classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1",
     ):
-        classes(
-            "border-gray-300 dark:border-slate-700/20",
-            "bg-blue-100/50 dark:bg-blue-700/10",
-        )
-        for predicate, objects in sorted_predicates:
-            # Check if all objects are literals
-            all_literals = all(isinstance(obj, Literal) for obj in objects)
+        if frameless.get() is False:
+            classes(
+                "border",
+                "border-gray-300 dark:border-slate-700/20",
+                "bg-blue-100/50 dark:bg-blue-700/10",
+            )
+        with frameless.bind(False):
+            for predicate, objects in sorted_predicates:
+                # Check if all objects are literals
+                all_literals = all(
+                    isinstance(obj, Literal) for obj in objects
+                )
 
-            if all_literals and len(objects) > 1:
-                # Render multiple literals together
-                render_property_with_multiple_literals(predicate, objects)
-            else:
-                # Render each object separately
-                for obj in objects:
-                    render_property(predicate, obj)
+                if all_literals and len(objects) > 1:
+                    # Render multiple literals together
+                    render_property_with_multiple_literals(
+                        predicate, objects
+                    )
+                else:
+                    # Render each object separately
+                    for obj in objects:
+                        render_property(predicate, obj)
 
 
 @html.div("flex flex-col")
@@ -705,7 +734,7 @@ def _render_uri(obj: URIRef) -> None:
 
             with tag(
                 "span",
-                classes="max-w-[18ch] truncate align-bottom inline",
+                classes="max-w-[18ch] truncate align-bottom inline-block text-ellipsis",
             ):
                 text(name)
             render_curie_prefix(prefix)
@@ -809,6 +838,7 @@ def _render_string_literal(obj: Literal) -> None:
 @html.span(
     "text-emerald-600 dark:text-emerald-500 font-mono",
     "inline-block text-ellipsis overflow-hidden",
+    "max-w-64",
     "before:content-['«'] after:content-['»']",
 )
 def render_other_string(obj):
