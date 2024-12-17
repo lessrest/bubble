@@ -95,14 +95,24 @@ class SheetEditingActor(ServerActor[None]):
             new(
                 NT.SheetEditor,
                 {
-                    NT.affordance: new(
-                        NT.Button,
-                        {
-                            NT.label: Literal("Type", "en"),
-                            NT.message: URIRef(NT.AddNote),
-                            NT.target: this(),
-                        },
-                    )
+                    NT.affordance: set(
+                        new(
+                            NT.Button,
+                            {
+                                NT.label: Literal("Type", "en"),
+                                NT.message: URIRef(NT.AddNote),
+                                NT.target: this(),
+                            },
+                        ),
+                        new(
+                            NT.Button,
+                            {
+                                NT.label: Literal("Make Image", "en"),
+                                NT.message: URIRef(NT.MakeImage),
+                                NT.target: this(),
+                            },
+                        ),
+                    ),
                 },
                 this(),
             )
@@ -111,6 +121,7 @@ class SheetEditingActor(ServerActor[None]):
         logger.info("Sheet actor handling message", graph=graph)
         request_id = graph.identifier
 
+        # TODO: Handle MakeImage message ai!
         if not is_a(request_id, NT.AddNote, graph):
             raise ValueError(f"Unexpected message type: {request_id}")
 
