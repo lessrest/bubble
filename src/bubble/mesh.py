@@ -17,7 +17,6 @@ import structlog
 import trio
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rdflib import (
-    OWL,
     PROV,
     RDF,
     RDFS,
@@ -171,22 +170,22 @@ class Vat:
             parent=parent,
         )
 
-        new(
-            OWL.Class,
-            {
-                RDFS.label: Literal("actor process", lang="en"),
-                RDFS.subClassOf: PROV.Activity,
-            },
-            subject=NT.ActorProcess,
-        )
-        new(
-            OWL.Class,
-            {
-                RDFS.label: Literal("actor", lang="en"),
-                RDFS.subClassOf: [PROV.Entity, PROV.SoftwareAgent],
-            },
-            subject=NT.Actor,
-        )
+        # new(
+        #     OWL.Class,
+        #     {
+        #         RDFS.label: Literal("actor process", lang="en"),
+        #         RDFS.subClassOf: PROV.Activity,
+        #     },
+        #     subject=NT.ActorProcess,
+        # )
+        # new(
+        #     OWL.Class,
+        #     {
+        #         RDFS.label: Literal("actor", lang="en"),
+        #         RDFS.subClassOf: [PROV.Entity, PROV.SoftwareAgent],
+        #     },
+        #     subject=NT.Actor,
+        # )
 
         now = Literal(datetime.now(UTC), datatype=XSD.dateTime)
 

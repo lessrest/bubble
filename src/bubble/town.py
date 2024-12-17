@@ -1,12 +1,9 @@
-import base64
 import io
 import json
-import os
 import uuid
 import pathlib
 
-from swash.mint import Mint
-from datetime import UTC, datetime
+from datetime import datetime
 
 from io import BytesIO
 from base64 import b64encode
@@ -56,17 +53,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from swash import mint, rdfa, vars
 from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
-from swash.prfx import NT, DID, Schema
+from swash.prfx import NT, DID
 from swash.rdfa import (
     rdf_resource,
     autoexpanding,
     get_subject_data,
     visited_resources,
 )
-from swash.util import P, S, add, new
+from swash.util import P, S, new
 from bubble.data import Repository, context
 from bubble.mesh import (
-    ActorContext,
     Vat,
     call,
     create_graph,
@@ -81,7 +77,6 @@ from bubble.icon import favicon
 from bubble.keys import (
     build_did_document,
     parse_public_key_hex,
-    verify_signed_data,
 )
 from bubble.page import base_html, base_shell
 from bubble.word import describe_word
@@ -961,14 +956,10 @@ def get_node_classes(graph: Graph, node: S) -> str:
     is_key = is_did_key(graph, node)
     is_current = is_current_identity(node)
 
-    classes = "border-l-4 pl-2 "
+    classes = "pl-2 "
     if is_key:
-        if is_current:
-            classes += "border-blue-500"
-        else:
-            classes += "border-gray-300 opacity-50 hidden"
-    else:
-        classes += "border-blue-500"
+        if not is_current:
+            classes += "opacity-50 hidden"
 
     return classes
 

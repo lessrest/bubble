@@ -194,7 +194,10 @@ def render_expander(obj, predicate):
         visited.add(obj)
     else:
         # Render as expandable button if we're at depth 0 or already visited
-        with tag("button", classes="text-gray-900 dark:text-white"):
+        with tag(
+            "button", classes="text-gray-900 dark:text-white px-2 mt-1"
+        ):
+            classes("dark:bg-blue-700/20 dark:border-blue-700/20")
             attr("hx-get", resource_path(obj))
             attr("hx-swap", "outerHTML")
             render_value(obj, predicate)
@@ -262,11 +265,11 @@ def render_upload_capability_resource(subject: S, data: Dict):
 
 
 @html.div(
-    "border border-l-4",
-    "bg-gray-100/50 dark:bg-gray-800/30",
-    "border-slate-300 dark:border-slate-700",
-    "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
-    "hover:border-slate-400 dark:hover:border-slate-600",
+    # "border border-l-4",
+    # "bg-gray-100/50 dark:bg-gray-800/30",
+    # "border-slate-300 dark:border-slate-700",
+    # "hover:bg-gray-200/50 dark:hover:bg-gray-800/50",
+    # "hover:border-slate-400 dark:hover:border-slate-600",
     "mt-1",
 )
 @html.div("flex", "flex-col", "gap-1")
@@ -277,8 +280,15 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
         attr("resource", str(subject))
     if data and data["type"]:
         attr("typeof", str(data["type"]))
-    with tag("details"):
+    with tag("details", open=True):
         with tag("summary"):
+            classes(
+                "pl-2",
+                "bg-blue-100/50 dark:bg-blue-700/20",
+                "border border-gray-300 dark:border-blue-700/20",
+                "w-fit",
+                "text-slate-800 dark:text-slate-300",
+            )
             render_resource_header(subject, data)
         render_properties(data)
 
@@ -367,48 +377,22 @@ def render_button_resource(subject, data):
     attr("hx-post", str(target) + "/message")
     attr("hx-swap", "afterend")
 
-    # Check if this is a prompt
-    if any(t == NT.Prompt for t in data.get("type", [])):
-        placeholder = next(
-            (
-                obj
-                for pred, obj in data["predicates"]
-                if pred == NT.placeholder
-            ),
-            "Enter text...",
-        )
-        with tag("div", classes="flex flex-col gap-2"):
-            with tag(
-                "input",
-                type="text",
-                name="prompt",
-                classes="border p-2 rounded dark:bg-gray-800/50 dark:text-white",
-            ):
-                attr("placeholder", str(placeholder))
-            with tag(
-                "input", type="hidden", name="type", value=str(message_uri)
-            ):
-                pass
-            with tag(
-                "button",
-                classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 py-2",
-            ):
-                text(label)
-    else:
-        # Regular button rendering
-        with tag(
-            "input", type="hidden", name="type", value=str(message_uri)
-        ):
-            pass
-        with tag(
-            "button",
-            classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1",
-        ):
-            text(label)
+    # Regular button rendering
+    with tag("input", type="hidden", name="type", value=str(message_uri)):
+        pass
+    with tag(
+        "button",
+        classes="bg-cyan-900 border border-cyan-600 hover:bg-cyan-600 text-white font-bold px-4 mt-1 ml-1",
+    ):
+        classes("dark:border-cyan-700/40 dark:bg-cyan-700/40 rounded-sm")
+        text(label)
 
 
-@html.form(classes="flex flex-col gap-2")
+@html.form(
+    classes="flex flex-col gap-2 p-2 border border-gray-300 dark:border-slate-700/40"
+)
 def render_prompt_resource(subject, data):
+    classes("bg-cyan-100/50 dark:bg-cyan-700/10")
     label = next(
         (obj for pred, obj in data["predicates"] if pred == NT.label), None
     )
@@ -435,22 +419,25 @@ def render_prompt_resource(subject, data):
     attr("hx-post", str(target) + "/message")
     attr("hx-swap", "afterend")
 
-    with tag("div", classes="htmx-indicator"):
-        text("💭")
-
     with tag(
         "input",
         type="text",
         name="https://node.town/2024/prompt",
-        classes="border p-2 dark:bg-slate-800 dark:text-white",
+        classes="border rounded-sm px-2 py-0 dark:bg-cyan-800/40 dark:text-white dark:border-cyan-600/40",
     ):
         attr("placeholder", str(placeholder))
     with tag("input", type="hidden", name="type", value=str(message_uri)):
         pass
     with tag(
         "button",
-        classes="bg-blue-900 border border-blue-600 hover:bg-blue-600 text-white font-bold px-4 mt-1 ml-1",
+        classes="bg-cyan-900 rounded-sm border border-cyan-600 hover:bg-cyan-600 text-white font-bold px-4 mt-1",
     ):
+        classes(
+            "inline-flex flex-row gap-2",
+            "dark:border-cyan-700/40 dark:bg-cyan-700/40",
+        )
+        with tag("span", classes="htmx-indicator"):
+            text("💭")
         text(label)
 
 
@@ -467,11 +454,37 @@ def render_properties(data):
             grouped_predicates[predicate] = []
         grouped_predicates[predicate].append(obj)
 
+    # Sort predicates by type of objects
+    def sort_key(predicate_objects):
+        predicate, objects = predicate_objects
+        all_literals = all(isinstance(obj, Literal) for obj in objects)
+        all_bnodes = all(isinstance(obj, BNode) for obj in objects)
+        all_urirefs = all(isinstance(obj, URIRef) for obj in objects)
+
+        return (
+            # Single literal first
+            not (all_literals and len(objects) == 1),
+            # Multiple literals second
+            not (all_literals and len(objects) > 1),
+            # BNodes third
+            not all_bnodes,
+            # URIRefs last
+            not all_urirefs,
+            str(predicate),  # Break ties alphabetically
+        )
+
+    sorted_predicates = sorted(grouped_predicates.items(), key=sort_key)
+
     # Render each group
     with tag(
-        "dl", classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1"
+        "dl",
+        classes="flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 py-2 mb-1 border",
     ):
-        for predicate, objects in grouped_predicates.items():
+        classes(
+            "border-gray-300 dark:border-slate-700/20",
+            "bg-blue-100/50 dark:bg-blue-700/10",
+        )
+        for predicate, objects in sorted_predicates:
             # Check if all objects are literals
             all_literals = all(isinstance(obj, Literal) for obj in objects)
 
@@ -534,8 +547,7 @@ def render_property_label(predicate):
 
 
 @html.div(
-    "inline-flex flex-row gap-4 px-2 justify-between bg-blue-100/50 dark:bg-blue-700/10",
-    "border border-gray-300 dark:border-slate-900",
+    "inline-flex flex-row gap-4 px-4 justify-between",
 )
 def render_resource_header(subject, data):
     render_value(subject)
@@ -628,6 +640,12 @@ def _render_uri(obj: URIRef) -> None:
             ):
                 text(name)
             render_curie_prefix(prefix)
+        elif str(obj).startswith("did:key:"):
+            key = str(obj).removeprefix("did:key:")
+            prefix = key[:4]
+            suffix = key[-4:]
+            with tag("span", classes="font-mono"):
+                text(f"🔑 {prefix}...{suffix}")
         else:
             with tag(
                 "span",

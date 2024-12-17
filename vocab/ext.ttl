@@ -7,6 +7,14 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix time: <http://www.w3.org/2006/time#> .
 @prefix talk: <https://swa.sh/2024/vox#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+# OWL terms
+owl:Class skos:prefLabel "class"@en .
+owl:ObjectProperty skos:prefLabel "object property"@en .
+owl:DatatypeProperty skos:prefLabel "datatype property"@en .
+owl:AnnotationProperty skos:prefLabel "annotation property"@en .
+owl:Ontology skos:prefLabel "ontology"@en .
 
 # RDFS terms
 rdfs:label skos:prefLabel "has label"@en .
@@ -27,6 +35,8 @@ prov:endedAtTime skos:prefLabel "was ended at time"@en .
 prov:invalidatedAtTime skos:prefLabel "was invalidated at time"@en .
 prov:started skos:prefLabel "started"@en .
 prov:wasRevisionOf skos:prefLabel "was revision of"@en .
+prov:SoftwareAgent skos:prefLabel "software agent"@en .
+prov:Entity skos:prefLabel "provenance entity"@en .
 
 # Node.Town terms
 nt:hasFilePath skos:prefLabel "has file path"@en .
@@ -47,7 +57,8 @@ nt:ActorIdentity skos:prefLabel "actor identity"@en .
 
 
 # DID terms
-did:Ed25519VerificationKey2020 skos:prefLabel "cryptographic identity using Ed25519"@en .
+did:Ed25519VerificationKey2020 skos:prefLabel "Ed25519 key"@en .
+did:publicKeyBase64 skos:prefLabel "public key (base 64)"@en .
 
 # SKOS terms
 skos:prefLabel skos:prefLabel "has preferred label"@en .

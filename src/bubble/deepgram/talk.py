@@ -275,7 +275,7 @@ def create_affordance_button(deepgram_client: URIRef):
             NT.affordance: blank(
                 NT.Button,
                 {
-                    NT.label: Literal("Start", "en"),
+                    NT.label: Literal("New Live Transcription", "en"),
                     NT.message: URIRef(Deepgram.Start),
                     NT.target: deepgram_client,
                 },
