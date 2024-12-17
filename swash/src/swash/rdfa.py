@@ -306,8 +306,18 @@ def render_image_resource(subject: S, data: Dict) -> None:
         ),
         None,
     )
+
+    # Check for mediaType predicate
+    media_type = next(
+        (obj for pred, obj in data["predicates"] if pred == DCAT.mediaType),
+        None,
+    )
+
     if href:
-        render_image(subject, href)
+        if media_type and media_type.startswith("video/"):
+            render_video_element(href)
+        else:
+            render_image(subject, href)
     else:
         render_image(subject, subject)
     render_properties(data)

@@ -22,6 +22,7 @@ from bubble.mesh import (
     this,
 )
 from bubble.data import context, timestamp
+from bubble.replicate.make import make_image, make_video
 
 logger = structlog.get_logger()
 
@@ -84,6 +85,110 @@ class TextTypingActor(ServerActor[None]):
             raise ValueError(f"Unexpected message type: {request_id}")
 
 
+class ImageGenerationActor(ServerActor[None]):
+    def __init__(self, graph_id: URIRef):
+        super().__init__(None)
+        self.graph_id = graph_id
+
+    async def init(self):
+        with context.bind_graph(self.graph_id) as sheet:
+            new(
+                NT.Prompt,
+                {
+                    NT.label: Literal("Image Prompt", "en"),
+                    NT.placeholder: Literal(
+                        "Enter an image prompt...", "en"
+                    ),
+                    NT.message: URIRef(NT.GenerateImage),
+                    NT.target: this(),
+                },
+                this(),
+            )
+
+            await persist(sheet)
+
+    async def handle(self, nursery, graph: Graph) -> Graph:
+        logger.info("Image generation actor handling message", graph=graph)
+        request_id = graph.identifier
+
+        if is_a(request_id, NT.GenerateImage, graph):
+            prompt = get_single_object(request_id, NT.prompt, graph)
+            with context.bind_graph(self.graph_id) as sheet:
+                readables = await make_image(prompt)
+
+                # Store the generated images and add them to the response
+                for readable in readables:
+                    img = await readable.aread()
+                    distribution = await context.repo.get().save_blob(
+                        img, "image/webp"
+                    )
+                    add(
+                        distribution,
+                        {
+                            PROV.wasGeneratedBy: this(),
+                            PROV.generatedAtTime: timestamp(),
+                        },
+                    )
+                    add(self.graph_id, {PROV.hadMember: distribution})
+
+                await persist(sheet)
+                return context.graph.get()
+        else:
+            raise ValueError(f"Unexpected message type: {request_id}")
+
+
+class VideoGenerationActor(ServerActor[None]):
+    def __init__(self, graph_id: URIRef):
+        super().__init__(None)
+        self.graph_id = graph_id
+
+    async def init(self):
+        with context.bind_graph(self.graph_id) as sheet:
+            new(
+                NT.Prompt,
+                {
+                    NT.label: Literal("Video Prompt", "en"),
+                    NT.placeholder: Literal(
+                        "Enter a video prompt...", "en"
+                    ),
+                    NT.message: URIRef(NT.GenerateVideo),
+                    NT.target: this(),
+                },
+                this(),
+            )
+
+            await persist(sheet)
+
+    async def handle(self, nursery, graph: Graph) -> Graph:
+        logger.info("Video generation actor handling message", graph=graph)
+        request_id = graph.identifier
+
+        if is_a(request_id, NT.GenerateVideo, graph):
+            prompt = get_single_object(request_id, NT.prompt, graph)
+            with context.bind_graph(self.graph_id) as sheet:
+                readables = await make_video(prompt)
+
+                # Store the generated videos and add them to the response
+                for readable in readables:
+                    video = await readable.aread()
+                    distribution = await context.repo.get().save_blob(
+                        video, "video/mp4"
+                    )
+                    add(
+                        distribution,
+                        {
+                            PROV.wasGeneratedBy: this(),
+                            PROV.generatedAtTime: timestamp(),
+                        },
+                    )
+                    add(self.graph_id, {PROV.hadMember: distribution})
+
+                await persist(sheet)
+                return context.graph.get()
+        else:
+            raise ValueError(f"Unexpected message type: {request_id}")
+
+
 class SheetEditingActor(ServerActor[None]):
     def __init__(self, graph_id: URIRef):
         super().__init__(None)
@@ -96,22 +201,32 @@ class SheetEditingActor(ServerActor[None]):
                 NT.SheetEditor,
                 {
                     NT.affordance: set(
-                        new(
-                            NT.Button,
-                            {
-                                NT.label: Literal("Type", "en"),
-                                NT.message: URIRef(NT.AddNote),
-                                NT.target: this(),
-                            },
-                        ),
-                        new(
-                            NT.Button,
-                            {
-                                NT.label: Literal("Make Image", "en"),
-                                NT.message: URIRef(NT.MakeImage),
-                                NT.target: this(),
-                            },
-                        ),
+                        [
+                            new(
+                                NT.Button,
+                                {
+                                    NT.label: Literal("Type", "en"),
+                                    NT.message: URIRef(NT.AddNote),
+                                    NT.target: this(),
+                                },
+                            ),
+                            new(
+                                NT.Button,
+                                {
+                                    NT.label: Literal("Make Image", "en"),
+                                    NT.message: URIRef(NT.MakeImage),
+                                    NT.target: this(),
+                                },
+                            ),
+                            new(
+                                NT.Button,
+                                {
+                                    NT.label: Literal("Make Video", "en"),
+                                    NT.message: URIRef(NT.MakeVideo),
+                                    NT.target: this(),
+                                },
+                            ),
+                        ]
                     ),
                 },
                 this(),
@@ -139,47 +254,37 @@ class SheetEditingActor(ServerActor[None]):
                 return context.graph.get()
 
         elif is_a(request_id, NT.MakeImage, graph):
-            # Find the Replicate client through the supervisor
-            replicate_client = None
-            dataset = context.repo.get().dataset
-            identity = vat.get().get_identity_uri()
-
-            # Find supervised actors through NT.environs
-            for supervisor in dataset.objects(identity, PROV.started):
-                for actor in dataset.objects(supervisor, NT.supervises):
-                    if (actor, RDF.type, Replicate.Client) in dataset:
-                        replicate_client = actor
-                        break
-                if replicate_client:
-                    break
-
-            if not replicate_client:
-                raise ValueError("Replicate client actor not found")
-
-            # Forward the message to the Replicate client
-            result = await call(replicate_client, graph)
-            
-            # Add the generated images to the sheet
             with context.bind_graph(self.graph_id) as sheet:
-                for distribution in result.objects(result.identifier, PROV.generated):
-                    add(self.graph_id, {PROV.hadMember: distribution})
+                add(
+                    self.graph_id,
+                    {
+                        NT.affordance: await spawn(
+                            nursery,
+                            ImageGenerationActor(self.graph_id),
+                            name="image generator",
+                        ),
+                    },
+                )
                 await persist(sheet)
                 return context.graph.get()
+
+        elif is_a(request_id, NT.MakeVideo, graph):
+            with context.bind_graph(self.graph_id) as sheet:
+                add(
+                    self.graph_id,
+                    {
+                        NT.affordance: await spawn(
+                            nursery,
+                            VideoGenerationActor(self.graph_id),
+                            name="video generator",
+                        ),
+                    },
+                )
+                await persist(sheet)
+                return context.graph.get()
+
         else:
             raise ValueError(f"Unexpected message type: {request_id}")
-            add(
-                self.graph_id,
-                {
-                    NT.affordance: await spawn(
-                        nursery,
-                        TextTypingActor(self.graph_id),
-                        name="note editor",
-                    ),
-                },
-            )
-
-            await persist(sheet)
-            return context.graph.get()
 
 
 class SheetCreatingActor(ServerActor[None]):

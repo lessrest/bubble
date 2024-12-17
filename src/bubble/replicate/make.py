@@ -39,12 +39,27 @@ async def make_image(prompt: str) -> list[AsyncReadable]:
             "prompt": prompt,
             "size": "2048x1024",
             #    "style": "realistic_image",
-            "num_outputs": 1,
+            "num_outputs": 2,
             "disable_safety_checker": True,
         },
     )
     result = await trio_asyncio.aio_as_trio(f)()
     logger.info("replicate.make.image", result=result)
+
+    if isinstance(result, list):
+        return result
+    else:
+        return [result]
+
+
+async def make_video(prompt: str) -> list[AsyncReadable]:
+    f = functools.partial(
+        replicate.async_run,
+        "minimax/video-01",
+        input={"prompt": prompt, "prompt_optimizer": True},
+    )
+    result = await trio_asyncio.aio_as_trio(f)()
+    logger.info("replicate.make.video", result=result)
 
     if isinstance(result, list):
         return result
