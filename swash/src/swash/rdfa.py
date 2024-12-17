@@ -441,6 +441,9 @@ def render_prompt_resource(subject, data):
         text(label)
 
 
+# implement a text editor affordance renderer ai!
+
+
 # @html.dl("flex flex-row flex-wrap gap-x-6 gap-y-2 px-4 mb-1")
 def render_properties(data):
     if not data["predicates"]:
