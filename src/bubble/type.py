@@ -13,7 +13,7 @@ from rdflib import Graph, URIRef, Literal
 
 from swash.prfx import NT
 from swash.util import add, get_single_object, is_a
-from bubble.mesh import ServerActor, persist, with_transient_graph
+from bubble.mesh import ServerActor, persist, with_transient_graph, spawn
 from bubble.data import context, timestamp
 
 logger = structlog.get_logger()
