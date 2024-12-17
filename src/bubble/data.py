@@ -40,7 +40,7 @@ from rdflib.namespace import PROV, DCAT, DCTERMS
 
 from swash import vars
 from swash.mint import fresh_uri
-from swash.util import O, P, add, get_single_object, new
+from swash.util import O, P, S, add, get_single_object, new
 from rich.console import Console
 
 FROTH = Namespace("https://node.town/ns/froth#")
@@ -99,6 +99,10 @@ class context:
 context.clock.set(
     lambda: Literal(arrow.now().datetime, datatype=XSD.dateTime)
 )
+
+
+def timestamp() -> O:
+    return context.clock.get()()
 
 
 class Git:
@@ -249,9 +253,9 @@ class Repository:
         self.metadata = self.dataset.graph(metadata_id)
 
         self.metadata.bind("home", namespace)
-        
+
         # Register builtin graphs
-        vocab_ext = URIRef("urn:x-bubble:vocab:ext") 
+        vocab_ext = URIRef("urn:x-bubble:vocab:ext")
         self.register_builtin_graph(vocab_ext, "vocab/ext.ttl")
         # Base path for graphs
         self.graphs_path = Path(self.git.workdir) / "graphs"
@@ -444,12 +448,16 @@ class Repository:
     async def save_graph(self, identifier: IdentifiedNode) -> None:
         """Save a graph to its graph.trig file"""
         assert isinstance(identifier, URIRef)
-        
+
         # Check if this is a builtin graph
-        is_builtin = (identifier, FROTH.isBuiltin, Literal(True)) in self.metadata
+        is_builtin = (
+            identifier,
+            FROTH.isBuiltin,
+            Literal(True),
+        ) in self.metadata
         if is_builtin:
             raise ValueError(f"Cannot save builtin graph {identifier}")
-            
+
         graph = self.graph(identifier)
         content = graph.serialize(format="trig")
         logger.debug("Saving graph", identifier=identifier, graph=graph)
@@ -484,10 +492,11 @@ class Repository:
 
         # Save all graphs with their full metadata
         if self.dirty_graphs:
-            logger.debug("Saving graphs", count=len(self.dirty_graphs))
-            for graph in self.dirty_graphs:
-                await self.save_graph(graph.identifier)
+            dirty_graphs = self.dirty_graphs.copy()
             self.dirty_graphs.clear()
+            logger.debug("Saving graphs", count=len(dirty_graphs))
+            for graph in dirty_graphs:
+                await self.save_graph(graph.identifier)
 
     async def load_all(self) -> None:
         """Load all graphs"""
@@ -521,40 +530,49 @@ class Repository:
         with context.bind_graph(identifier, self) as graph:
             yield graph
 
-    def register_builtin_graph(self, identifier: URIRef, path: str) -> Graph:
+    def register_builtin_graph(
+        self, identifier: URIRef, path: str
+    ) -> Graph:
         """Register a builtin graph that lives in the project source.
-        
+
         Args:
-            identifier: The graph identifier 
+            identifier: The graph identifier
             path: Path relative to project root
-            
+
         Returns:
             The registered graph
         """
-        logger.debug("Registering builtin graph", identifier=identifier, path=path)
+        logger.debug(
+            "Registering builtin graph", identifier=identifier, path=path
+        )
         self.metadata.add((identifier, RDF.type, VOID.Dataset))
         self.metadata.add((identifier, FROTH.isBuiltin, Literal(True)))
         self.metadata.add((identifier, NT.hasFilePath, Literal(path)))
-        
+
         graph = self.dataset.graph(identifier, base=self.namespace)
         graph.parse(path, format="turtle")
         return graph
 
     def reload_builtin_graphs(self) -> None:
         """Reload all registered builtin graphs from their source files."""
-        for s, p, o in self.metadata.triples((None, FROTH.isBuiltin, Literal(True))):
+        for s, p, o in self.metadata.triples(
+            (None, FROTH.isBuiltin, Literal(True))
+        ):
             identifier = URIRef(str(s))
             path = str(get_single_object(identifier, NT.hasFilePath))
-            logger.debug("Reloading builtin graph", identifier=identifier, path=path)
-            
+            logger.debug(
+                "Reloading builtin graph", identifier=identifier, path=path
+            )
+
             # Clear existing graph
             graph = self.dataset.graph(identifier)
             graph.remove((None, None, None))
-            
+
             # Reload from file
             graph.parse(path, format="turtle")
 
-    def graph(self, identifier: URIRef) -> Graph:
+    def graph(self, identifier: S) -> Graph:
+        assert isinstance(identifier, URIRef)
         if (
             identifier not in self.list_graphs()
             and identifier is not self.metadata_id

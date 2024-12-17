@@ -277,8 +277,10 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
         attr("resource", str(subject))
     if data and data["type"]:
         attr("typeof", str(data["type"]))
-    render_resource_header(subject, data)
-    render_properties(data)
+    with tag("details"):
+        with tag("summary"):
+            render_resource_header(subject, data)
+        render_properties(data)
 
 
 @html.div("flex", "flex-col", "items-start", "gap-2")
@@ -532,7 +534,7 @@ def render_property_label(predicate):
 
 
 @html.div(
-    "flex flex-row gap-2 px-2 justify-between bg-blue-100/50 dark:bg-blue-700/10",
+    "inline-flex flex-row gap-4 px-2 justify-between bg-blue-100/50 dark:bg-blue-700/10",
     "border border-gray-300 dark:border-slate-900",
 )
 def render_resource_header(subject, data):
@@ -643,14 +645,13 @@ def render_curie_prefix(prefix):
 
 
 @html.a(
-    "text-cyan-700 dark:text-cyan-600 font-mono border-b",
-    "border-cyan-300 dark:border-cyan-900",
+    "text-cyan-700 dark:text-cyan-600 font-mono",
     hx_swap="outerHTML",
 )
 def _render_bnode(obj: BNode) -> None:
     attr("href", resource_path(obj))
     attr("hx-get", resource_path(obj))
-    text(str(obj))
+    text("♢")
 
 
 def _render_literal(obj: Literal) -> None:

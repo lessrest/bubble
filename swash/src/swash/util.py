@@ -138,21 +138,8 @@ def turtle(src: str) -> Graph:
         return graph
 
 
-@overload
-def add(subject: S, properties: dict[P, Any]) -> None: ...
-@overload
-def add(subject: None, properties: dict[P, Any]) -> None: ...
-
-
-def add(
-    subject: S | BNode | None = None, properties: dict[P, Any] = {}
-) -> None:
-    graph = vars.graph.get()
-    if subject is None:
-        subject = vars.current_subject.get()
-    assert subject is not None
-    for predicate, object in properties.items():
-        graph.add((subject, predicate, object))
+def add(subject: S, properties: dict[P, Any] = {}) -> None:
+    build_resource(subject, None, properties=properties)
 
 
 @overload
@@ -254,7 +241,8 @@ def build_resource[Subject: S](
 
     if properties is not None:
         for predicate, object in properties.items():
-            if isinstance(object, list):
+            if isinstance(object, list) or isinstance(object, set):
+                # TODO: list should mean rdf list
                 for item in object:
                     o = item if isinstance(item, O) else Literal(item)
                     graph.add((subject, predicate, o))

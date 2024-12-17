@@ -5,6 +5,8 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix time: <http://www.w3.org/2006/time#> .
+@prefix talk: <https://swa.sh/2024/vox#> .
 
 # RDFS terms
 rdfs:label skos:prefLabel "has label"@en .
@@ -24,6 +26,7 @@ prov:startedAtTime skos:prefLabel "was started at time"@en .
 prov:endedAtTime skos:prefLabel "was ended at time"@en .
 prov:invalidatedAtTime skos:prefLabel "was invalidated at time"@en .
 prov:started skos:prefLabel "started"@en .
+prov:wasRevisionOf skos:prefLabel "was revision of"@en .
 
 # Node.Town terms
 nt:hasFilePath skos:prefLabel "has file path"@en .
@@ -42,8 +45,34 @@ nt:Supervisor skos:prefLabel "actor supervisor"@en .
 nt:TownProcess skos:prefLabel "town server process"@en .
 nt:ActorIdentity skos:prefLabel "actor identity"@en .
 
+
 # DID terms
 did:Ed25519VerificationKey2020 skos:prefLabel "cryptographic identity using Ed25519"@en .
 
 # SKOS terms
 skos:prefLabel skos:prefLabel "has preferred label"@en .
+
+# Time terms
+time:hasTime skos:prefLabel "has time"@en .
+time:hasTRS skos:prefLabel "has temporal reference system"@en .
+time:hasBeginning skos:prefLabel "has beginning"@en .
+time:hasEnding skos:prefLabel "has ending"@en .
+time:hasDuration skos:prefLabel "has duration"@en .
+time:TimePosition skos:prefLabel "time position"@en .
+time:Instant skos:prefLabel "time instant"@en .
+time:Interval skos:prefLabel "time interval"@en .
+time:Duration skos:prefLabel "duration"@en .
+time:inTimePosition skos:prefLabel "has time position"@en .
+time:numericPosition skos:prefLabel "has numeric time position"@en .
+time:unitType skos:prefLabel "has unit type"@en .
+time:secondUnit skos:prefLabel "seconds (unit)"@en .
+
+# Talk terms
+talk:hasText skos:prefLabel "has text"@en .
+talk:hasConfidence skos:prefLabel "has confidence rating"@en .
+talk:hasSubdivision skos:prefLabel "has subdivision"@en .
+talk:DraftTranscript skos:prefLabel "draft transcript"@en .
+talk:Transcript skos:prefLabel "transcript"@en .
+talk:WordTranscript skos:prefLabel "word transcript"@en .
+talk:hasBareWord skos:prefLabel "has bare word"@en .
+talk:TranscriptionProcess skos:prefLabel "transcription process"@en .

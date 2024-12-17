@@ -50,17 +50,18 @@ from swash.util import (
     make_list,
     get_single_object,
 )
-from swash.vars import in_graph
+import swash.vars as vars
+from bubble.data import timestamp
 from bubble.mesh import (
     ServerActor,
-    get_base,
+    persist,
     receive,
     send,
     spawn,
     this,
     with_transient_graph,
 )
-from bubble.time import make_instant, make_duration, make_interval
+from bubble.time import make_interval
 from bubble.mesh import (
     txgraph,
 )
@@ -101,24 +102,19 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
             return None
         return speakers[i]
 
-    process = new(
-        TALK.TranscriptionProcess,
-        {
-            PROV.startedAtTime: datetime.now(UTC),
-            PROV.wasAssociatedWith: TALK.Deepgram,
-        },
-    )
-
     def represent_transcript(message: Graph, payload: DeepgramMessage):
         def word_segment(word: Word):
             return new(
-                TALK.Transcript,
+                TALK.WordTranscript,
                 {
-                    TALK.hasTextWithoutPunctuation: word.word,
+                    TALK.hasBareWord: word.word,
                     TALK.hasText: word.punctuated_word,
                     TALK.hasConfidence: decimal(word.confidence),
-                    TIME.hasBeginning: make_instant(stream, word.start),
-                    TIME.hasDuration: make_duration(word.end - word.start),
+                    TIME.numericPosition: decimal(word.start),
+                    #                    TIME.hasBeginning: make_instant(stream, word.start),
+                    #                   TIME.hasDuration: make_duration(word.end - word.start),
+                    TIME.numericDuration: decimal(word.end - word.start),
+                    TIME.hasTRS: stream,
                     PROV.wasAttributedTo: speaker(word.speaker),
                 },
             )
@@ -128,13 +124,13 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
         return new(
             TALK.Transcript if payload.is_final else TALK.DraftTranscript,
             {
-                PROV.generatedAtTime: datetime.now(UTC),
+                PROV.generatedAtTime: timestamp(),
                 PROV.wasDerivedFrom: message.identifier,
                 PROV.wasGeneratedBy: process,
                 TALK.hasTime: make_interval(
                     stream, payload.start, payload.duration
                 ),
-                TALK.hasPunctuatedText: alternative.transcript,
+                TALK.hasText: alternative.transcript,
                 TALK.hasConfidence: decimal(alternative.confidence),
                 TALK.hasSubdivision: make_list(
                     list(word_segment(word) for word in alternative.words),
@@ -145,9 +141,9 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
 
     interim = None
 
-    while True:
-        message, payload = await receive_event()
-        async with txgraph() as g:
+    async with txgraph() as g:
+        while True:
+            message, payload = await receive_event()
             transcript = represent_transcript(message, payload)
             if interim is not None:
                 add(transcript, {PROV.wasRevisionOf: interim})
@@ -158,14 +154,7 @@ async def deepgram_transcription_receiver(process: URIRef, stream: URIRef):
             else:
                 interim = transcript
 
-        with in_graph(message):
-            add(
-                message.identifier,
-                {
-                    PROV.wasUsedBy: process,
-                    NT.resultedIn: g,
-                },
-            )
+            await persist(g)
 
 
 async def receive_event():
@@ -178,13 +167,13 @@ async def receive_event():
 
 def chunk_data(graph: Graph) -> bytes:
     """Extract audio chunk data from a message graph."""
-    chunk = get_single_object(graph.identifier, NT.bytes)
+    chunk = get_single_object(graph.identifier, NT.bytes, graph)
     data = chunk.toPython()
     assert isinstance(data, bytes)
     return data
 
 
-async def deepgram_session(results: URIRef):
+async def deepgram_session_actor(results: URIRef):
     from bubble.town import in_request_graph  # Import where needed
 
     # Wait for first chunk before starting session
@@ -235,9 +224,9 @@ async def deepgram_session(results: URIRef):
                 await client.send_message(first_chunk)
                 while True:
                     msg = await receive()
-                    with in_request_graph(msg) as request_graph:
-                        chunk = chunk_data(request_graph)
-                        await client.send_message(chunk)
+                    logger.info("dg received message", msg=msg)
+                    chunk = chunk_data(msg)
+                    await client.send_message(chunk)
 
 
 class DeepgramClientActor(ServerActor[str]):
@@ -246,46 +235,37 @@ class DeepgramClientActor(ServerActor[str]):
 
     async def init(self):
         await super().init()
-        async with txgraph():
-            create_affordance_button(this())
+        create_affordance_button(this())
 
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         logger.info("Deepgram client actor handling message", graph=graph)
         request_id = graph.identifier
-        async with txgraph(graph) as result:
-            result.add((result.identifier, NT.isResponseTo, request_id))
-            if is_a(request_id, Deepgram.Start):
-                root = get_base()
-
-                logger.info("Starting new Deepgram session")
+        with with_transient_graph() as result:
+            add(result, {NT.isResponseTo: request_id})
+            if is_a(request_id, Deepgram.Start, graph):
                 results = await spawn(nursery, deepgram_results_actor)
+                session = await spawn(
+                    nursery, deepgram_session_actor, results
+                )
 
-                logger.info("Spawned results actor", results=results)
-                session = await spawn(nursery, deepgram_session, results)
+                assert isinstance(result, URIRef)
 
-                logger.info("Spawned session actor", session=session)
-                assert isinstance(result.identifier, URIRef)
-
+                ws_url = (
+                    str(session).replace("https://", "wss://") + "/upload"
+                )
                 endpoint = blank(
                     NT.UploadEndpoint,
                     {
                         NT.method: NT.WebSocket,
                         NT.accepts: NT.AudioData,
+                        NT.url: Literal(ws_url, datatype=XSD.anyURI),
                     },
                 )
-                add(root, {NT.has: session})
-                add(root, {NT.has: results})
-                add(root, {NT.has: endpoint})
-                ws_url = (
-                    str(session).replace("https://", "wss://") + "/upload"
-                )
-                logger.info("WebSocket URL", url=ws_url)
-                add(
-                    endpoint, {NT.url: Literal(ws_url, datatype=XSD.anyURI)}
-                )
+
+                add(result, {NT.has: set([session, results, endpoint])})
 
             logger.info("Returning result", result=result)
-            return result
+            return vars.graph.get()
 
 
 def create_affordance_button(deepgram_client: URIRef):
@@ -321,6 +301,7 @@ async def receive_results(
         )
 
         while True:
+            logger.info("Waiting for message")
             result = await client.get_message()
             message = DeepgramMessage.model_validate_json(result)
 
@@ -339,3 +320,5 @@ async def receive_results(
                         },
                     )
                     await send(transcription_receiver)
+            else:
+                logger.info("No transcript in message", message=message)

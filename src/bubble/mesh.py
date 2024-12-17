@@ -83,47 +83,6 @@ def get_site() -> Namespace:
     return vat.get().site
 
 
-def create_graph(
-    suffix: Optional[str] = None, *, base: Optional[str] = None
-) -> Graph:
-    """Create a new graph with standard bindings and optional suffix-based identifier.
-
-    Args:
-        suffix: Optional path suffix for the graph ID. If None, a fresh URI is minted.
-        base: Optional base URI. If None, uses the current site.
-    """
-    site = get_site()
-    base = base or str(site)
-
-    if suffix is None:
-        id = mint.fresh_uri(site)
-    else:
-        id = site[suffix]
-
-    logger.info("creating graph", id=id, base=base)
-
-    #    g = Graph(base=base, identifier=id)
-    g = context.repo.get().dataset.graph(id, base)
-    g.bind("nt", NT)
-    g.bind("deepgram", DEEPGRAM)
-    g.bind("site", site)
-    g.bind("did", DID)
-    g.bind("prov", PROV)
-
-    return g
-
-
-@contextmanager
-def with_transient_graph(
-    suffix: Optional[str] = None,
-) -> Generator[URIRef, None, None]:
-    """Create a temporary graph that won't be persisted."""
-    g = create_graph(suffix)
-    with vars.graph.bind(g):
-        assert isinstance(g.identifier, URIRef)
-        yield g.identifier
-
-
 class Vat:
     site: Namespace
     curr: Parameter[ActorContext]
@@ -459,15 +418,17 @@ async def persist(graph: Graph):
     repo = context.repo.get()
     before_count = len(repo.dataset)
 
-    repo.dataset.add_graph(graph)
-    for s, p, o in graph:
-        repo.dataset.add((s, p, o, graph))
-    after_count = len(repo.dataset)
-
     graph_id = graph.identifier
     assert isinstance(graph_id, URIRef)
+
+    repo_graph = repo.graph(graph_id)
+    for s, p, o in graph:
+        repo_graph.add((s, p, o))
+
+    after_count = len(repo.dataset)
+
     async with save_lock:
-        await repo.save_graph(graph_id)
+        await repo.save_all()
 
     logger.info(
         "persisted graph",
@@ -477,6 +438,44 @@ async def persist(graph: Graph):
         repo=repo,
         graph=graph,
     )
+
+
+def create_graph(
+    suffix: Optional[str] = None, *, base: Optional[str] = None
+) -> Graph:
+    """Create a new graph with standard bindings and optional suffix-based identifier.
+
+    Args:
+        suffix: Optional path suffix for the graph ID. If None, a fresh URI is minted.
+        base: Optional base URI. If None, uses the current site.
+    """
+    site = get_site()
+    base = base or str(site)
+
+    if suffix is None:
+        id = mint.fresh_uri(site)
+    else:
+        id = site[suffix]
+
+    g = context.repo.get().dataset.graph(id, base)
+    g.bind("nt", NT)
+    g.bind("deepgram", DEEPGRAM)
+    g.bind("site", site)
+    g.bind("did", DID)
+    g.bind("prov", PROV)
+
+    return g
+
+
+@contextmanager
+def with_transient_graph(
+    suffix: Optional[str] = None,
+) -> Generator[URIRef, None, None]:
+    """Create a temporary graph that won't be persisted."""
+    g = create_graph(suffix)
+    with vars.graph.bind(g):
+        assert isinstance(g.identifier, URIRef)
+        yield g.identifier
 
 
 @asynccontextmanager
