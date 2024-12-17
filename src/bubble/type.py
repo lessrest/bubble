@@ -87,6 +87,27 @@ class SheetCreatingActor(ServerActor[None]):
 
     async def handle(self, nursery, graph: Graph) -> Graph:
         logger.info("Sheet creating actor handling message", graph=graph)
-        # this should accept NT.CreateSheet messages and spawn a new sheet editing actor
-        # ai! implement this in a nice and simple way
-        return graph
+        request_id = graph.identifier
+
+        if not is_a(request_id, NT.CreateSheet, graph):
+            raise ValueError(f"Unexpected message type: {request_id}")
+
+        # Create response graph
+        with with_transient_graph() as result:
+            # Spawn new sheet editing actor
+            editor = await spawn(
+                nursery,
+                SheetEditingActor(self.graph_id),
+                name=f"Sheet editor for {self.graph_id}"
+            )
+            
+            # Return success response with editor reference
+            add(
+                result,
+                {
+                    NT.isResponseTo: request_id,
+                    NT.status: NT.Success,
+                    NT.editor: editor
+                }
+            )
+            return context.graph.get()
