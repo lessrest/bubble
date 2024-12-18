@@ -99,7 +99,7 @@ swash = { workspace = true }
 members = ["swash"]
 
 [project.scripts]
-bubble = "bubble.main:app"
+bubble = "bubble.cli:app"
 
 [tool.uv]
 package = true

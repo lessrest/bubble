@@ -4,12 +4,11 @@ from typing import Tuple, AsyncGenerator
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 
-from swash.util import S
 import trio
 import httpx
 import structlog
 
-from rdflib import RDF, XSD, Dataset, Graph, URIRef, Literal
+from rdflib import RDF, XSD, Graph, URIRef, Dataset, Literal
 from fastapi import WebSocket
 from httpx_ws import aconnect_ws
 from cryptography.hazmat.primitives.asymmetric import ed25519

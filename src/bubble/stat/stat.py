@@ -1,18 +1,19 @@
-from datetime import UTC, datetime
 import os
-import platform
 import pwd
-import socket
-import psutil
-from rdflib import XSD, Literal
 import uuid
+import socket
+import platform
+
+from pwd import struct_passwd
+from typing import TypedDict
+from datetime import UTC, datetime
+
+import psutil
+
+from rdflib import XSD, URIRef, Literal
 
 from swash.prfx import NT
 from bubble.stat.disk import DiskInfo, get_disk_info
-
-from typing import TypedDict
-from pwd import struct_passwd
-from rdflib import URIRef
 
 
 class SystemInfo(TypedDict):

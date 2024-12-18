@@ -1,15 +1,15 @@
 import pytest
 
 from swash.html import (
-    document,
+    XMLResponse,
+    HypermediaResponse,
     tag,
-    text,
     attr,
+    html,
+    text,
     classes,
     dataset,
-    html,
-    HypermediaResponse,
-    XMLResponse,
+    document,
 )
 
 

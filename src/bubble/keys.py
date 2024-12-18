@@ -2,11 +2,11 @@ from base64 import b64encode
 from typing import Tuple
 from datetime import UTC, datetime
 
-from rdflib import XSD, URIRef, Literal, PROV
+from rdflib import XSD, PROV, URIRef, Literal
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from swash.prfx import NT, DID
+from swash.prfx import DID
 from swash.util import new
 
 
@@ -39,13 +39,13 @@ def generate_identity_uri(public_key: ed25519.Ed25519PublicKey) -> URIRef:
 
 def parse_public_key_hex(hex_string: str) -> ed25519.Ed25519PublicKey:
     """Parse a hex-encoded Ed25519 public key.
-    
+
     Args:
         hex_string: Hex-encoded public key
-        
+
     Returns:
         Ed25519PublicKey: The parsed public key
-        
+
     Raises:
         ValueError: If the hex string is invalid
     """
@@ -57,17 +57,15 @@ def parse_public_key_hex(hex_string: str) -> ed25519.Ed25519PublicKey:
 
 
 def verify_signed_data(
-    message: bytes,
-    signature: bytes, 
-    public_key: ed25519.Ed25519PublicKey
+    message: bytes, signature: bytes, public_key: ed25519.Ed25519PublicKey
 ) -> bool:
     """Verify a signed message using an Ed25519 public key.
-    
+
     Args:
         message: The original message bytes
         signature: The signature bytes to verify
         public_key: The public key to verify with
-        
+
     Returns:
         bool: True if signature is valid, False otherwise
     """

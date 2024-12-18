@@ -1,8 +1,11 @@
 from typing import AsyncGenerator
+
 import pytest
-from bubble.slop import stream_sentences, stream_normally
 import hypothesis.strategies as st
+
 from hypothesis import given
+
+from bubble.slop import stream_normally, stream_sentences
 
 sentence_ending_punctuation = st.sampled_from(".!?")
 

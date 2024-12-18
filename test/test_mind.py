@@ -7,6 +7,7 @@ These tests verify that:
 """
 
 import pytest
+
 from rdflib import URIRef
 from rdflib.namespace import RDF
 

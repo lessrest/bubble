@@ -1,14 +1,15 @@
 import os
 import tempfile
-from rdflib import Literal, RDF, Namespace
-from rdflib.namespace import PROV
-from swash.util import new
+
 from trio import Path
-from bubble.data import FROTH
+from rdflib import RDF, Literal, Namespace
+from rdflib.namespace import PROV
 
-from .data import Git, Repository, context
-
+from swash.util import new
 from bubble.logs import configure_logging
+from bubble.repo.repo import FROTH
+
+from .repo.repo import Git, Repository, context
 
 logger = configure_logging()
 

@@ -10,9 +10,9 @@ import arrow
 import structlog
 
 from rdflib import (
-    DCAT,
     RDF,
     XSD,
+    DCAT,
     RDFS,
     SKOS,
     BNode,
@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException
 from rdflib.graph import QuotedGraph
 from rdflib.collection import Collection
 
-from swash import vars
+from swash import here
 from swash.html import (
     HypermediaResponse,
     tag,
@@ -42,16 +42,16 @@ router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 
 logger = structlog.get_logger()
 
-rendering_sensitive_data = vars.Parameter(
+rendering_sensitive_data = here.Parameter(
     "rendering_sensitive_data", default=False
 )
 
-language_preferences = vars.Parameter(
+language_preferences = here.Parameter(
     "language_preferences", default=["en", "sv", "lv"]
 )
 
-expansion_depth = vars.Parameter("expansion_depth", default=4)
-visited_resources = vars.Parameter("visited_resources", default=set())
+expansion_depth = here.Parameter("expansion_depth", default=4)
+visited_resources = here.Parameter("visited_resources", default=set())
 
 
 @contextlib.contextmanager
@@ -108,7 +108,7 @@ def get_subject_data(
     #    set_trace()
 
     data = {"type": None, "predicates": []}
-    graph = context or dataset or vars.graph.get()
+    graph = context or dataset or here.graph.get()
     assert isinstance(graph, Graph)
     for predicate, obj in graph.predicate_objects(subject):
         if predicate == RDF.type:
@@ -139,7 +139,7 @@ def has_doxxing_risk(predicate: Optional[P]) -> bool:
     if predicate is None:
         return False
     return any(
-        vars.dataset.get().triples((predicate, NT.hasRisk, NT.DoxxingRisk))
+        here.dataset.get().triples((predicate, NT.hasRisk, NT.DoxxingRisk))
     )
 
 
@@ -170,7 +170,7 @@ def group_triples(
 
 @html.dd("flex flex-col")
 def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
-    dataset = vars.dataset.get()
+    dataset = here.dataset.get()
     if isinstance(subject, BNode):
         if any(dataset.triples((subject, RDF.first, None))):
             render_list(dataset.collection(subject), predicate)
@@ -213,12 +213,12 @@ def get_rdf_resource(subject: str) -> None:
     rdf_resource(subject)
 
 
-frameless = vars.Parameter("frameless", default=False)
+frameless = here.Parameter("frameless", default=False)
 
 
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
-        data = get_subject_data(vars.dataset.get(), subject)
+        data = get_subject_data(here.dataset.get(), subject)
 
     # logger.info(
     #     "Rendering resource",
@@ -304,7 +304,7 @@ def render_affordance_resource(subject: S, data: Dict) -> None:
     render_resource_header(subject, data)
 
     # Get affordances from the graph
-    dataset = vars.dataset.get()
+    dataset = here.dataset.get()
     affordances = list(dataset.objects(subject, NT.affordance))
 
     if affordances:
@@ -633,12 +633,12 @@ def render_property(predicate, obj):
     render_subresource(obj, predicate)
 
 
-inside_property_label = vars.Parameter("inside_property_label", False)
+inside_property_label = here.Parameter("inside_property_label", False)
 
 
 @html.dt("flex flex-col")
 def render_property_label(predicate):
-    dataset = vars.dataset.get()
+    dataset = here.dataset.get()
     label = get_label(dataset, predicate)
     with inside_property_label.bind(True):
         render_value(label or predicate)
@@ -651,7 +651,7 @@ def render_resource_header(subject, data):
     render_value(subject)
     if data and data["type"]:
         with tag("span"):
-            dataset = vars.dataset.get()
+            dataset = here.dataset.get()
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):
                 render_value(type_label or data["type"])
@@ -712,7 +712,7 @@ def _render_uri(obj: URIRef) -> None:
     attr("resource", str(obj))
 
     # Try to get a label first
-    dataset = vars.dataset.get()
+    dataset = here.dataset.get()
     label = get_label(dataset, obj)
 
     if label:
@@ -815,7 +815,7 @@ def _render_json_literal(obj: Literal) -> None:
 
 @router.get("/json/{json_hash}")
 def get_json(json_hash: str):
-    dataset = vars.dataset.get()
+    dataset = here.dataset.get()
     for s, p, o in dataset.triples((None, NT.payload, None)):
         literal = o
         dictionary = json.loads(literal)

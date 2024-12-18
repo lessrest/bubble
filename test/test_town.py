@@ -1,34 +1,33 @@
-from trio import Path
 import re
 
 from contextlib import asynccontextmanager
 
-from structlog.stdlib import BoundLogger
 import trio
 
+from trio import Path
 from httpx import AsyncClient, ASGITransport
 from pytest import fixture
 from rdflib import Graph, URIRef, Literal, Namespace
 from asgi_lifespan import LifespanManager
+from structlog.stdlib import BoundLogger
 
 from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
 from swash.util import is_a, bubble, get_single_object
-from bubble.mesh import (
-    ServerActor,
-    call,
-    receive,
-    send,
-    spawn,
-    this,
-)
 from bubble.logs import configure_logging
-from bubble.data import Git, Repository
-
-from bubble.town import (
+from bubble.http.town import (
     Site,
     town_app,
 )
+from bubble.mesh.mesh import (
+    ServerActor,
+    call,
+    send,
+    this,
+    spawn,
+    receive,
+)
+from bubble.repo.repo import Git, Repository
 
 
 @fixture

@@ -1,22 +1,21 @@
-from pydantic import SecretStr
 import pytest
-from rdflib import Graph, URIRef
 
-from swash import vars
-from swash.prfx import NT, AI
+from rdflib import Graph, URIRef
+from pydantic import SecretStr
+
+from swash import here
+from swash.prfx import AI, NT
+from swash.util import NoResultsFoundError, MultipleResultsError
 from bubble.cred import (
     InsecureCredentialError,
     get_service_credential,
 )
 
 
-from swash.util import NoResultsFoundError, MultipleResultsError
-
-
 @pytest.fixture
 def graph():
     """Create a test graph with credential data"""
-    with vars.graph.bind(Graph()) as g:
+    with here.graph.bind(Graph()) as g:
         g.bind("nt", NT)
         g.bind("ai", AI)
         yield g

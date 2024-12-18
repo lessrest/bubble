@@ -1,5 +1,6 @@
-from swash.util import decimal, blank
 from rdflib.namespace import TIME
+
+from swash.util import blank, decimal
 
 
 def make_duration(seconds: float):

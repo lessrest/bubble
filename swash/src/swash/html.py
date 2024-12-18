@@ -16,14 +16,13 @@ from contextlib import contextmanager, asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-import structlog
 import trio
+import structlog
 
 from fastapi import (
     Response,
 )
 from fastapi.responses import HTMLResponse
-
 
 logger = structlog.get_logger()
 

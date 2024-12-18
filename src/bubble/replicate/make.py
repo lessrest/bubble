@@ -1,23 +1,24 @@
-import functools
 import os
+import functools
+
 from typing import Protocol, runtime_checkable
 from datetime import UTC, datetime
 
 import trio
-import trio_asyncio
 import replicate
 import structlog
-from rdflib import PROV, URIRef, Literal, XSD, Graph, Namespace
+import trio_asyncio
 
-from swash.prfx import NT, Schema
-import swash.vars as vars
+from rdflib import PROV, Graph, URIRef, Literal, Namespace
+
+from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
-from bubble.data import Repository
-from bubble.mesh import (
+from bubble.mesh.mesh import (
     ServerActor,
     this,
     txgraph,
 )
+from bubble.repo.repo import Repository
 
 logger = structlog.get_logger(__name__)
 

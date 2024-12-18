@@ -1,15 +1,16 @@
 import pytest
+
 from rdflib import URIRef, Literal
 from rdflib.namespace import RDF
 
-from swash.util import get_single_subject, print_n3, turtle
-from swash import vars
+from swash import here
+from swash.util import turtle, print_n3, get_single_subject
 
 
 @pytest.fixture
 def test_graph():
     """Create a test graph with a simple triple"""
-    with vars.graph.bind(
+    with here.graph.bind(
         turtle("""
         @prefix : <http://example.org/> .
 

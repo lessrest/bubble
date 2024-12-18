@@ -1,32 +1,30 @@
 """Node.Town RDF/N3 utilities."""
 
-from .util import (
-    print_n3,
-    get_single_subject,
-    get_subjects,
-    select_one_row,
-    select_rows,
-    turtle,
-    new,
-    is_a,
-)
-
+from .here import Parameter
 from .html import (
-    document,
+    Fragment,
+    LiveMessage,
+    XMLResponse,
+    HypermediaResponse,
     tag,
-    text,
     attr,
+    text,
     classes,
     dataset,
-    Fragment,
-    HypermediaResponse,
-    XMLResponse,
+    document,
     appending,
     live_node,
-    LiveMessage,
 )
-
-from .vars import Parameter
+from .util import (
+    new,
+    is_a,
+    turtle,
+    print_n3,
+    select_rows,
+    get_subjects,
+    select_one_row,
+    get_single_subject,
+)
 
 __version__ = "0.1.0"
 

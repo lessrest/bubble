@@ -1,26 +1,27 @@
 import json
+
 from datetime import UTC, datetime
 
+import trio
 import pytest
 import structlog
-import trio
-from rdflib import Graph, Literal, URIRef, Namespace
 
-from bubble.mesh import spawn, with_transient_graph
-from bubble.deepgram.json import (
-    Alternative,
-    Channel,
-    DeepgramMessage,
-    Metadata,
-    ModelInfo,
-    Word,
-)
-from bubble.deepgram.talk import deepgram_transcription_receiver
-from bubble.mesh import send
-from bubble.town import Site
-from bubble.data import Repository, Git
+from rdflib import Graph, URIRef, Literal, Namespace
+
 from swash.prfx import NT
 from swash.util import add, get_single_object
+from bubble.http.town import Site
+from bubble.mesh.mesh import send, spawn, with_transient_graph
+from bubble.repo.repo import Git, Repository
+from bubble.deepgram.json import (
+    Word,
+    Channel,
+    Metadata,
+    ModelInfo,
+    Alternative,
+    DeepgramMessage,
+)
+from bubble.deepgram.talk import deepgram_transcription_receiver
 
 EXPECTED_GRAPH = """
 @prefix prov: <http://www.w3.org/ns/prov#> .

@@ -28,7 +28,7 @@ structuring real-time audio transcriptions within a semantic framework.
 
 import os
 
-from typing import AsyncContextManager, Optional
+from typing import Optional, AsyncContextManager
 from datetime import UTC, datetime
 from collections import defaultdict
 from urllib.parse import urlencode
@@ -37,34 +37,32 @@ import trio
 import structlog
 
 from rdflib import XSD, Graph, URIRef, Literal, IdentifiedNode
-from trio_websocket import WebSocketConnection, open_websocket_url, Endpoint
+from trio_websocket import Endpoint, WebSocketConnection, open_websocket_url
 from rdflib.namespace import PROV, TIME
 
+import swash.here as here
+
 from swash.prfx import NT, TALK, Deepgram
+from swash.time import make_interval
 from swash.util import (
     add,
-    blank,
     new,
     is_a,
+    blank,
     decimal,
     make_list,
     get_single_object,
 )
-import swash.vars as vars
-from bubble.data import timestamp
-from bubble.mesh import (
+from bubble.mesh.mesh import (
     ServerActor,
-    persist,
-    receive,
     send,
     spawn,
-    this,
+    persist,
+    receive,
+    txgraph,
     with_transient_graph,
 )
-from bubble.time import make_interval
-from bubble.mesh import (
-    txgraph,
-)
+from bubble.repo.repo import timestamp
 from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage
 
 logger = structlog.get_logger()
@@ -174,7 +172,7 @@ def chunk_data(graph: Graph) -> bytes:
 
 
 async def deepgram_session_actor(results: URIRef):
-    from bubble.town import in_request_graph  # Import where needed
+    from bubble.http.town import in_request_graph  # Import where needed
 
     # Wait for first chunk before starting session
     msg = await receive()
@@ -264,7 +262,7 @@ class DeepgramClientActor(ServerActor[str]):
                 add(result, {NT.has: set([session, results, endpoint])})
 
             logger.info("Returning result", result=result)
-            return vars.graph.get()
+            return here.graph.get()
 
 
 def create_affordance_button(deepgram_client: URIRef):

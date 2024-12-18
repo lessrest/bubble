@@ -5,20 +5,21 @@ It sets up the initial graph structure with system information, user details,
 and basic bubble metadata using the PROV ontology for provenance tracking.
 """
 
-from datetime import datetime, timezone
 import os
 import pwd
 import getpass
 
+from datetime import datetime, timezone
+
 from trio import Path
-from rdflib import OWL, RDFS, Graph, URIRef, Literal, RDF
+from rdflib import OWL, RDF, RDFS, Graph, URIRef, Literal
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from swash import vars
+from swash import here
 from swash.prfx import NT, SWA, PROV, UUID
 from swash.util import new
-from bubble.stat.stat import SystemInfo, gather_system_info
 from bubble.keys import create_identity_graph, generate_identity_uri
+from bubble.stat.stat import SystemInfo, gather_system_info
 
 
 async def describe_new_bubble(
@@ -36,10 +37,10 @@ async def construct_bubble_graph(
     bubble: URIRef,
     public_key: ed25519.Ed25519PublicKey,
 ) -> Graph:
-    with vars.graph.bind(
+    with here.graph.bind(
         Graph(identifier=bubble, base=URIRef(str(bubble)))
     ) as g:
-        vars.bind_prefixes(g)
+        here.bind_prefixes(g)
 
         machine = SWA[info["machine_id"]]
 

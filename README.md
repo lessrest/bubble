@@ -131,7 +131,7 @@ overmind connect css
 overmind connect test
 
 # Explore your bubble's knowledge graph with LLM assistance
-python -m bubble.main show
+python -m bubble.cli show
 ```
 
 ## Project Structure

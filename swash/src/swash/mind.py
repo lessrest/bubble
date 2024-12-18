@@ -1,8 +1,11 @@
 import tempfile
-from pathlib import Path
-import trio
-from rdflib import Graph
+
 from typing import Sequence
+from pathlib import Path
+
+import trio
+
+from rdflib import Graph
 
 
 async def reason(graphs: Sequence[Graph]) -> Graph:

@@ -7,19 +7,19 @@ import hypothesis.strategies as st
 from rdflib import XSD, Graph, Literal, Variable
 from hypothesis import given
 
+from swash import here
 from swash.json import (
     json_from_rdf,
     rdf_from_json,
 )
 from swash.prfx import JSON
-from swash.util import is_a, new, select_rows
-from swash import vars
+from swash.util import new, is_a, select_rows
 
 
 @pytest.fixture
 def graph():
     """Create a test graph with JSON data"""
-    with vars.graph.bind(Graph()) as g:
+    with here.graph.bind(Graph()) as g:
         g.bind("json", JSON)
         yield g
 

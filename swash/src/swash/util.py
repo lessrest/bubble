@@ -9,16 +9,16 @@ from rdflib import (
     XSD,
     BNode,
     Graph,
+    URIRef,
     Literal,
     Namespace,
     IdentifiedNode,
-    URIRef,
 )
-from rdflib.collection import Collection
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
+from rdflib.collection import Collection
 
-import swash.vars as vars
+import swash.here as here
 
 from swash.mint import fresh_uri
 from swash.prfx import AI, NT, JSON
@@ -36,7 +36,7 @@ def print_n3(
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    g = graph if graph is not None else vars.graph.get()
+    g = graph if graph is not None else here.graph.get()
     n3 = g.serialize(format="n3").replace("    ", "  ").strip()
 
     # only if connected to terminal do we use rich
@@ -61,7 +61,7 @@ def graph_string(graph: Graph) -> str:
 
 def get_single_object(subject: S, predicate: P, graph=None) -> O:
     """Get a single object for a subject-predicate pair from the current graph"""
-    graph = graph if graph is not None else vars.graph.get()
+    graph = graph if graph is not None else here.graph.get()
     objects = list(graph.objects(subject, predicate))
     if len(objects) != 1:
         raise ValueError(f"Expected 1 object, got {len(objects)}")
@@ -70,7 +70,7 @@ def get_single_object(subject: S, predicate: P, graph=None) -> O:
 
 def get_single_subject(predicate: P, object: O, graph=None) -> S:
     """Get a single subject for a predicate-object pair from the current graph"""
-    graph = graph if graph is not None else vars.graph.get()
+    graph = graph if graph is not None else here.graph.get()
     subjects = list(graph.subjects(predicate, object))
     if len(subjects) != 1:
         raise ValueError(f"Expected 1 subject, got {len(subjects)}")
@@ -79,13 +79,13 @@ def get_single_subject(predicate: P, object: O, graph=None) -> S:
 
 def get_subjects(predicate, object):
     """Get all subjects for a predicate-object pair from the current graph"""
-    g = vars.graph.get()
+    g = here.graph.get()
     return list(g.subjects(predicate, object))
 
 
 def get_objects(subject, predicate):
     """Get all objects for a subject-predicate pair from the current graph"""
-    g = vars.graph.get()
+    g = here.graph.get()
     return list(g.objects(subject, predicate))
 
 
@@ -122,7 +122,7 @@ def select_one_row(query: str, bindings: dict = {}) -> ResultRow:
 
 def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
     """Select multiple rows from a query on the current graph"""
-    results = vars.graph.get().query(
+    results = here.graph.get().query(
         query,
         initBindings=bindings,
         initNs={"nt": NT, "json": JSON, "ai": AI},
@@ -132,7 +132,7 @@ def select_rows(query: str, bindings: dict = {}) -> list[ResultRow]:
 
 def turtle(src: str) -> Graph:
     """Parse turtle data into the current graph"""
-    with vars.graph.bind(Graph()) as graph:
+    with here.graph.bind(Graph()) as graph:
         graph.parse(data=src, format="n3")
         graph.bind("nt", NT)
         return graph
@@ -158,12 +158,12 @@ def new(
     subject: Optional[URIRef] = None,
 ) -> URIRef:
     if subject is None:
-        subject = fresh_uri(vars.graph.get())
+        subject = fresh_uri(here.graph.get())
     return build_resource(subject, type, properties)
 
 
 def is_a(subject: S, type: S, graph=None) -> bool:
-    graph = graph if graph is not None else vars.graph.get()
+    graph = graph if graph is not None else here.graph.get()
     if isinstance(subject, IdentifiedNode):
         return type in graph.objects(subject, RDF.type)
     elif isinstance(subject, Literal):
@@ -191,7 +191,7 @@ def make_list(
     seq: Sequence[O], subject: Optional[IdentifiedNode] = None
 ) -> IdentifiedNode:
     node = BNode() if subject is None else subject
-    Collection(vars.graph.get(), node, list(seq))
+    Collection(here.graph.get(), node, list(seq))
     return node
 
 
@@ -234,7 +234,7 @@ def build_resource[Subject: S](
     Returns:
         The subject node with added properties
     """
-    graph = vars.graph.get()
+    graph = here.graph.get()
 
     if type is not None:
         graph.add((subject, RDF.type, type))

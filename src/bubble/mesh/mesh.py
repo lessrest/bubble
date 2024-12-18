@@ -1,50 +1,47 @@
-from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing_extensions import runtime_checkable
-
-import tenacity
-from bubble.data import context
-from bubble.keys import (
-    create_identity_graph,
-    generate_identity_uri,
-    generate_keypair,
-    get_public_key_bytes,
-    get_public_key_hex,
-)
-
-
-import structlog
-import trio
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from rdflib import (
-    PROV,
-    RDF,
-    RDFS,
-    XSD,
-    Graph,
-    Literal,
-    Namespace,
-    URIRef,
-)
-from swash import Parameter, mint, vars
-from swash.prfx import DEEPGRAM, DID, NT
-from swash.util import P, add, new, blank
-
-
-from collections import defaultdict
 from typing import (
     Any,
-    Awaitable,
-    Callable,
+    Set,
     Dict,
-    Generator,
-    MutableMapping,
+    Callable,
     Optional,
     Protocol,
-    Set,
+    Awaitable,
+    Generator,
+    MutableMapping,
 )
+from datetime import UTC, datetime
+from contextlib import contextmanager, asynccontextmanager
+from collections import defaultdict
+from dataclasses import dataclass
 
+import trio
+import tenacity
+import structlog
+
+from rdflib import (
+    RDF,
+    XSD,
+    PROV,
+    RDFS,
+    Graph,
+    URIRef,
+    Literal,
+    Namespace,
+)
+from typing_extensions import runtime_checkable
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+from swash import Parameter, here, mint
+from swash.prfx import NT, DID, DEEPGRAM
+from swash.util import P, add, new, blank
+from bubble.keys import (
+    generate_keypair,
+    get_public_key_hex,
+    get_public_key_bytes,
+    create_identity_graph,
+    generate_identity_uri,
+)
+from bubble.repo.repo import context
 
 logger = structlog.get_logger()
 
@@ -302,7 +299,7 @@ class Vat:
 
     async def send(self, actor: URIRef, message: Optional[Graph] = None):
         if message is None:
-            message = vars.graph.get()
+            message = here.graph.get()
 
         if actor not in self.deck:
             raise ValueError(f"Actor {actor} not found")
@@ -383,7 +380,7 @@ def boss() -> URIRef:
 async def send(actor: URIRef, message: Optional[Graph] = None):
     system = vat.get()
     if message is None:
-        message = vars.graph.get()
+        message = here.graph.get()
     logger.info("sending message", actor=actor, graph=message)
     return await system.send(actor, message)
 
@@ -486,7 +483,7 @@ def with_transient_graph(
 ) -> Generator[URIRef, None, None]:
     """Create a temporary graph that won't be persisted."""
     g = create_graph(suffix)
-    with vars.graph.bind(g):
+    with here.graph.bind(g):
         assert isinstance(g.identifier, URIRef)
         yield g.identifier
 
@@ -497,7 +494,7 @@ async def txgraph(graph: Optional[Graph] = None):
     if graph is not None:
         g += graph
 
-    with vars.graph.bind(g):
+    with here.graph.bind(g):
         yield g
 
     await persist(g)
@@ -545,7 +542,7 @@ class SimpleSupervisor:
 
 async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
     if payload is None:
-        payload = vars.graph.get()
+        payload = here.graph.get()
 
     sendchan, recvchan = trio.open_memory_channel[Graph](1)
 

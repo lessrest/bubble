@@ -1,14 +1,15 @@
-import subprocess
 import tempfile
+import subprocess
+
 from pathlib import Path
 
-from rdflib import RDFS, Dataset, Graph, Literal, Namespace
-from swash.rdfa import autoexpanding, rdf_resource
-from swash.html import document, Fragment, root
-from swash.util import new
-from swash import vars as swash_vars
+from rdflib import RDFS, Graph, Dataset, Literal, Namespace
 
-from bubble.data import context
+from swash import here as swash_vars
+from swash.html import Fragment, root, document
+from swash.rdfa import rdf_resource, autoexpanding
+from swash.util import new
+from bubble.repo.repo import context
 
 EX = Namespace("http://example.org/")
 

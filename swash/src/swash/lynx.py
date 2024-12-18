@@ -1,18 +1,17 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import List, Optional, Literal, Union, Dict
+
+from typing import Dict, List, Union, Literal, Optional
+from dataclasses import field, dataclass
 from xml.etree.ElementTree import Element as HTMLElement
 
-import rich
-from rich.console import Console, ConsoleRenderable, Group
+from rich import box
 from rich.text import Text
-from rich.padding import Padding
-from rich.columns import Columns
-from rich.panel import Panel
-from rich import box, inspect
-from rich.align import Align
-
 from structlog import get_logger
+from rich.align import Align
+from rich.panel import Panel
+from rich.columns import Columns
+from rich.console import Group, Console, ConsoleRenderable
+from rich.padding import Padding
 
 logger = get_logger()
 

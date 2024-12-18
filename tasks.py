@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import field, dataclass
+
 from invoke.tasks import task
 from invoke.context import Context
 
@@ -94,3 +95,9 @@ def clean(c: Context):
     for pattern in patterns:
         run(c, sh("rm -rf", pattern))
     run(c, sh("git status"))
+
+
+@task
+def fmt(c: Context):
+    """Format imports using Ruff."""
+    run(c, sh("ruff", "check", "--select", "I", "--fix", "."))

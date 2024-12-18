@@ -5,11 +5,13 @@ Uses the wn library to access WordNet data.
 
 from typing import Optional, Generator
 
-from wn import Lexicon, Wordnet
-from rdflib import RDFS, URIRef, Literal, Namespace, VOID
-from swash.util import new, add
-from swash.prfx import SWA
 import structlog
+
+from wn import Lexicon, Wordnet
+from rdflib import RDFS, VOID, URIRef, Literal, Namespace
+
+from swash.prfx import SWA
+from swash.util import add, new
 
 logger = structlog.get_logger(__name__)
 

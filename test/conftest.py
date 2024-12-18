@@ -1,6 +1,7 @@
 """Test configuration for bubble"""
 
 import platform
+
 import pytest
 
 

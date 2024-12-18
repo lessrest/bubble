@@ -1,5 +1,6 @@
 from typing import Optional
-from swash.html import attr, tag, html
+
+from swash.html import tag, attr, html
 from swash.html import classes as klasses
 
 

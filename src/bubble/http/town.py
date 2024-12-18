@@ -23,9 +23,9 @@ import trio
 import structlog
 
 from rdflib import (
-    DCTERMS,
     RDF,
     XSD,
+    DCTERMS,
     Graph,
     URIRef,
     Dataset,
@@ -47,7 +47,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from swash import mint, rdfa, vars
+from swash import here, mint, rdfa
 from swash.html import (
     HypermediaResponse,
     tag,
@@ -65,13 +65,17 @@ from swash.rdfa import (
     render_affordance_resource,
 )
 from swash.util import P, S, new
-from bubble.data import Repository, context
-from bubble.icon import favicon
+from swash.word import describe_word
 from bubble.keys import (
     build_did_document,
     parse_public_key_hex,
 )
-from bubble.mesh import (
+from bubble.http.icon import favicon
+from bubble.http.page import (
+    base_html,
+    base_shell,
+)
+from bubble.mesh.mesh import (
     Vat,
     vat,
     call,
@@ -82,11 +86,7 @@ from bubble.mesh import (
     record_message,
     with_transient_graph,
 )
-from bubble.page import (
-    base_html,
-    base_shell,
-)
-from bubble.word import describe_word
+from bubble.repo.repo import Repository, context
 
 logger = structlog.get_logger(__name__)
 
@@ -102,7 +102,7 @@ class LinkedDataResponse(HypermediaResponse):
         headers: Optional[Dict[str, str]] = None,
     ):
         if graph is None:
-            graph = vars.graph.get()
+            graph = here.graph.get()
 
         if headers is None:
             headers = {}
@@ -129,7 +129,7 @@ class JSONLinkedDataResponse(JSONResponse):
         headers: Optional[Dict[str, str]] = None,
     ):
         if graph is None:
-            graph = vars.graph.get()
+            graph = here.graph.get()
 
         if context is None:
             context = {
@@ -307,7 +307,7 @@ class Site:
                 with tag("div", classes="p-4"):
                     with tag("h1", classes="text-2xl font-bold mb-4"):
                         text("DID Document")
-                    render_graph_view(vars.graph.get())
+                    render_graph_view(here.graph.get())
         return HypermediaResponse()
 
     async def actor_message(self, id: str, request: Request):
@@ -321,7 +321,7 @@ class Site:
                 if isinstance(v, str) and k != "type"
             }
             with with_transient_graph():
-                g = vars.graph.get()
+                g = here.graph.get()
                 record_message(type, actor, g, properties=properties)
                 result = await call(actor, g)
                 return LinkedDataResponse(result)
@@ -434,7 +434,7 @@ class Site:
         with base_shell("Bubble"):
             with tag("div", classes="p-4"):
                 # Find resources with affordances
-                graph = vars.graph.get()
+                graph = here.graph.get()
                 resources_with_affordances = set(
                     graph.subjects(NT.affordance, None)
                 )
@@ -444,7 +444,7 @@ class Site:
                         with tag("div", classes="flex flex-col gap-4"):
                             for subject in resources_with_affordances:
                                 data = get_subject_data(
-                                    vars.dataset.get(), subject
+                                    here.dataset.get(), subject
                                 )
                                 render_affordance_resource(subject, data)
                     else:
@@ -456,19 +456,19 @@ class Site:
     async def sheets(self):
         with base_shell("Sheets"):
             with tag("div", classes="p-4"):
-                for sheet in vars.dataset.get().subjects(
+                for sheet in here.dataset.get().subjects(
                     RDF.type, NT.Sheet
                 ):
-                    render_graph_view(vars.dataset.get().graph(sheet))
+                    render_graph_view(here.dataset.get().graph(sheet))
         return HypermediaResponse()
 
     async def get_timeline(self):
         with base_shell("Timeline"):
             with tag("div", classes="p-4 flex flex-col gap-4"):
-                entries = vars.dataset.get().subjects(DCTERMS.created, None)
+                entries = here.dataset.get().subjects(DCTERMS.created, None)
                 times = {}
                 for entry in entries:
-                    times[entry] = vars.dataset.get().value(
+                    times[entry] = here.dataset.get().value(
                         entry, DCTERMS.created
                     )
                 sorted_times = sorted(times.items(), key=lambda x: x[1])
@@ -559,7 +559,7 @@ class Site:
 
     async def ws_actor_join(self, websocket: WebSocket, key: str):
         """Handle a remote actor joining the town with a provided identity key."""
-        from bubble.peer import handle_actor_join
+        from bubble.sock.peer import handle_actor_join
 
         # Parse the hex key string into an Ed25519PublicKey object before passing to handle_actor_join
         public_key = parse_public_key_hex(key)
@@ -567,7 +567,7 @@ class Site:
 
     async def ws_anonymous_join(self, websocket: WebSocket):
         """Handle an anonymous/transient actor joining the town."""
-        from bubble.peer import handle_anonymous_join
+        from bubble.sock.peer import handle_anonymous_join
 
         await handle_anonymous_join(websocket, self.vat)
 
@@ -576,7 +576,7 @@ class Site:
         """Install the actor system and bubble context for request handling."""
         with vat.bind(self.vat):
             with context.repo.bind(self.repo):
-                with vars.dataset.bind(self.repo.dataset):
+                with here.dataset.bind(self.repo.dataset):
                     yield
 
     async def _handle_upload_stream(
@@ -818,19 +818,19 @@ class Site:
 
         pos = pos if pos and pos.strip() else None
 
-        with vars.graph.bind(create_graph()):
+        with here.graph.bind(create_graph()):
             for word_node in describe_word(word, pos):
                 pass
 
-            render_graph_view(vars.graph.get())
-            logger.info("word lookup", graph=vars.graph.get())
+            render_graph_view(here.graph.get())
+            logger.info("word lookup", graph=here.graph.get())
 
             return HypermediaResponse()
 
 
 @contextmanager
 def in_request_graph(g: Graph):
-    with vars.graph.bind(g):
+    with here.graph.bind(g):
         yield g
 
 
@@ -921,9 +921,9 @@ def render_node(graph: Graph, node: S) -> None:
     if node in visited:
         return
 
-    with vars.in_graph(graph):
+    with here.in_graph(graph):
         with tag("div", classes=get_node_classes(graph, node)):
-            dataset = vars.dataset.get()
+            dataset = here.dataset.get()
             dataset.add_graph(graph)
             data = get_subject_data(dataset, node, context=graph)
             rdf_resource(node, data)

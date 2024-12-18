@@ -1,11 +1,12 @@
 import base64
-from contextvars import ContextVar
 import secrets
+
+from contextvars import ContextVar
 
 from xid import XID
 from rdflib import Graph, URIRef, Namespace
 
-import swash.vars as vars
+import swash.here as here
 
 
 class Mint:
@@ -72,7 +73,7 @@ def fresh_uri(namespace: Namespace | Graph) -> URIRef:
 
 
 def fresh_iri() -> URIRef:
-    graph = vars.graph.get()
+    graph = here.graph.get()
     return fresh_uri(graph)
 
 

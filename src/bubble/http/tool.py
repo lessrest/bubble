@@ -18,8 +18,7 @@ from rdflib import PROV, Graph, URIRef, Literal
 
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
-from bubble.data import context, timestamp
-from bubble.mesh import (
+from bubble.mesh.mesh import (
     ServerActor,
     boss,
     this,
@@ -28,6 +27,7 @@ from bubble.mesh import (
     txgraph,
     with_transient_graph,
 )
+from bubble.repo.repo import context, timestamp
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import AsyncReadable, make_image, make_video
 

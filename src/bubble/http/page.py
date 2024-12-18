@@ -1,16 +1,16 @@
-from base64 import b64encode
-from urllib.parse import quote
-from swash.html import tag, text
-
 import json
-from contextlib import contextmanager
 
+from base64 import b64encode
+from contextlib import contextmanager
+from urllib.parse import quote
+
+from rdflib import PROV
+
+from swash import here
+from swash.html import tag, text
 from swash.prfx import NT
 from swash.rdfa import rdf_resource
-
-from bubble.mesh import vat
-from swash import vars
-from rdflib import PROV
+from bubble.mesh.mesh import vat
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
@@ -80,11 +80,11 @@ def base_shell(title: str):
             ):
                 with tag("div", classes="flex items-center"):
                     # find the editor actor which is started by the town's identity
-                    editors = vars.dataset.get().objects(
+                    editors = here.dataset.get().objects(
                         vat.get().get_identity_uri(), PROV.started
                     )
                     for editor in editors:
-                        affordances = vars.dataset.get().objects(
+                        affordances = here.dataset.get().objects(
                             editor, NT.affordance
                         )
                         for affordance in affordances:

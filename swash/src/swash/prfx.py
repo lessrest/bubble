@@ -1,5 +1,6 @@
-from rdflib import Namespace
 import rdflib.namespace as ns
+
+from rdflib import Namespace
 
 NT = Namespace("https://node.town/2024/")
 SWA = Namespace("https://swa.sh/2024/")

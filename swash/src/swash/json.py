@@ -1,10 +1,13 @@
-from rdflib import IdentifiedNode, Literal, URIRef
-from rdflib.collection import Collection
 import structlog
+
+from rdflib import URIRef, Literal, IdentifiedNode
+from rdflib.collection import Collection
+
+from swash import here
 from swash.mint import fresh_uri
-from swash.prfx import JSON, SWA
-from swash.util import O, S, is_a, new, select_rows
-from swash import vars
+from swash.prfx import SWA, JSON
+from swash.util import O, S, new, is_a, select_rows
+
 # import importhook
 
 logger = structlog.get_logger()
@@ -35,7 +38,7 @@ def json_from_rdf(
 
     if is_a(node, JSON.Array):
         assert isinstance(node, IdentifiedNode)
-        list = Collection(vars.graph.get(), node)
+        list = Collection(here.graph.get(), node)
         return [json_from_rdf(item) for item in list]
     if is_a(node, JSON.Object):
         return {
@@ -85,7 +88,7 @@ def rdf_from_json(
         for item in value:
             items.append(rdf_from_json(item))
 
-        collection = Collection(vars.graph.get(), fresh_uri(SWA), items)
+        collection = Collection(here.graph.get(), fresh_uri(SWA), items)
         assert isinstance(collection.uri, URIRef)
 
         return new(JSON.Array, {}, subject=collection.uri)

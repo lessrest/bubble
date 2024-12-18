@@ -5,11 +5,11 @@ from typing import Any, Generic, TypeVar, Optional, Sequence, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from rdflib import PROV, BNode, Dataset, Graph, Literal, URIRef, Namespace
+from rdflib import PROV, BNode, Graph, URIRef, Dataset, Literal, Namespace
 from rdflib.graph import QuotedGraph, _TripleType
 
 from swash.mint import fresh_iri
-from swash.prfx import AS, DID, NT, SWA
+from swash.prfx import AS, NT, DID, SWA
 
 T = TypeVar("T")
 

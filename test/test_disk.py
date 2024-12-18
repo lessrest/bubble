@@ -1,7 +1,8 @@
 """Tests for disk information functionality"""
 
-import pytest
 import uuid
+
+import pytest
 
 from bubble.stat.disk import get_disk_info
 

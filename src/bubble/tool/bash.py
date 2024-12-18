@@ -1,8 +1,11 @@
-from anthropic import types
-import trio
 import json
+
 from typing import Optional
+
+import trio
+
 from pydantic import BaseModel
+from anthropic import types
 
 
 class BashResult(BaseModel):

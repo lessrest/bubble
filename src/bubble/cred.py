@@ -1,9 +1,10 @@
+from rdflib import URIRef, Literal
 from pydantic import SecretStr
+
+from swash.prfx import AI
 from swash.util import (
     select_one_row,
 )
-from rdflib import Literal, URIRef
-from swash.prfx import AI
 
 
 class CredentialError(Exception):

@@ -5,10 +5,12 @@ different platforms, with specialized handling for macOS using diskutil.
 """
 
 import os
-import platform
-import psutil
 import uuid
+import platform
+
 from typing import TypedDict
+
+import psutil
 
 
 class DiskInfo(TypedDict):

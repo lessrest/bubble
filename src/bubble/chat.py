@@ -1,23 +1,24 @@
 from typing import NoReturn
 
-import anthropic
 import rich
-import rich.console
+import anthropic
 import rich.json
 import rich.panel
-import rich.progress_bar
-import rich.syntax
 import rich.table
+import rich.syntax
+import rich.console
+import rich.progress_bar
+
+from rdflib.query import ResultRow
 from anthropic.types import MessageParam, ToolResultBlockParam
 from anthropic.types.message import Message
 from anthropic.types.tool_use_block import ToolUseBlock
-from rdflib.query import ResultRow
 
-from bubble.tool.bash import get_shell_tool_spec, handle_shell_tool
-from bubble.data import context
-from bubble.slop import Claude
+from swash.here import graph
 from swash.util import select_rows
-from swash.vars import graph
+from bubble.slop import Claude
+from bubble.repo.repo import context
+from bubble.tool.bash import handle_shell_tool, get_shell_tool_spec
 
 
 def join_sentences(*sentences) -> str:
