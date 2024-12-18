@@ -189,7 +189,7 @@ class Site:
         self.bind = bind
         self.repo = repo
         self.site = Namespace(base_url)
-        self.yell = structlog.get_logger(__name__).bind(bind=bind)
+        self.yell = structlog.get_logger(__name__)
         self.app = FastAPI()
 
         self._setup_error_handlers()

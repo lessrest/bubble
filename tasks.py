@@ -57,21 +57,33 @@ def test(c: Context, coverage=False):
 
 
 @task
-def server(c: Context, watch=True, debug=True, bind="0.0.0.0:2024"):
+def server(c: Context, watch=True, bind="127.0.0.1:2026"):
     """Run Bubble web server."""
-    run(
-        c,
-        sh(
-            "hypercorn",
-            {"-k": "trio"},
-            {"--reload": watch},
-            {"--debug": debug},
-            {"--bind": bind},
-            "bubble.http:app",
-        ),
-        pty=False,
-        echo=True,
-    )
+    if not watch:
+        # If not watching, just run the server directly
+        run(
+            c,
+            sh(
+                "bubble",
+                "serve",
+                {"--bind": bind},
+            ),
+            pty=True,
+        )
+    else:
+        # Use watchfiles to restart on changes
+        run(
+            c,
+            sh(
+                "watchfiles",
+                "--filter",
+                "python",
+                f"'bubble serve --bind {bind}'",
+                "./src",
+                "./swash",
+            ),
+            pty=True,
+        )
 
 
 @task

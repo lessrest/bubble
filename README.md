@@ -45,30 +45,13 @@ The project combines:
 - Language models (via Anthropic's Claude)
 - Structured concurrency with Trio
 
-## Current State
-
-This is an exploratory research project, currently focusing on:
-
-- `bubble/repo.py`: Git-based RDF/N3 document management
-- `bubble/mind.py`: EYE reasoner integration for logical inference
-- `bubble/http.py`: Web interface with HTMX for fluid interactions
-- `bubble/main.py`: CLI interface with LLM-powered graph exploration
-
-The system maintains a knowledge graph about its own state and capabilities,
-which serves as both:
-
-1. A formal model that can be reasoned about by the system
-2. A grounding context for language model interactions
-
 ## Prerequisites
 
 - Python 3.13+
-- Node.js (for Tailwind CSS)
-- SWI-Prolog: A modern implementation of Prolog, the original logical
-  programming language. While often overlooked in today's landscape, Prolog
-  represents one of computing's most elegant approaches to knowledge
-  representation and reasoning.
-- EYE reasoner (clone from https://github.com/josd/eye)
+- Node.js (for Tailwind CSS, etc)
+- uv (<https://docs.astral.sh/uv/>)
+- SWI-Prolog (<https://www.swi-prolog.org/>)
+- EYE reasoner (<https://github.com/eyereasoner/eye>)
 - Git
 - API keys for language models (currently Claude)
 

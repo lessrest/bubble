@@ -1,4 +1,5 @@
 from urllib.parse import urlparse, urljoin
+import os
 
 from fastapi import FastAPI
 import trio
@@ -19,7 +20,7 @@ from bubble.http.town import Site
 from bubble.mesh.mesh import this, spawn
 from bubble.repo.repo import Git, Repository
 from bubble.http.cert import generate_self_signed_cert
-from bubble.cli.app import app, RepoPath
+from bubble.cli.app import app, RepoPath, BaseUrl
 
 logger = structlog.get_logger()
 
@@ -33,11 +34,9 @@ async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
 
 
 @app.command()
-def town(
+def serve(
     bind: str = Option("127.0.0.1:2026", "--bind", help="Bind address"),
-    base_url: str = Option(
-        "https://localhost:2026/", "--base-url", help="Public base URL"
-    ),
+    base_url: str = BaseUrl,
     repo_path: str = RepoPath,
     shell: bool = Option(False, "--shell", help="Start a bash subshell"),
     cert_file: str = Option(
@@ -50,9 +49,19 @@ def town(
         help="Generate and use a self-signed certificate",
     ),
 ) -> None:
-    """Serve the Node.Town web interface. Uses HTTP if no certificate/key provided, assuming HTTPS termination by reverse proxy."""
+    """Serve the Node.Town web interface."""
+    # Command line args override environment variables
+    if repo_path is None:
+        repo_path = os.environ.get("BUBBLE")
+    if base_url is None:
+        base_url = os.environ.get("BUBBLE_BASE")
+    if cert_file is None:
+        cert_file = os.environ.get("BUBBLE_CERT")
+    if key_file is None:
+        key_file = os.environ.get("BUBBLE_KEY")
+
     trio_asyncio.run(
-        _bubble_town,
+        _serve,
         bind,
         base_url,
         repo_path,
@@ -63,7 +72,7 @@ def town(
     )
 
 
-async def _bubble_town(
+async def _serve(
     bind: str,
     base_url: str,
     repo_path: str,

@@ -6,7 +6,7 @@ services:
     ports:
       - "80"
     command: [
-      "bubble", "town", 
+      "bubble", "serve", 
       "--bind", "0.0.0.0:80", 
       "--base-url", "https://{repo}.bubble.local",
       "--repo", "/data/repo"

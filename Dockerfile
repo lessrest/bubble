@@ -43,5 +43,3 @@ COPY . .
 
 # do the full sync including installing the project etc
 RUN uv sync --frozen
-
-CMD ["bubble", "town"]

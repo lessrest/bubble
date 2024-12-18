@@ -14,7 +14,20 @@ app = typer.Typer(
 
 home = pathlib.Path.home()
 
-RepoPath = Option(str(home / "repo"), "--repo", help="Repository path")
+app_dir = pathlib.Path(typer.get_app_dir("bubble"))
+
+# Use environment variables if set, otherwise use defaults
+RepoPath = Option(
+    os.environ.get("BUBBLE", str(app_dir / "repo")),
+    "--repo",
+    help="Repository path",
+)
+
+BaseUrl = Option(
+    os.environ.get("BUBBLE_BASE", "https://localhost:2026/"),
+    "--base-url",
+    help="Public base URL",
+)
 
 
 def get_log_level() -> int:

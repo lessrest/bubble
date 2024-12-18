@@ -134,6 +134,8 @@ dev-dependencies = [
     "coverage==7.*",
     # Used only for comment wrapping functionality
     "autopep8==2.*",
+    # Watchfiles for file watching
+    "watchfiles==0.21.0",
 ]
 
 [tool.ruff]
