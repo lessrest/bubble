@@ -41,6 +41,14 @@ jobs:
     - name: Install dependencies
       run: uv sync --all-extras --dev
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Node.js dependencies
+      run: npm ci
+
     - name: Run tests with coverage
       run: |
         uv run pytest --cov=bubble --md-report --md-report-output tmp.md
