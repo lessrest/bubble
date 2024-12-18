@@ -38,7 +38,7 @@ def logger():
 @fixture
 async def temp_repo(tmp_path: Path):
     """Create a temporary repository for testing"""
-    repo = await Repository.create(Git(tmp_path), namespace=EX)
+    repo = await Repository.create(Git(tmp_path), base_url_template=EX)
     yield repo
 
 

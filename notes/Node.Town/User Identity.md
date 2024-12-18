@@ -1,13 +1,7 @@
 A [[Bubble]] is not necessarily specific to a single person or agent; it may be used by several.
 
-There should be a [[Root Identity]] for each bubble. It would correspond to the [[Keypair]] that's generated when creating a [[Repository]].
+See [[The Concept of a User]] which suggests thinking about capabilities rather than users as the primary concept. Instead of creating new users, we can think of creating new graphs or graph bundles.
 
-It should be possible to create a new [[User]] using the root identity.
+The [[Root Capability]] has unrestricted access to everything. The essential task of access control is to attenuate the root capability in meaningful, helpful ways.
 
-Creating a new user should be a [[Capability]]. That means there should be an [[Actor]] corresponding to the [[Root Identity]] which responds to user creation messages.
-
-So we should spawn a [[Root Actor]].
-
-This brings up the question of [[Actor Identity]].
-
-See [[The Concept of a User]].
+For an [[ActivityPub]] system, the minimal requirement is the ability to create a new inbox with one opaque read URL and another opaque write URL.

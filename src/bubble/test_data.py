@@ -20,7 +20,7 @@ EX = Namespace("http://example.org/")
 async def test_graph_repo_basics():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(Path(workdir))
-        repo = await Repository.create(git, namespace=EX)
+        repo = await Repository.create(git, base_url_template=EX)
 
         # Create initial graph and add data
         with repo.new_graph() as graph_id:
@@ -29,7 +29,7 @@ async def test_graph_repo_basics():
             await repo.save_all()
 
         # Test loading in new repo instance
-        repo2 = await Repository.create(git, namespace=EX)
+        repo2 = await Repository.create(git, base_url_template=EX)
         await repo2.load_all()
 
         # Verify loaded data
@@ -49,7 +49,7 @@ async def test_graph_repo_new_derived_graph():
     """Test deriving graphs with explicit and current context parameters"""
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(Path(workdir))
-        repo = await Repository.create(git, namespace=EX)
+        repo = await Repository.create(git, base_url_template=EX)
 
         # Create source graph
         with repo.new_graph() as source_graph_id:
@@ -97,7 +97,7 @@ async def test_graph_repo_new_derived_graph():
 async def test_graph_repo_new_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(Path(workdir))
-        repo = await Repository.create(git, namespace=EX)
+        repo = await Repository.create(git, base_url_template=EX)
 
         # Create new graph and add data
         with repo.new_graph() as graph_id:
@@ -118,7 +118,7 @@ async def test_graph_repo_new_graph():
 async def test_graph_repo_add_with_current_graph():
     with tempfile.TemporaryDirectory() as workdir:
         git = Git(Path(workdir))
-        repo = await Repository.create(git, namespace=EX)
+        repo = await Repository.create(git, base_url_template=EX)
 
         # Test adding with current graph
         with repo.new_graph() as graph_id:
@@ -134,7 +134,7 @@ async def test_graph_repo_add_with_current_graph():
 
         # Test persistence
         await repo.save_all()
-        repo2 = await Repository.create(git, namespace=EX)
+        repo2 = await Repository.create(git, base_url_template=EX)
         await repo2.load_all()
 
         graph2 = repo2.graph(graph_id)
