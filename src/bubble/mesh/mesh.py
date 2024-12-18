@@ -382,7 +382,7 @@ async def send(actor: URIRef, message: Optional[Graph] = None):
     if message is None:
         message = here.graph.get()
     logger.info("sending message", actor=actor, graph=message)
-    return await system.send(actor, message)
+    await system.send(actor, message)
 
 
 async def receive() -> Graph:

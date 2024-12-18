@@ -4,12 +4,9 @@ import pathlib
 
 import trio
 import typer
-import hypercorn
 import trio_asyncio
-import hypercorn.trio
 
 from typer import Option
-from fastapi import FastAPI
 
 from bubble.logs import configure_logging
 from bubble.cli.info import bubble_info

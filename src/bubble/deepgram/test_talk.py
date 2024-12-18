@@ -6,10 +6,11 @@ import trio
 import pytest
 import structlog
 
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import URIRef, Literal, Namespace
 
 from swash.prfx import NT
-from swash.util import add, get_single_object
+from swash.util import add
+from bubble.logs import configure_logging
 from bubble.http.town import Site
 from bubble.mesh.mesh import send, spawn, with_transient_graph
 from bubble.repo.repo import Git, Repository
@@ -23,71 +24,45 @@ from bubble.deepgram.json import (
 )
 from bubble.deepgram.talk import deepgram_transcription_receiver
 
-EXPECTED_GRAPH = """
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix time: <http://www.w3.org/2006/time#> .
-@prefix vox: <http://example.org/vox#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+configure_logging()
 
-[] a vox:Recognition ;
-    prov:generatedAtTime "2024-03-14T12:00:00Z"^^xsd:dateTime ;
-    prov:wasGeneratedBy _:process ;
-    vox:hasConfidence "0.98"^^xsd:decimal ;
-    vox:hasPunctuatedText "Hello world." ;
-    vox:hasSubdivision _:subdivisions ;
-    vox:hasTime _:interval .
+VOX = Namespace("https://swa.sh/2024/vox#")
 
-_:subdivisions rdf:first [
-    a vox:Recognition ;
-    vox:hasConfidence "0.99"^^xsd:decimal ;
-    vox:hasText "Hello" ;
-    vox:hasTextWithoutPunctuation "Hello" ;
-    time:hasBeginning _:start1 ;
-    time:hasDuration _:duration1
-] .
+VALIDATION_QUERY = """
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX time: <http://www.w3.org/2006/time#>
+PREFIX talk: <https://swa.sh/2024/vox#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ex: <http://example.com/>
 
-_:subdivisions rdf:rest [
-    rdf:first [
-        a vox:Recognition ;
-        vox:hasConfidence "0.97"^^xsd:decimal ;
-        vox:hasText "world." ;
-        vox:hasTextWithoutPunctuation "world" ;
-        time:hasBeginning _:start2 ;
-        time:hasDuration _:duration2
-    ] ;
-    rdf:rest rdf:nil
-] .
-
-_:process a vox:TranscriptionProcess ;
-    prov:wasAssociatedWith vox:Deepgram .
-
-_:interval time:hasBeginning _:start ;
-    time:hasDuration _:duration .
-
-_:start time:inTimePosition [
-    time:numericPosition "0.0"^^xsd:decimal ;
-    time:unitType time:unitSecond
-] .
-
-_:duration time:numericDuration "1.0"^^xsd:decimal ;
-    time:unitType time:unitSecond .
-
-_:start1 time:inTimePosition [
-    time:numericPosition "0.0"^^xsd:decimal ;
-    time:unitType time:unitSecond
-] .
-
-_:duration1 time:numericDuration "0.5"^^xsd:decimal ;
-    time:unitType time:unitSecond .
-
-_:start2 time:inTimePosition [
-    time:numericPosition "0.6"^^xsd:decimal ;
-    time:unitType time:unitSecond
-] .
-
-_:duration2 time:numericDuration "0.4"^^xsd:decimal ;
-    time:unitType time:unitSecond .
+ASK {
+    ?transcript a talk:Transcript ;
+        prov:wasGeneratedBy ex:process ;
+        talk:hasConfidence 0.98 ;
+        talk:hasText "Hello world." ;
+        talk:hasSubdivision (
+            [ a talk:WordTranscript ;
+              talk:hasConfidence 0.99 ;
+              talk:hasText "Hello" ;
+              talk:hasBareWord "Hello" ;
+              time:numericPosition 0.0 ;
+              time:numericDuration 0.5 ;
+              time:hasTRS ex:stream ;
+              prov:wasAttributedTo ?p0
+            ]
+            [ a talk:WordTranscript ;
+              talk:hasConfidence 0.97 ;
+              talk:hasText "world." ;
+              talk:hasBareWord "world" ;
+              time:numericPosition 0.6 ;
+              time:numericDuration 0.4 ;
+              time:hasTRS ex:stream ;
+              prov:wasAttributedTo ?p0
+            ]
+        ) .
+    ?p0 a prov:Person .
+}
 """
 
 
@@ -181,23 +156,11 @@ async def test_transcription_receiver(
             # Allow some time for processing
             await trio.sleep(0.1)
 
-            # Compare the resulting graph with expected
-            expected = Graph()
-            expected.parse(data=EXPECTED_GRAPH, format="turtle")
-
-            gg = repo.dataset.graph(g, base=str(repo.namespace))
-            structlog.get_logger().info("g", g=g, graph=gg)
-
-            result = get_single_object(g, NT.resultedIn, gg)
-            transcript_graph = repo.dataset.graph(
-                result, base=str(repo.namespace)
-            )
-            structlog.get_logger().info(
-                "transcript_graph", graph=transcript_graph
-            )
-
-            #            assert rdflib.compare.isomorphic(transcript_graph, expected)
-
-            # XXX do the comparison
+            # Run SPARQL validation on the entire dataset
+            logger.info("dataset", dataset=repo.dataset)
+            validation_result = repo.dataset.query(VALIDATION_QUERY)
+            assert (
+                validation_result.askAnswer
+            ), "Graph structure does not match expected pattern"
 
             nursery.cancel_scope.cancel()
