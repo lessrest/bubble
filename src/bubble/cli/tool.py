@@ -1,10 +1,10 @@
 import os
-
 import rich
 import trio
+import trio_asyncio
+from typer import Option
 
-from rdflib import Namespace
-
+from bubble.cli.app import app, RepoPath
 from swash.mint import fresh_id
 from bubble.repo.repo import Git, Repository, context, from_env
 from bubble.replicate.make import make_image
@@ -12,7 +12,21 @@ from bubble.replicate.make import make_image
 console = rich.console.Console(width=80)
 
 
-async def run_generate_images(prompt: str, repo_path: str):
+@app.command()
+def tool(
+    prompt: str,
+    repo_path: str = RepoPath,
+    base_url: str = Option(
+        ..., "--base-url", help="Base URL for the repository"
+    ),
+) -> None:
+    """Run a tool, for now just generate images."""
+    trio_asyncio.run(_run_generate_images, prompt, repo_path, base_url)
+
+
+async def _run_generate_images(
+    prompt: str, repo_path: str, base_url: str
+) -> None:
     async def generate_images(repo: Repository, prompt: str):
         """Generate and save images for the given prompt."""
         try:
@@ -55,8 +69,6 @@ async def run_generate_images(prompt: str, repo_path: str):
     else:
         # Fall back to creating repo from path
         git = Git(trio.Path(repo_path))
-        repo = await Repository.create(
-            git, namespace=Namespace("file://" + repo_path + "/")
-        )
+        repo = await Repository.create(git, base_url_template=base_url)
         await repo.load_all()
         await generate_images(repo, prompt)

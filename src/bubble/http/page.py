@@ -1,6 +1,5 @@
-import json
-
 from base64 import b64encode
+import json
 from contextlib import contextmanager
 from urllib.parse import quote
 
@@ -11,6 +10,7 @@ from swash.html import tag, text
 from swash.prfx import NT
 from swash.rdfa import rdf_resource
 from bubble.mesh.mesh import vat
+from bubble.repo.repo import context
 
 cdn_scripts = [
     "https://unpkg.com/htmx.org@2",
@@ -110,8 +110,7 @@ def base_shell(title: str):
                                 "transition-colors",
                             ],
                         ):
-                            pubkey = vat.get().get_public_key_bytes()
-                            text(b64encode(pubkey).decode()[0:8])
+                            text(context.repo.get().get_repo_id())
 
                     # Site URL
                     with tag("div", classes="flex flex-col"):

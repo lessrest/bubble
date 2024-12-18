@@ -1,9 +1,11 @@
+import trio
 import structlog
-
+from typer import Option
 from rdflib import URIRef
 from fastapi import WebSocket
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from bubble.cli.app import app
 from bubble.sock.join import (
     receive_datasets,
     signed_connection,
@@ -11,7 +13,18 @@ from bubble.sock.join import (
 )
 
 
-async def bubble_join_simple(town: str, anonymous: bool):
+@app.command()
+def join(
+    town: str = Option(..., "--town", help="Town URL to join"),
+    anonymous: bool = Option(
+        False, "--anonymous", help="Join anonymously without an identity"
+    ),
+) -> None:
+    """Join a remote town as a simple peer that prints incoming messages."""
+    trio.run(_bubble_join, town, anonymous)
+
+
+async def _bubble_join(town: str, anonymous: bool) -> None:
     logger = structlog.get_logger()
 
     async def handle_dataset_receiving(ws: WebSocket, actor_uri: URIRef):

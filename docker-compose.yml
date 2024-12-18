@@ -1,0 +1,22 @@
+services:
+  www:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80"
+    command: [
+      "bubble", "town", 
+      "--bind", "0.0.0.0:80", 
+      "--base-url", "https://{repo}.bubble.local",
+      "--repo", "/data/repo"
+    ]
+    container_name: bubble 
+    labels:
+      - dev.orbstack.domains=*.bubble.local
+    volumes:
+      - ./src:/app/src
+      - ./test:/app/test
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+      - /data

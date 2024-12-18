@@ -1,6 +1,8 @@
 import os
 import hashlib
 import subprocess
+import base64
+from urllib.parse import urlparse
 
 from typing import (
     Any,
@@ -36,13 +38,15 @@ from rich.text import Text
 from rich.console import Console
 from rich.padding import Padding
 from rdflib.namespace import DCAT, PROV, DCTERMS
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 import swash
 
 from swash import here
 from swash.mint import fresh_uri
-from swash.prfx import NT
+from swash.prfx import NT, DID
 from swash.util import O, P, S, add, new, get_single_object
+from bubble.keys import generate_keypair, get_public_key_bytes
 
 FROTH = Namespace("https://node.town/ns/froth#")
 
@@ -242,19 +246,42 @@ class Repository:
     async def __init__(
         self,
         git: Git,
-        namespace: Namespace,
+        base_url_template: str,
         dataset: Optional[Dataset] = None,
         metadata_id: URIRef = URIRef("urn:x-meta:"),
     ):
         self.git = git
-        self.namespace = namespace
+
+        # Generate or load keypair first since we need repo_id for base URL
+        await self._init_keypair()
+
+        # Parse base URL template
+        parsed = urlparse(base_url_template)
+        assert parsed.scheme == "https", "Base URL must start with https://"
+
+        if "{repo}" in parsed.netloc:
+            hostname = parsed.netloc.format(repo=self.repo_id)
+            base_url = parsed._replace(netloc=hostname).geturl()
+        else:
+            base_url = base_url_template
+
+        # Ensure URL ends with forward slash
+        if not base_url.endswith("/"):
+            base_url += "/"
+
+        self.base_url = base_url
+        logger.info(
+            "Using base URL", base_url=self.base_url, repo_id=self.repo_id
+        )
+
+        self.namespace = Namespace(self.base_url)
         self.dataset = dataset or Dataset(default_union=True)
 
-        self.dataset.bind("home", namespace)
+        self.dataset.bind("home", self.namespace)
         self.metadata_id = metadata_id
         self.metadata = self.dataset.graph(metadata_id)
 
-        self.metadata.bind("home", namespace)
+        self.metadata.bind("home", self.namespace)
 
         # Register builtin graphs
         vocab_ext = URIRef("urn:x-bubble:vocab:ext")
@@ -266,7 +293,7 @@ class Repository:
         try:
             content = await self.git.read_file("void.ttl")
             self.metadata.parse(data=content, format="turtle")
-            self.metadata.bind("home", namespace)
+            self.metadata.bind("home", self.namespace)
         except FileNotFoundError:
             # Initialize new metadata graph
             with self.using_metadata():
@@ -288,6 +315,35 @@ class Repository:
             rdflib.store.TripleRemovedEvent, self.on_triple_removed
         )
 
+    async def _init_keypair(self):
+        """Initialize or load the repository's keypair."""
+        try:
+            # Try to load existing keypair from metadata
+            key_data = await self.git.read_file(".bubble/key")
+            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                base64.b64decode(key_data)
+            )
+            self.private_key = private_key
+            self.public_key = private_key.public_key()
+        except FileNotFoundError:
+            # Generate new keypair
+            self.private_key, self.public_key = generate_keypair()
+            # Save private key
+            key_bytes = base64.b64encode(
+                self.private_key.private_bytes_raw()
+            ).decode()
+            await self.git.write_file(".bubble/key", key_bytes)
+
+        # Get repo ID from public key
+        pub_bytes = get_public_key_bytes(self.public_key)
+        self.repo_id = (
+            base64.b32encode(pub_bytes[:5]).decode().rstrip("=").lower()
+        )
+
+    def get_repo_id(self) -> str:
+        """Get the repository's unique ID derived from its public key."""
+        return self.repo_id
+
     def on_triple_added(self, event: rdflib.store.TripleAddedEvent) -> None:
         graph = event.context  # type: ignore
         assert isinstance(graph, Graph)
@@ -304,13 +360,13 @@ class Repository:
     async def create(
         cls,
         git: Git,
-        namespace: Namespace,
+        base_url_template: str,
         dataset: Optional[Dataset] = None,
         metadata_id: URIRef = URIRef("urn:x-bubble:meta"),
     ) -> "Repository":
         """Factory method to create a new Repository instance."""
         self = cls.__new__(cls)
-        await self.__init__(git, namespace, dataset, metadata_id)  # type: ignore
+        await self.__init__(git, base_url_template, dataset, metadata_id)  # type: ignore
         return self
 
     async def create_meta_symlink(self) -> None:
@@ -733,6 +789,10 @@ class Repository:
         except subprocess.CalledProcessError:
             return False
 
+    def get_base_url(self) -> str:
+        """Get the repository's base URL with repo ID if templated."""
+        return self.base_url
+
 
 @asynccontextmanager
 async def from_env() -> AsyncIterator[Repository]:
@@ -740,6 +800,7 @@ async def from_env() -> AsyncIterator[Repository]:
 
     Requires the following environment variables:
     - BUBBLE: Path to the repository
+    - BUBBLE_BASE: Base URL for the repository
     - BUBBLE_GRAPH: Current graph URI
     - BUBBLE_ACTIVITY: Current activity URI
     - BUBBLE_AGENT: Current agent URI
@@ -751,12 +812,15 @@ async def from_env() -> AsyncIterator[Repository]:
         ValueError: If required environment variables are missing
     """
     bubble_path = os.environ.get("BUBBLE")
+    bubble_base = os.environ.get("BUBBLE_BASE")
     bubble_graph = os.environ.get("BUBBLE_GRAPH")
     bubble_activity = os.environ.get("BUBBLE_ACTIVITY")
     bubble_agent = os.environ.get("BUBBLE_AGENT")
 
     if not bubble_path:
         raise ValueError("BUBBLE environment variable not set")
+    if not bubble_base:
+        raise ValueError("BUBBLE_BASE environment variable not set")
     if not bubble_graph:
         raise ValueError("BUBBLE_GRAPH environment variable not set")
     if not bubble_activity:
@@ -766,9 +830,7 @@ async def from_env() -> AsyncIterator[Repository]:
 
     async def init_repo() -> Repository:
         git = Git(trio.Path(bubble_path))
-        repo = await Repository.create(
-            git, namespace=Namespace("file://" + bubble_path + "/")
-        )
+        repo = await Repository.create(git, base_url_template=bubble_base)
         await repo.load_all()
         return repo
 

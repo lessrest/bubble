@@ -34,7 +34,7 @@ PREFIX time: <http://www.w3.org/2006/time#>
 PREFIX talk: <https://swa.sh/2024/vox#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ex: <http://example.com/>
+PREFIX ex: <https://example.com/>
 
 ASK {
     ?transcript a talk:Transcript ;
@@ -124,13 +124,13 @@ async def test_transcription_receiver(
     )
 
     repo = await Repository.create(
-        Git(tmp_path), namespace=Namespace("http://example.com/")
+        Git(tmp_path), base_url_template="https://example.com/"
     )
-    town = Site("http://example.com/", "localhost:8000", repo=repo)
+    town = Site("https://example.com/", "localhost:8000", repo=repo)
     with town.install_context():
         async with trio.open_nursery() as nursery:
-            process = URIRef("http://example.com/process")
-            stream = URIRef("http://example.com/stream")
+            process = URIRef("https://example.com/process")
+            stream = URIRef("https://example.com/stream")
             receiver = await spawn(
                 nursery,
                 deepgram_transcription_receiver,

@@ -4,6 +4,7 @@ import sys
 import trio
 import structlog
 import rdflib.collection
+from typer import Option
 
 from rdflib import PROV, BNode, Literal, Namespace
 
@@ -11,13 +12,27 @@ from swash.prfx import NT
 from swash.util import new
 from bubble.repo.repo import Git, Repository, context
 from bubble.stat.stat import gather_system_info
+from bubble.cli.app import app, RepoPath
 
 
-async def bubble_shell(repo_path: str, namespace: str) -> None:
+@app.command()
+def shell(
+    repo_path: str = RepoPath,
+    base_url: str = Option(
+        "https://example.com/",
+        "--base-url",
+        help="Base URL for the repository",
+    ),
+) -> None:
+    """Create a new repository and start a shell session."""
+    trio.run(_bubble_shell, repo_path, base_url)
+
+
+async def _bubble_shell(repo_path: str, base_url: str) -> None:
     logger = structlog.get_logger()
     git = Git(trio.Path(repo_path))
     await git.init()
-    repo = await Repository.create(git, namespace=Namespace(namespace))
+    repo = await Repository.create(git, base_url_template=base_url)
     await repo.save_all()
     await repo.commit("new repository")
 
@@ -76,6 +91,7 @@ async def bubble_shell(repo_path: str, namespace: str) -> None:
                         cwd=str(graph_dir),
                         env={
                             "BUBBLE": repo_path,
+                            "BUBBLE_BASE": repo.get_base_url(),
                             "BUBBLE_GRAPH": str(derived_id),
                             "BUBBLE_GRAPH_DIR": str(graph_dir),
                             "BUBBLE_ACTIVITY": str(activity),
