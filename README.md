@@ -89,7 +89,7 @@ overmind start
 
 This will start:
 
-- FastAPI server on http://localhost:8000
+- FastAPI server on <http://localhost:8000>
 - Tailwind CSS watcher
 - pytest watcher
 
