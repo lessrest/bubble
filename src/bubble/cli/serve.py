@@ -17,10 +17,10 @@ import swash.here as here
 from swash.prfx import NT, RDF
 from swash.util import add
 from bubble.cli.app import BaseUrl, RepoPath, app
+from bubble.http.tools import SheetEditor
 from bubble.mesh.base import spawn
 from bubble.repo.git import Git
 from bubble.http.cert import generate_self_signed_cert
-from bubble.http.tool import SheetEditor
 from bubble.http.town import Site
 from bubble.mesh.base import this
 from bubble.repo.repo import Repository

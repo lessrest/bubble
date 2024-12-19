@@ -271,6 +271,7 @@ dependencies = [
     { name = "trio-websocket" },
     { name = "typer" },
     { name = "wn" },
+    { name = "yt-dlp" },
 ]
 
 [package.dev-dependencies]
@@ -343,6 +344,7 @@ requires-dist = [
     { name = "trio-websocket", specifier = ">=0.11.1" },
     { name = "typer", specifier = "==0.*" },
     { name = "wn", specifier = ">=0.11.0" },
+    { name = "yt-dlp", specifier = ">=2023.12.30" },
 ]
 
 [package.metadata.requires-dev]
@@ -2429,4 +2431,13 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7d/e3/924c3f64b6b3077889df9a1ece1ed8947e7b61b0a933f2ec93041990a677/yarl-1.18.3-cp312-cp312-win32.whl", hash = "sha256:f91c4803173928a25e1a55b943c81f55b8872f0018be83e3ad4938adffb77dd2", size = 84097 },
     { url = "https://files.pythonhosted.org/packages/34/45/0e055320daaabfc169b21ff6174567b2c910c45617b0d79c68d7ab349b02/yarl-1.18.3-cp312-cp312-win_amd64.whl", hash = "sha256:7e2ee16578af3b52ac2f334c3b1f92262f47e02cc6193c598502bd46f5cd1477", size = 90399 },
     { url = "https://files.pythonhosted.org/packages/f5/4b/a06e0ec3d155924f77835ed2d167ebd3b211a7b0853da1cf8d8414d784ef/yarl-1.18.3-py3-none-any.whl", hash = "sha256:b57f4f58099328dfb26c6a771d09fb20dbbae81d20cfb66141251ea063bd101b", size = 45109 },
+]
+
+[[package]]
+name = "yt-dlp"
+version = "2024.12.13"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/fd/a05fac6661cc43057a6f804eeeba3f8f893f3f3bb22e071e0c4aa798ccdb/yt_dlp-2024.12.13.tar.gz", hash = "sha256:77e15afb9d460ecb7294a39bb5e39dc9f4e8a65f3a37ef4db58800b94d095511", size = 2913186 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/5b/e39cb315ce5be55cfd1ebef707dc2d8e4f02c6c6f8b61752076c67c8427f/yt_dlp-2024.12.13-py3-none-any.whl", hash = "sha256:5a16b7511e8500cbb13ff0babc9c6deb1e049dc1c854a51738aad2529167fcdf", size = 3175556 },
 ]

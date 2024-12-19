@@ -30,7 +30,9 @@ from typing import (
     Optional,
     Awaitable,
     AsyncGenerator,
+    Protocol,
     cast,
+    List,
 )
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -56,11 +58,14 @@ from bubble.mesh.otp import (
     ServerActor,
 )
 from bubble.repo.repo import context, timestamp
-from bubble.apis.recraft import RecraftAPI
-from bubble.deepgram.talk import DeepgramClientActor
-from bubble.apis.replicate import AsyncReadable, make_image, make_video
 
 logger = structlog.get_logger()
+
+
+class AsyncReadable(Protocol):
+    """Protocol for objects that can be read asynchronously."""
+
+    async def aread(self) -> bytes: ...
 
 
 @dataclass
@@ -158,17 +163,19 @@ async def spawn_actor(nursery, actor_class, name: str) -> URIRef:
     """Spawn a new actor and return the actor's URIRef."""
     actor = actor_class()
     actor_uri = await spawn(nursery, actor, name=name)
-    #    await actor.setup(actor_uri)
     return actor_uri
 
 
 async def store_generated_assets(
-    graph_id: URIRef, readables: Iterable[AsyncReadable], mime_type: str
+    graph_id: URIRef,
+    assets: List[
+        tuple[AsyncReadable, str]
+    ],  # List of (readable, mimetype) tuples
 ):
     """Store binary assets in the repository and link them to the graph."""
     async with persist_graph_changes(graph_id):
         distributions = []
-        for readable in readables:
+        for readable, mime_type in assets:
             data = await readable.aread()
             distribution = await context.repo.get().save_blob(
                 data, mime_type
@@ -178,6 +185,7 @@ async def store_generated_assets(
                 {
                     PROV.wasGeneratedBy: this(),
                     PROV.generatedAtTime: timestamp(),
+                    NT.mimeType: Literal(mime_type),
                 },
             )
             distributions.append(distribution)
@@ -283,328 +291,3 @@ class DispatchingActor(ServerActor[None]):
     def current_graph(self) -> Graph:
         """Convenience to return the current context graph."""
         return context.buffer.get()
-
-
-# ------------------------------------
-# Specific Actors
-# ------------------------------------
-
-
-class NoteEditor(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        """Initialize by creating a TextEditor affordance."""
-        new(
-            NT.TextEditor,
-            {
-                NT.placeholder: Literal("Type something...", "en"),
-                NT.message: URIRef(NT.TextUpdate),
-                #                NT.target: actor_uri,
-                NT.text: Literal("", "en"),
-            },
-            actor_uri,
-        )
-
-    @handler(NT.TextUpdate)
-    async def handle_text_update(self, ctx: DispatchContext):
-        new_text = get_single_object(ctx.request_id, NT.text, ctx.buffer)
-        async with persist_graph_changes(this()) as graph:
-            graph.set((this(), NT.text, Literal(new_text, lang="en")))
-            graph.set((this(), NT.modifiedAt, timestamp()))
-        with with_transient_graph() as graph:
-            add(graph, {PROV.revisedEntity: this()})
-            return context.buffer.get()
-
-
-class ImageGenerator(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        new(
-            NT.ImageGenerator,
-            {
-                NT.affordance: create_prompt(
-                    "Image Prompt",
-                    "Enter an image prompt...",
-                    NT.GenerateImage,
-                    actor_uri,
-                )
-            },
-            actor_uri,
-        )
-
-    @handler(NT.GenerateImage)
-    async def handle_generate_image(self, ctx: DispatchContext):
-        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
-        readables = await make_image(prompt)
-        thing = await store_generated_assets(
-            boss(), readables, "image/webp"
-        )
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: thing})
-            return context.buffer.get()
-
-
-class VideoGenerator(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        new(
-            NT.VideoGenerator,
-            {
-                NT.affordance: create_prompt(
-                    "Video Prompt",
-                    "Enter a video prompt...",
-                    NT.GenerateVideo,
-                    actor_uri,
-                )
-            },
-            actor_uri,
-        )
-
-    @handler(NT.GenerateVideo)
-    async def handle_generate_video(self, ctx: DispatchContext):
-        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
-        readables = await make_video(prompt)
-        thing = await store_generated_assets(boss(), readables, "video/mp4")
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: thing})
-            return context.buffer.get()
-
-
-class ImageUploader(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        """Initialize by creating an ImageUploader with upload affordance."""
-        new(
-            NT.ImageUploader,
-            {
-                NT.affordance: new(
-                    NT.ImageUploadForm,
-                    {
-                        NT.label: Literal("Upload Image", "en"),
-                        NT.message: NT.UploadImage,
-                        NT.target: actor_uri,
-                        NT.accept: Literal("image/*"),
-                    },
-                )
-            },
-            actor_uri,
-        )
-
-    @handler(NT.UploadImage)
-    async def handle_upload_image(self, ctx: DispatchContext):
-        """Handle image upload by saving to repo and optionally modifying the background."""
-        # Get the uploaded file from the message
-        file_node = get_single_object(
-            ctx.request_id, NT.fileData, ctx.buffer
-        )
-
-        # Extract file data and mime type from NT.File structure
-        file_data = get_single_object(file_node, NT.data, ctx.buffer)
-        mime_type = get_single_object(file_node, NT.mimeType, ctx.buffer)
-
-        # Convert file_data to bytes
-        file_bytes = cast(bytes, file_data.toPython())
-
-        # Save the original image to the repository
-        distribution = await context.repo.get().save_blob(
-            file_bytes, mime_type
-        )
-
-        # Add provenance information
-        add(
-            distribution,
-            {
-                PROV.wasGeneratedBy: this(),
-                PROV.generatedAtTime: timestamp(),
-            },
-        )
-
-        # Get background option
-        bg_option = get_single_object(
-            ctx.request_id, NT.backgroundOption, ctx.buffer
-        )
-
-        if bg_option and bg_option != Literal("none"):
-            try:
-                # Create temporary file for Recraft API
-                with tempfile.NamedTemporaryFile(
-                    suffix=".png", delete=False
-                ) as tmp:
-                    tmp.write(file_bytes)
-                    tmp_path = tmp.name
-
-                try:
-                    # Process the image using Recraft API
-                    recraft = RecraftAPI()
-
-                    processed_url = None
-                    if bg_option == Literal("remove"):
-                        processed_url = await recraft.remove_background(
-                            tmp_path
-                        )
-                    elif bg_option == Literal("modify"):
-                        bg_prompt = get_single_object(
-                            ctx.request_id, NT.backgroundPrompt, ctx.buffer
-                        )
-                        if not bg_prompt:
-                            raise ValueError(
-                                "Background prompt is required for modification"
-                            )
-                        processed_url = await recraft.modify_background(
-                            tmp_path, str(bg_prompt)
-                        )
-
-                    if not processed_url:
-                        raise ValueError(
-                            f"Invalid background option: {bg_option}"
-                        )
-
-                    # Add the processed version
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(processed_url)
-                        response.raise_for_status()
-                        processed_data = response.content
-
-                    processed_dist = await context.repo.get().save_blob(
-                        processed_data, mime_type
-                    )
-                    add(
-                        processed_dist,
-                        {
-                            PROV.wasGeneratedBy: this(),
-                            PROV.generatedAtTime: timestamp(),
-                            NT.backgroundModified: Literal(True),
-                            NT.backgroundOption: bg_option,
-                        },
-                    )
-                    distribution = processed_dist
-                finally:
-                    # Clean up the temporary file
-                    os.unlink(tmp_path)
-
-            except Exception as e:
-                logger.error("Failed to process background", error=e)
-                # Continue with original image if background processing fails
-
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: distribution})
-            return context.buffer.get()
-
-
-class SheetEditor(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        """Initialize by creating a SheetEditor with affordances."""
-        new(
-            NT.SheetEditor,
-            {
-                NT.affordance: {
-                    create_button(
-                        "New Note",
-                        icon="✏️",
-                        message_type=NT.AddNote,
-                        target=actor_uri,
-                    ),
-                    create_button(
-                        "New Speech",
-                        icon="🎤",
-                        message_type=NT.RecordVoice,
-                        target=actor_uri,
-                    ),
-                    create_button(
-                        "New Image",
-                        icon="🖼️",
-                        message_type=NT.MakeImage,
-                        target=actor_uri,
-                    ),
-                    create_button(
-                        "Upload Image",
-                        icon="📤",
-                        message_type=NT.AddImageUploader,
-                        target=actor_uri,
-                    ),
-                    create_button(
-                        "New Video",
-                        icon="🎥",
-                        message_type=NT.MakeVideo,
-                        target=actor_uri,
-                    ),
-                },
-            },
-            actor_uri,
-        )
-
-    @handler(NT.AddNote)
-    async def handle_add_note(self, ctx: DispatchContext):
-        actor_uri = await spawn_actor(
-            ctx.nursery, NoteEditor, "note editor"
-        )
-        await add_affordance_to_sheet(this(), actor_uri)
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: actor_uri})
-            return context.buffer.get()
-
-    @handler(NT.MakeImage)
-    async def handle_make_image(self, ctx: DispatchContext):
-        actor_uri = await spawn_actor(
-            ctx.nursery, ImageGenerator, "image generator"
-        )
-        await add_affordance_to_sheet(this(), actor_uri)
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: actor_uri})
-            return context.buffer.get()
-
-    @handler(NT.MakeVideo)
-    async def handle_make_video(self, ctx: DispatchContext):
-        actor_uri = await spawn_actor(
-            ctx.nursery, VideoGenerator, "video generator"
-        )
-        await add_affordance_to_sheet(this(), actor_uri)
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: actor_uri})
-            return context.buffer.get()
-
-    @handler(NT.RecordVoice)
-    async def handle_record_voice(self, ctx: DispatchContext):
-        actor_uri = await spawn_actor(
-            ctx.nursery, DeepgramClientActor, "voice recorder"
-        )
-        await add_affordance_to_sheet(this(), actor_uri)
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: actor_uri})
-            return context.buffer.get()
-
-    @handler(NT.AddImageUploader)
-    async def handle_add_image_uploader(self, ctx: DispatchContext):
-        actor_uri = await spawn_actor(
-            ctx.nursery, ImageUploader, "image uploader"
-        )
-        await add_affordance_to_sheet(this(), actor_uri)
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: actor_uri})
-            return context.buffer.get()
-
-
-class SheetCreator(DispatchingActor):
-    async def setup(self, actor_uri: URIRef):
-        """Initialize by creating a SheetCreator with a 'New Sheet' button."""
-        new(
-            NT.SheetCreator,
-            {
-                NT.affordance: create_button(
-                    "New Sheet",
-                    icon="📝",
-                    message_type=NT.CreateSheet,
-                    target=actor_uri,
-                )
-            },
-            actor_uri,
-        )
-
-    @handler(NT.CreateSheet)
-    async def handle_create_sheet(self, ctx: DispatchContext):
-        async with new_persistent_graph():
-            editor_uri = await spawn_actor(
-                ctx.nursery,
-                SheetEditor,
-                name="sheet editor",
-            )
-
-        with with_transient_graph() as graph:
-            add(graph, {PROV.generated: editor_uri})
-            return context.buffer.get()
