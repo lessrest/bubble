@@ -3,6 +3,7 @@ import logging
 import pathlib
 
 import typer
+
 from typer import Option
 
 from bubble.logs import configure_logging

@@ -26,46 +26,50 @@ rudimentary and not feature-complete, it outlines a scalable approach to
 structuring real-time audio transcriptions within a semantic framework.
 """
 
+from collections import defaultdict
+from datetime import UTC, datetime
 import os
 
-from typing import Optional, AsyncContextManager
-from datetime import UTC, datetime
-from collections import defaultdict
+from typing import (
+    AsyncContextManager,
+    Optional,
+)
 from urllib.parse import urlencode
 
-import trio
 import structlog
 
-from rdflib import XSD, Graph, URIRef, Literal, IdentifiedNode
-from trio_websocket import Endpoint, WebSocketConnection, open_websocket_url
-from rdflib.namespace import PROV, TIME
+from rdflib import PROV, TIME, XSD, Graph, IdentifiedNode, URIRef, Literal
 
-import swash.here as here
-
+from swash import here
 from swash.prfx import NT, TALK, Deepgram
 from swash.time import make_interval
 from swash.util import (
     add,
-    new,
-    is_a,
     blank,
     decimal,
     make_list,
+    new,
+    is_a,
     get_single_object,
 )
-from bubble.mesh.mesh import (
-    ServerActor,
-    send,
-    spawn,
+import trio
+from trio_websocket import open_websocket_url, WebSocketConnection, Endpoint
+
+from bubble.deepgram.json import DeepgramMessage, DeepgramParams, Word
+from bubble.mesh.base import (
     persist,
     receive,
+    send,
+    spawn,
     txgraph,
     with_transient_graph,
 )
+from bubble.mesh.otp import (
+    ServerActor,
+)
 from bubble.repo.repo import timestamp
-from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 
 def using_deepgram_live_session(

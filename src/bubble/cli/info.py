@@ -1,17 +1,19 @@
 import os
+
 from datetime import datetime
 
 import trio_asyncio
+
 from rich import box
+from rdflib import DCAT, PROV, URIRef, Literal
 from rich.panel import Panel
 from rich.table import Table
 from rich.console import Console
-from rdflib import DCAT, PROV, URIRef, Literal
 
-from bubble.cli.app import app
 from swash.html import document
 from swash.lynx import render_html
 from swash.rdfa import rdf_resource, autoexpanding
+from bubble.cli.app import app
 from bubble.repo.repo import from_env
 
 

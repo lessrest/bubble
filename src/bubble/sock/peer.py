@@ -15,7 +15,8 @@ from swash.mint import fresh_uri
 from swash.prfx import NT
 from swash.util import S, add, new
 from bubble.keys import verify_signed_data
-from bubble.mesh.mesh import Vat, ActorContext, with_transient_graph
+from bubble.mesh.base import ActorContext, Vat
+from bubble.mesh.base import with_transient_graph
 from bubble.repo.repo import context
 
 logger = structlog.get_logger(__name__)
@@ -194,7 +195,7 @@ async def _perform_handshake(
             outgoing_handshake,
         )
 
-        handshake_msg = context.graph.get().serialize(format="turtle")
+        handshake_msg = context.buffer.get().serialize(format="turtle")
         logger.info("sending handshake", graph=handshake_msg)
         await websocket.send_text(handshake_msg)
 

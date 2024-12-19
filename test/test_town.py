@@ -15,19 +15,19 @@ from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
 from swash.util import is_a, bubble, get_single_object
 from bubble.logs import configure_logging
+from bubble.mesh.base import receive, send, spawn, this
+from bubble.mesh.call import call
+from bubble.repo.git import Git
 from bubble.http.town import (
     Site,
     town_app,
 )
-from bubble.mesh.mesh import (
+from bubble.mesh.otp import (
     ServerActor,
-    call,
-    send,
-    this,
-    spawn,
-    receive,
 )
-from bubble.repo.repo import Git, Repository
+from bubble.repo.repo import Repository
+
+logger = structlog.get_logger(__name__)
 
 
 @fixture

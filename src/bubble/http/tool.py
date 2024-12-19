@@ -1,3 +1,26 @@
+"""Digital Craftsmanship: The Art of Message Handling
+
+In traditional crafts, a master artisan's workshop is organized around
+their tools - each with its place, each with its purpose. In our
+digital workshop, we organize around message handlers and actors,
+each precisely tuned to handle specific types of interactions.
+
+This module implements a sophisticated message handling system where:
+
+- Actors are our master craftsmen
+- Messages are their raw materials
+- Handlers are their specialized tools
+- Graphs are their workbenches
+
+Historical note: The actor model dates back to 1973, but like a
+well-maintained craftsman's tool, it has only grown more valuable
+with time. Here we blend it with modern Python's type system and
+async capabilities.
+"""
+
+import os
+import tempfile
+
 from typing import (
     Dict,
     Self,
@@ -7,10 +30,13 @@ from typing import (
     Optional,
     Awaitable,
     AsyncGenerator,
+    cast,
 )
+from pathlib import Path
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
+import httpx
 import structlog
 
 from trio import Nursery
@@ -18,35 +44,37 @@ from rdflib import PROV, Graph, URIRef, Literal
 
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
-from bubble.mesh.mesh import (
-    ServerActor,
+from bubble.mesh.base import (
     boss,
-    this,
-    spawn,
     persist,
+    spawn,
+    this,
     txgraph,
     with_transient_graph,
 )
+from bubble.mesh.otp import (
+    ServerActor,
+)
 from bubble.repo.repo import context, timestamp
-from bubble.deepgram.talk import DeepgramClientActor
-from bubble.replicate.make import AsyncReadable, make_image, make_video
 from bubble.apis.recraft import RecraftAPI
-
-import httpx
-from pathlib import Path
-from typing import cast
-import tempfile
-import os
+from bubble.deepgram.talk import DeepgramClientActor
+from bubble.apis.replicate import AsyncReadable, make_image, make_video
 
 logger = structlog.get_logger()
 
 
 @dataclass
 class DispatchContext:
-    """Context for message dispatch handling."""
+    """Context for message dispatch handling.
+
+    Like a craftsman's workbench, this context provides everything
+    needed to handle a message - the nursery for spawning helpers,
+    the graph for recording work, and the request ID for tracking
+    our creation.
+    """
 
     nursery: Nursery
-    graph: Graph
+    buffer: Graph
     request_id: URIRef
 
 
@@ -57,7 +85,13 @@ class DispatchContext:
 
 @asynccontextmanager
 async def persist_graph_changes(graph_id: URIRef):
-    """Context manager to bind to a graph, apply updates, and persist changes."""
+    """Context manager to bind to a graph, apply updates, and persist changes.
+
+    Like a master craftsman signing their work, this ensures our
+    changes are properly recorded and preserved. It's the digital
+    equivalent of applying a final protective finish to a piece
+    of fine woodwork.
+    """
     with context.bind_graph(graph_id) as sheet:
         try:
             yield sheet
@@ -79,7 +113,12 @@ def create_button(
     message_type: URIRef,
     target: Optional[URIRef] = None,
 ) -> URIRef:
-    """Create a button affordance with a given label and message type."""
+    """Create a button affordance with a given label and message type.
+
+    Like crafting a fine tool handle, this shapes raw materials
+    (label, icon, message type) into a polished interface element
+    that fits perfectly in the user's hand.
+    """
     return new(
         NT.Button,
         {
@@ -163,10 +202,12 @@ async def store_generated_assets(
 
 
 def handler[T](msg_type: URIRef) -> Callable[[T], T]:
-    """
-    A decorator to register a handler method for a given message type.
-    The decorator attaches the message type to the function so it can be
-    picked up by the class-level introspection.
+    """A decorator to register a handler method for a given message type.
+
+    Like a master craftsman's stamp that marks each tool for its
+    specific purpose, this decorator marks methods to handle
+    specific types of messages. It's how we maintain order in
+    our digital workshop.
     """
 
     def decorator(fn: T) -> T:
@@ -178,6 +219,12 @@ def handler[T](msg_type: URIRef) -> Callable[[T], T]:
 
 class DispatchingActor(ServerActor[None]):
     """A base actor that provides structured message handling via decorators.
+
+    Like a master craftsman who can handle many different types of
+    work, this actor knows how to process various message types
+    through its registered handlers. It's the foundation of our
+    digital workshop, where each message is carefully routed to
+    the right specialist.
 
     This class is intended to be subclassed by actors that need to handle
     messages and persist changes to their own identity graphs, which we call
@@ -223,7 +270,7 @@ class DispatchingActor(ServerActor[None]):
 
         ctx = DispatchContext(
             nursery=nursery,
-            graph=graph,
+            buffer=graph,
             request_id=request_id,
         )
 
@@ -235,7 +282,7 @@ class DispatchingActor(ServerActor[None]):
 
     def current_graph(self) -> Graph:
         """Convenience to return the current context graph."""
-        return context.graph.get()
+        return context.buffer.get()
 
 
 # ------------------------------------
@@ -259,13 +306,13 @@ class NoteEditor(DispatchingActor):
 
     @handler(NT.TextUpdate)
     async def handle_text_update(self, ctx: DispatchContext):
-        new_text = get_single_object(ctx.request_id, NT.text, ctx.graph)
+        new_text = get_single_object(ctx.request_id, NT.text, ctx.buffer)
         async with persist_graph_changes(this()) as graph:
             graph.set((this(), NT.text, Literal(new_text, lang="en")))
             graph.set((this(), NT.modifiedAt, timestamp()))
         with with_transient_graph() as graph:
             add(graph, {PROV.revisedEntity: this()})
-            return context.graph.get()
+            return context.buffer.get()
 
 
 class ImageGenerator(DispatchingActor):
@@ -285,14 +332,14 @@ class ImageGenerator(DispatchingActor):
 
     @handler(NT.GenerateImage)
     async def handle_generate_image(self, ctx: DispatchContext):
-        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.graph)
+        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
         readables = await make_image(prompt)
         thing = await store_generated_assets(
             boss(), readables, "image/webp"
         )
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: thing})
-            return context.graph.get()
+            return context.buffer.get()
 
 
 class VideoGenerator(DispatchingActor):
@@ -312,12 +359,12 @@ class VideoGenerator(DispatchingActor):
 
     @handler(NT.GenerateVideo)
     async def handle_generate_video(self, ctx: DispatchContext):
-        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.graph)
+        prompt = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
         readables = await make_video(prompt)
         thing = await store_generated_assets(boss(), readables, "video/mp4")
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: thing})
-            return context.graph.get()
+            return context.buffer.get()
 
 
 class ImageUploader(DispatchingActor):
@@ -344,12 +391,12 @@ class ImageUploader(DispatchingActor):
         """Handle image upload by saving to repo and optionally modifying the background."""
         # Get the uploaded file from the message
         file_node = get_single_object(
-            ctx.request_id, NT.fileData, ctx.graph
+            ctx.request_id, NT.fileData, ctx.buffer
         )
 
         # Extract file data and mime type from NT.File structure
-        file_data = get_single_object(file_node, NT.data, ctx.graph)
-        mime_type = get_single_object(file_node, NT.mimeType, ctx.graph)
+        file_data = get_single_object(file_node, NT.data, ctx.buffer)
+        mime_type = get_single_object(file_node, NT.mimeType, ctx.buffer)
 
         # Convert file_data to bytes
         file_bytes = cast(bytes, file_data.toPython())
@@ -370,7 +417,7 @@ class ImageUploader(DispatchingActor):
 
         # Get background option
         bg_option = get_single_object(
-            ctx.request_id, NT.backgroundOption, ctx.graph
+            ctx.request_id, NT.backgroundOption, ctx.buffer
         )
 
         if bg_option and bg_option != Literal("none"):
@@ -393,7 +440,7 @@ class ImageUploader(DispatchingActor):
                         )
                     elif bg_option == Literal("modify"):
                         bg_prompt = get_single_object(
-                            ctx.request_id, NT.backgroundPrompt, ctx.graph
+                            ctx.request_id, NT.backgroundPrompt, ctx.buffer
                         )
                         if not bg_prompt:
                             raise ValueError(
@@ -437,7 +484,7 @@ class ImageUploader(DispatchingActor):
 
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: distribution})
-            return context.graph.get()
+            return context.buffer.get()
 
 
 class SheetEditor(DispatchingActor):
@@ -490,7 +537,7 @@ class SheetEditor(DispatchingActor):
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: actor_uri})
-            return context.graph.get()
+            return context.buffer.get()
 
     @handler(NT.MakeImage)
     async def handle_make_image(self, ctx: DispatchContext):
@@ -500,7 +547,7 @@ class SheetEditor(DispatchingActor):
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: actor_uri})
-            return context.graph.get()
+            return context.buffer.get()
 
     @handler(NT.MakeVideo)
     async def handle_make_video(self, ctx: DispatchContext):
@@ -510,7 +557,7 @@ class SheetEditor(DispatchingActor):
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: actor_uri})
-            return context.graph.get()
+            return context.buffer.get()
 
     @handler(NT.RecordVoice)
     async def handle_record_voice(self, ctx: DispatchContext):
@@ -520,7 +567,7 @@ class SheetEditor(DispatchingActor):
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: actor_uri})
-            return context.graph.get()
+            return context.buffer.get()
 
     @handler(NT.AddImageUploader)
     async def handle_add_image_uploader(self, ctx: DispatchContext):
@@ -530,7 +577,7 @@ class SheetEditor(DispatchingActor):
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: actor_uri})
-            return context.graph.get()
+            return context.buffer.get()
 
 
 class SheetCreator(DispatchingActor):
@@ -560,4 +607,4 @@ class SheetCreator(DispatchingActor):
 
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: editor_uri})
-            return context.graph.get()
+            return context.buffer.get()

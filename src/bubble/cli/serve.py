@@ -1,28 +1,33 @@
-from urllib.parse import urlparse, urljoin
 import os
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
-from fastapi import FastAPI
 import trio
+import typer
 import hypercorn
 import structlog
-import hypercorn.trio
 import trio_asyncio
+import hypercorn.trio
 from typer import Option
-
-from rdflib import PROV, SKOS, Literal, Namespace
+from rdflib import PROV, SKOS, Literal, Namespace, Graph, URIRef
+from fastapi import FastAPI
 
 import swash.here as here
 
 from swash.prfx import NT, RDF
 from swash.util import add
+from bubble.cli.app import BaseUrl, RepoPath, app
+from bubble.mesh.base import spawn
+from bubble.repo.git import Git
+from bubble.http.cert import generate_self_signed_cert
 from bubble.http.tool import SheetEditor
 from bubble.http.town import Site
-from bubble.mesh.mesh import this, spawn
-from bubble.repo.repo import Git, Repository
-from bubble.http.cert import generate_self_signed_cert
-from bubble.cli.app import app, RepoPath, BaseUrl
+from bubble.mesh.base import this
+from bubble.repo.repo import Repository
 
 logger = structlog.get_logger()
+CONFIG = Namespace("https://bubble.node.town/vocab/config#")
+app_dir = Path(typer.get_app_dir("bubble"))
 
 
 async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
@@ -33,9 +38,48 @@ async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
     )
 
 
+def load_config(
+    repo_path: str,
+) -> tuple[str | None, str | None, str | None, str | None, bool]:
+    """Load configuration from config.ttl if it exists."""
+    config_path = app_dir / "config.ttl"
+
+    if not config_path.exists():
+        logger.warning(
+            "No config.ttl found. Run 'bubble init' to create one, "
+            "or provide configuration through environment variables or command line options."
+        )
+        return None, None, None, None, False
+
+    g = Graph()
+    g.parse(config_path, format="turtle")
+
+    config = URIRef("bubble:config")
+    server_type = str(g.value(config, CONFIG.serverType))
+    base_url = str(g.value(config, CONFIG.baseUrl))
+
+    if server_type == "self-signed":
+        bind = f"{g.value(config, CONFIG.hostname)}:{g.value(config, CONFIG.port)}"
+        cert_file = str(g.value(config, CONFIG.certFile))
+        key_file = str(g.value(config, CONFIG.keyFile))
+        self_signed = True
+    elif server_type == "ssl":
+        bind = f"{g.value(config, CONFIG.hostname)}:{g.value(config, CONFIG.port)}"
+        cert_file = str(g.value(config, CONFIG.certFile))
+        key_file = str(g.value(config, CONFIG.keyFile))
+        self_signed = False
+    else:  # http
+        bind = f"{g.value(config, CONFIG.bindHost)}:{g.value(config, CONFIG.bindPort)}"
+        cert_file = None
+        key_file = None
+        self_signed = False
+
+    return bind, base_url, cert_file, key_file, self_signed
+
+
 @app.command()
 def serve(
-    bind: str = Option("127.0.0.1:2026", "--bind", help="Bind address"),
+    bind: str = Option(None, "--bind", help="Bind address"),
     base_url: str = BaseUrl,
     repo_path: str = RepoPath,
     shell: bool = Option(False, "--shell", help="Start a bash subshell"),
@@ -50,15 +94,35 @@ def serve(
     ),
 ) -> None:
     """Serve the Node.Town web interface."""
-    # Command line args override environment variables
-    if repo_path is None:
-        repo_path = os.environ.get("BUBBLE")
+
+    # Try to load config.ttl first
+    (
+        config_bind,
+        config_base_url,
+        config_cert,
+        config_key,
+        config_self_signed,
+    ) = load_config(repo_path)
+
+    # Command line args override config.ttl, which overrides environment variables
+    if bind is None:
+        bind = config_bind or os.environ.get(
+            "BUBBLE_BIND", "127.0.0.1:2026"
+        )
     if base_url is None:
-        base_url = os.environ.get("BUBBLE_BASE")
+        base_url = config_base_url or os.environ.get("BUBBLE_BASE")
     if cert_file is None:
-        cert_file = os.environ.get("BUBBLE_CERT")
+        cert_file = config_cert or os.environ.get("BUBBLE_CERT")
     if key_file is None:
-        key_file = os.environ.get("BUBBLE_KEY")
+        key_file = config_key or os.environ.get("BUBBLE_KEY")
+    if not self_signed:
+        self_signed = config_self_signed
+
+    if not any([cert_file, key_file, self_signed]):
+        logger.info(
+            "No SSL configuration found. Run 'bubble init' to configure SSL, "
+            "or ensure HTTPS termination is handled by your reverse proxy."
+        )
 
     trio_asyncio.run(
         _serve,

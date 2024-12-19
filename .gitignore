@@ -21,3 +21,11 @@ src/bubble/static/css/output.css
 .idea/rdfandsparql.xml
 audio_packets.db
 .obsidian
+
+# Documentation
+docs/_build/
+docs/build/
+docs/source/_autosummary/
+docs/source/generated/
+*.doctree
+*.pickle

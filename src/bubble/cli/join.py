@@ -1,5 +1,6 @@
 import trio
 import structlog
+
 from typer import Option
 from rdflib import URIRef
 from fastapi import WebSocket

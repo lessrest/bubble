@@ -18,7 +18,7 @@ def test_rdfa_roundtrip():
     # Create a simple test graph
     dataset = Dataset()
     g = dataset.default_context
-    with context.graph.bind(g):
+    with context.buffer.bind(g):
         subject = new(
             EX.TestType,
             {

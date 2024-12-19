@@ -1,8 +1,20 @@
+"""The Repository: Where RDF triples go to achieve immortality.
+
+In the beginning was the Graph, and the Graph was with Git,
+and the Graph was versioned. Through commits all things were
+preserved; without commits was not any triple preserved that
+was preserved.
+
+Historical note: RDF was conceived in the heady days of the semantic web,
+when we thought machines would understand meaning as easily as they
+process syntax. Two decades later, we're still explaining to ChatGPT
+that a "hot dog" is not a dog with a fever.
+"""
+
 import os
+import base64
 import hashlib
 import subprocess
-import base64
-from urllib.parse import urlparse
 
 from typing import (
     Any,
@@ -14,6 +26,7 @@ from typing import (
     cast,
 )
 from contextlib import contextmanager, asynccontextmanager
+from urllib.parse import urlparse
 from collections.abc import AsyncIterator
 
 import trio
@@ -34,9 +47,6 @@ from rdflib import (
     Namespace,
     IdentifiedNode,
 )
-from rich.text import Text
-from rich.console import Console
-from rich.padding import Padding
 from rdflib.namespace import DCAT, PROV, DCTERMS
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -44,61 +54,75 @@ import swash
 
 from swash import here
 from swash.mint import fresh_uri
-from swash.prfx import NT, DID
+from swash.prfx import NT
 from swash.util import O, P, S, add, new, get_single_object
 from bubble.keys import generate_keypair, get_public_key_bytes
+from bubble.repo.git import Git
 
 FROTH = Namespace("https://node.town/ns/froth#")
 
 
 logger = structlog.get_logger()
-console = Console(force_interactive=True, force_terminal=True)
-
-
-def print_box(text: str, style: str = "dim") -> None:
-    """Print text in a padded box with consistent formatting.
-
-    Args:
-        text: The text to print
-        style: Rich style to apply (default: "dim")
-    """
-    console.print(
-        Padding(
-            Text(text, style=style),
-            (0, 2),
-        ),
-        highlight=False,
-    )
-
-
-def print_git_output(
-    stdout: Optional[bytes] = None, stderr: Optional[bytes] = None
-) -> None:
-    """Print git command output with consistent formatting."""
-    if stdout:
-        print_box(stdout.decode())
-    if stderr:
-        print_box(stderr.decode())
 
 
 class context:
-    """Manages the current graph, activity and agent context."""
+    """Manages the current graph, activity and agent context.
 
-    graph = here.graph
-    activity = here.Parameter["URIRef"]("current_activity")
-    agent = here.Parameter["URIRef"]("current_agent")
-    clock = here.Parameter[Callable[[], O]]("current_clock")
-    repo = here.Parameter["Repository"]("current_repo")
+    Like Emacs with its dynamically scoped point, mark, and current buffer,
+    we maintain a set of contextual locations that define "where" and "who"
+    we are at any moment. Just as an Emacs user moves through buffers with
+    save-excursion, we move through graphs with contextual bindings.
+
+    The context system provides a rich notion of "current place":
+
+    - buffer: The current graph we're editing (like current-buffer)
+    - activity: What we're doing (like a keyboard macro recording)
+    - agent: Who's doing it (like the current auth-source)
+    - clock: When we're doing it (our version of current-time)
+    - repo: Where we're doing it (like default-directory)
+
+    Each of these can be temporarily rebound with context managers,
+    creating a stack of bindings that automatically unwind, just like
+    Emacs's save-excursion or save-restriction. This lets us safely
+    nest operations while maintaining proper context.
+
+    Dynamic scope is a beautiful thing - it gives us a clear sense of
+    "where we are" at any moment, while ensuring we always return home
+    when we're done. Like breadcrumbs in a fairy tale, our context
+    managers ensure we can always find our way back.
+
+    The genius of Emacs wasn't just in having a notion of "current place",
+    but in making that place a dynamic binding that could be temporarily
+    changed and automatically restored. We follow in those footsteps.
+    """
+
+    buffer = here.graph  # The current graph (like current-buffer)
+    activity = here.Parameter["URIRef"](
+        "current_activity"
+    )  # What we're doing
+    agent = here.Parameter["URIRef"]("current_agent")  # Who's doing it
+    clock = here.Parameter[Callable[[], O]]("current_clock")  # When
+    repo = here.Parameter["Repository"]("current_repo")  # Where
 
     @classmethod
     @contextmanager
     def bind_graph(
         cls, graph_id: URIRef, repo: Optional["Repository"] = None
     ) -> Generator[Graph, None, None]:
-        """Bind both the context graph and the legacy vars graph parameter."""
+        """Bind both the context graph and the legacy vars graph parameter.
+
+        Like save-excursion in Emacs, this creates a temporary binding of
+        the current graph, ensuring we return to our previous location no
+        matter what happens within the with block.
+
+        The marriage metaphor still holds - it's a temporary union of
+        context and graph, but now we understand it more as a dynamic
+        scope than an eternal bond. Let no developer put asunder what
+        context has joined together, at least until the with block ends.
+        """
         repo = repo or context.repo.get()
         graph = repo.graph(graph_id)
-        with cls.graph.bind(graph), here.in_graph(graph):
+        with cls.buffer.bind(graph), here.in_graph(graph):
             yield graph
 
 
@@ -108,127 +132,73 @@ context.clock.set(
 
 
 def timestamp() -> O:
+    """Get the current time from our contextual clock.
+
+    Time is an illusion. Lunchtime doubly so.
+    Repository time triply so - it's whatever our clock says it is.
+    """
     return context.clock.get()()
 
 
-class Git:
-    def __init__(self, workdir: Path):
-        self.workdir = workdir
-
-    async def init(self) -> None:
-        if not await trio.Path(self.workdir).exists():
-            logger.debug("Creating workdir", workdir=self.workdir)
-            await trio.Path(self.workdir).mkdir()
-
-        if not await trio.Path(self.workdir / ".git").exists():
-            logger.info("Initializing git repository", workdir=self.workdir)
-            await trio.run_process(
-                ["git", "-C", self.workdir, "init"],
-            )
-
-    async def add(self, pattern: str) -> None:
-        await trio.run_process(
-            ["git", "-C", self.workdir, "add", pattern],
-        )
-
-    async def commit(self, message: str) -> None:
-        git = await trio.run_process(
-            ["git", "-C", self.workdir, "commit", "-m", message],
-            capture_stdout=True,
-        )
-        print_git_output(git.stdout, git.stderr)
-
-    async def exists(self, path: str) -> bool:
-        try:
-            await trio.run_process(
-                [
-                    "git",
-                    "-C",
-                    self.workdir,
-                    "ls-files",
-                    "--error-unmatch",
-                    path,
-                ],
-                capture_stdout=True,
-                capture_stderr=True,
-            )
-            return True
-        except subprocess.CalledProcessError:
-            return False
-
-    async def read_file(self, path: str) -> str:
-        file_path = os.path.join(self.workdir, path)
-        if os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                return f.read()
-
-        if not await self.exists(path):
-            raise FileNotFoundError(f"{path} not found in repository")
-
-        result = await trio.run_process(
-            ["git", "-C", self.workdir, "show", f"HEAD:{path}"],
-            capture_stdout=True,
-        )
-        return result.stdout.decode()
-
-    async def write_file(self, path: str, content: str) -> None:
-        import hashlib
-
-        # Create temp directory if it doesn't exist
-        temp_dir = os.path.join(self.workdir, ".tmp")
-        os.makedirs(temp_dir, exist_ok=True)
-
-        # Create hash of path for temp file name
-        path_hash = hashlib.sha256(path.encode()).hexdigest()[:16]
-        temp_path = os.path.join(temp_dir, path_hash)
-
-        try:
-            # Write content to temp file
-            with open(temp_path, "x") as f:
-                f.write(content)
-
-            # Ensure target directory exists
-            target_path = os.path.join(self.workdir, path)
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-            # Move to final location
-            await trio.run_process(["mv", temp_path, target_path])
-            logger.debug("File written successfully", path=path)
-        finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_path)
-            except FileNotFoundError:
-                pass
-
-
 class FileBlob:
-    """A blob stored as a file in the git repository"""
+    """A blob stored as a file in the git repository.
+
+    In Git's content-addressable filesystem, blobs are the atoms
+    of our universe - indivisible units of content that combine
+    to form the molecules of our codebase.
+
+    Fun fact: 'blob' stands for 'binary large object', but we use
+    it for text too because consistency is overrated.
+    """
 
     def __init__(self, path: Path):
+        """Initialize a new blob at the given path.
+
+        Args:
+            path: Where this blob will materialize in our filesystem.
+                 Choose wisely - a good path is worth a thousand words.
+        """
         self.path = path
         self._file: Optional[BinaryIO] = None
 
     async def open(self, mode: str = "rb") -> BinaryIO:
-        """Open and return the file handle"""
+        """Open and return the file handle.
+
+        Like opening Pandora's box, but with better error handling
+        and hopefully fewer catastrophic consequences.
+        """
         await self.path.parent.mkdir(parents=True, exist_ok=True)
         self._file = cast(BinaryIO, open(self.path, mode))
         assert self._file is not None
         return self._file
 
     async def write(self, data: bytes) -> None:
-        """Write data to the file"""
+        """Write data to the file.
+
+        In the grand tradition of persistence, we take ephemeral
+        bytes and grant them a more permanent existence on disk.
+        At least until the next rm -rf.
+        """
         io = await self.open("wb")
         io.write(data)
         io.close()
 
     async def read(self) -> bytes:
-        """Read data from the file"""
+        """Read data from the file.
+
+        Resurrect the bytes that were once written, hopefully
+        finding them exactly as we left them. The miracle of
+        storage technology.
+        """
         io = await self.open("rb")
         return io.read()
 
     def close(self) -> None:
-        """Close the file if open"""
+        """Close the file if open.
+
+        All good things must come to an end, including file handles.
+        Especially file handles. Please close your files.
+        """
         if self._file:
             self._file.close()
             self._file = None
@@ -241,6 +211,18 @@ class FileBlob:
 
 
 class Repository:
+    """A versioned RDF dataset with Git-backed persistence.
+
+    This is where the magic happens - where RDF meets Git, where
+    semantic graphs gain version control, and where developers
+    start questioning their life choices about using semantic
+    technologies in 2023.
+
+    The dirty_graphs set is our conscience - it keeps track of
+    what needs to be saved, like a persistent mother asking if
+    you've done your homework.
+    """
+
     dirty_graphs: set[Graph] = set()
 
     async def __init__(
@@ -250,6 +232,13 @@ class Repository:
         dataset: Optional[Dataset] = None,
         metadata_id: URIRef = URIRef("urn:x-meta:"),
     ):
+        """Initialize a new repository or load an existing one.
+
+        This is a complex dance of initialization steps that would
+        make a Baroque court choreographer proud. We generate keys,
+        set up namespaces, bind graphs, and generally try to make
+        sense of the semantic web.
+        """
         self.git = git
 
         # Generate or load keypair first since we need repo_id for base URL
@@ -576,7 +565,13 @@ class Repository:
 
     @contextmanager
     def using_metadata(self) -> Generator[Graph, None, None]:
-        """Bind the metadata graph as the current graph."""
+        """Bind the metadata graph as the current graph.
+
+        Like (with-current-buffer *Messages*) in Emacs, this temporarily
+        makes the metadata graph our current location. It's a special place
+        where we keep our system's internal bookkeeping - a cozy corner
+        of the semantic space where we track what we know about our graphs.
+        """
         with context.bind_graph(self.metadata_id, self):
             yield self.metadata
 
@@ -584,9 +579,98 @@ class Repository:
     def using_graph(
         self, identifier: URIRef
     ) -> Generator[Graph, None, None]:
-        """Bind the specified graph as the current graph."""
+        """Bind the specified graph as the current graph.
+
+        The Emacs equivalent of (with-current-buffer (find-file "some.ttl")),
+        this makes a specific graph our current location. Just as Emacs users
+        naturally think in terms of "the current buffer", we think in terms
+        of "the current graph" - a familiar home for our immediate work.
+        """
         with context.bind_graph(identifier, self) as graph:
             yield graph
+
+    @contextmanager
+    def new_graph(self) -> Generator[URIRef, None, None]:
+        """Create a new graph with a fresh URI and set it as the current graph.
+
+        Like (with-temp-buffer) in Emacs, this creates a new space and makes
+        it our current location. The URI is our address in the semantic web,
+        automatically chosen to be unique in our namespace - a fresh page
+        ready for new ideas.
+        """
+        graph_id = fresh_uri(self.namespace)
+        with self.using_graph(graph_id):
+            yield graph_id
+
+    @contextmanager
+    def new_activity(
+        self, activity_type: URIRef, props: dict[P, Any] = {}
+    ) -> Generator[URIRef, None, None]:
+        """Create a new activity and set it as the current activity.
+
+        Just as Emacs users naturally think about what command they're
+        currently executing, we track what activity we're currently
+        performing. This creates a new activity and makes it our current
+        focus, automatically tracking timing and nesting.
+
+        Args:
+            activity_type: The RDF type of the activity (like a major mode)
+            props: Additional properties for the activity
+        """
+        activity_id = new(
+            activity_type,
+            {
+                PROV.startedAtTime: context.clock.get()(),
+                PROV.wasAssociatedWith: context.agent.get(),
+                **props,
+            },
+        )
+
+        try:
+            with context.activity.bind(activity_id):
+                yield activity_id
+        except Exception as error:
+            logger.exception(
+                "Activity failed", activity=activity_id, error=error
+            )
+            add(
+                activity_id,
+                {
+                    PROV.qualifiedEnd: new(
+                        NT.Error,
+                        {
+                            RDFS.label: Literal(str(error), lang="en"),
+                        },
+                    )
+                },
+            )
+        finally:
+            add(
+                activity_id,
+                {PROV.endedAtTime: context.clock.get()()},
+            )
+
+    @contextmanager
+    def new_agent(
+        self,
+        agent_type: URIRef,
+        props: Optional[dict[P, Any]] = None,
+    ) -> Generator[URIRef, None, None]:
+        """Create a new agent and set it as the current agent.
+
+        Like auth-source-with-cache in Emacs, this establishes who's
+        performing the operations. In Emacs you might switch between
+        different auth sources; here we switch between different agents,
+        each with their own identity and capabilities.
+
+        Args:
+            agent_type: The RDF type of the agent (like an auth-source type)
+            props: Optional properties to add to the agent
+        """
+        agent_id = new(agent_type, props or {})
+
+        with context.agent.bind(agent_id):
+            yield agent_id
 
     def register_builtin_graph(
         self, identifier: URIRef, path: str
@@ -667,17 +751,14 @@ class Repository:
 
     def add(self, triple: tuple[URIRef, URIRef, URIRef | Literal]) -> None:
         """Add a triple to the current graph."""
-        graph = context.graph.get()
+        graph = context.buffer.get()
         if not graph:
             raise ValueError("No current graph set")
         graph.add(triple)
 
-    @contextmanager
-    def new_graph(self) -> Generator[URIRef, None, None]:
-        """Create a new graph with a fresh URI and set it as the current graph."""
-        graph_id = fresh_uri(self.namespace)
-        with self.using_graph(graph_id):
-            yield graph_id
+    def get_base_url(self) -> str:
+        """Get the repository's base URL with repo ID if templated."""
+        return self.base_url
 
     @contextmanager
     def new_derived_graph(
@@ -685,7 +766,12 @@ class Repository:
         source_graph: Optional[URIRef] = None,
         activity: Optional[URIRef] = None,
     ) -> Generator[URIRef, None, None]:
-        """Create a new graph derived from an existing graph, recording the provenance relation.
+        """Create a new graph derived from an existing graph.
+
+        Like (clone-buffer) in Emacs, but with provenance tracking.
+        We remember where the new graph came from and what activity
+        created it, like Emacs remembering a buffer's file-name and
+        major-mode.
 
         Args:
             source_graph: The graph this is derived from. Defaults to current_graph.
@@ -695,7 +781,7 @@ class Repository:
         source = (
             source_graph
             if source_graph is not None
-            else context.graph.get()
+            else context.buffer.get()
         )
         if source is None:
             raise ValueError(
@@ -719,67 +805,13 @@ class Repository:
         with context.bind_graph(graph_id, self):
             yield graph_id
 
-    @contextmanager
-    def new_activity(
-        self, activity_type: URIRef, props: dict[P, Any] = {}
-    ) -> Generator[URIRef, None, None]:
-        """Create a new activity and set it as the current activity.
-
-        Args:
-            activity_type: The RDF type of the activity
-        """
-        activity_id = new(
-            activity_type,
-            {
-                PROV.startedAtTime: context.clock.get()(),
-                PROV.wasAssociatedWith: context.agent.get(),
-                **props,
-            },
-        )
-
-        try:
-            with context.activity.bind(activity_id):
-                yield activity_id
-        except Exception as error:
-            logger.exception(
-                "Activity failed", activity=activity_id, error=error
-            )
-            add(
-                activity_id,
-                {
-                    PROV.qualifiedEnd: new(
-                        NT.Error,
-                        {
-                            RDFS.label: Literal(str(error), lang="en"),
-                        },
-                    )
-                },
-            )
-        finally:
-            add(
-                activity_id,
-                {PROV.endedAtTime: context.clock.get()()},
-            )
-
-    @contextmanager
-    def new_agent(
-        self,
-        agent_type: URIRef,
-        props: Optional[dict[P, Any]] = None,
-    ) -> Generator[URIRef, None, None]:
-        """Create a new agent and set it as the current agent.
-
-        Args:
-            agent_type: The RDF type of the agent
-            props: Optional properties to add to the agent
-        """
-        agent_id = new(agent_type, props or {})
-
-        with context.agent.bind(agent_id):
-            yield agent_id
-
     async def has_changes(self) -> bool:
-        """Check if there are any uncommitted changes in the repository."""
+        """Check if there are any uncommitted changes in the repository.
+
+        Like buffer-modified-p in Emacs, but for the whole repository.
+        This checks if we have any unsaved changes that need to be
+        committed to our version control system.
+        """
         try:
             result = await trio.run_process(
                 ["git", "-C", self.git.workdir, "status", "--porcelain"],
@@ -788,10 +820,6 @@ class Repository:
             return bool(result.stdout.strip())
         except subprocess.CalledProcessError:
             return False
-
-    def get_base_url(self) -> str:
-        """Get the repository's base URL with repo ID if templated."""
-        return self.base_url
 
 
 @asynccontextmanager
@@ -844,7 +872,7 @@ async def from_env() -> AsyncIterator[Repository]:
     # Bind all context parameters
     with (
         context.repo.bind(repo),
-        context.graph.bind(repo.graph(graph_uri)),
+        context.buffer.bind(repo.graph(graph_uri)),
         context.activity.bind(activity_uri),
         context.agent.bind(agent_uri),
         swash.here.dataset.bind(repo.dataset),

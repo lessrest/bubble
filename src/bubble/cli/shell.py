@@ -4,15 +4,16 @@ import sys
 import trio
 import structlog
 import rdflib.collection
-from typer import Option
 
+from typer import Option
 from rdflib import PROV, BNode, Literal, Namespace
 
 from swash.prfx import NT
 from swash.util import new
-from bubble.repo.repo import Git, Repository, context
+from bubble.cli.app import RepoPath, app
+from bubble.repo.git import Git
+from bubble.repo.repo import Repository, context
 from bubble.stat.stat import gather_system_info
-from bubble.cli.app import app, RepoPath
 
 
 @app.command()
@@ -48,7 +49,7 @@ async def _bubble_shell(repo_path: str, base_url: str) -> None:
         ) as agent:
             arguments = BNode()
             rdflib.collection.Collection(
-                context.graph.get(),
+                context.buffer.get(),
                 arguments,
                 [Literal(arg) for arg in sys.argv[1:]],
             )

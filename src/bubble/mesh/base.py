@@ -1,89 +1,134 @@
+"""The foundation of our actor system, where digital souls come to life.
+
+As Alan Kay once said, "The best way to predict the future is to invent it."
+This module invents a future where every computation is an actor, every message
+a promise, and every failure a chance for redemption through supervision.
+
+Historical note: The actor model was first described by Carl Hewitt in 1973.
+Sadly, it took the industry several decades of pain with shared-state concurrency
+before realizing he was right all along.
+"""
+
+from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from typing import (
-    Any,
-    Set,
-    Dict,
-    Callable,
-    Optional,
-    Protocol,
     Awaitable,
+    Callable,
+    Dict,
     Generator,
     MutableMapping,
-)
-from datetime import UTC, datetime
-from contextlib import contextmanager, asynccontextmanager
-from collections import defaultdict
-from dataclasses import dataclass
-
-import trio
-import tenacity
-import structlog
-
-from rdflib import (
-    RDF,
-    XSD,
-    PROV,
-    RDFS,
-    Graph,
-    URIRef,
-    Literal,
-    Namespace,
+    Optional,
+    Protocol,
+    Set,
 )
 from typing_extensions import runtime_checkable
-from cryptography.hazmat.primitives.asymmetric import ed25519
-
-from swash import Parameter, here, mint
-from swash.prfx import NT, DID, DEEPGRAM
-from swash.util import P, add, new, blank
 from bubble.keys import (
-    generate_keypair,
-    get_public_key_hex,
-    get_public_key_bytes,
     create_identity_graph,
     generate_identity_uri,
+    generate_keypair,
+    get_public_key_bytes,
+    get_public_key_hex,
 )
+
+import structlog
+import trio
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from rdflib import PROV, RDFS, XSD, Graph, Literal, Namespace, URIRef
+from swash import Parameter, here, mint
+from swash.prfx import DEEPGRAM, DID, NT
+from swash.util import add, blank, new
+
+from collections import defaultdict
+from datetime import UTC, datetime
+
 from bubble.repo.repo import context
 
 logger = structlog.get_logger()
 
 
-@dataclass
-class ActorContext:
-    boss: URIRef
-    addr: URIRef
-    proc: URIRef
-    send: trio.MemorySendChannel
-    recv: trio.MemoryReceiveChannel
-    name: str = "anonymous"
-    trap: bool = False
+@runtime_checkable
+class SetupableActor(Protocol):
+    """An actor that requires initialization before its performance begins.
+
+    Like a method actor preparing for a role, these actors need time to get
+    into character before the main show starts.
+    """
+
+    async def setup(self, actor_uri: URIRef): ...
 
 
 def fresh_uri(site: Optional[Namespace] = None) -> URIRef:
+    """Generate a fresh URI for a new entity in our digital theater.
+
+    As Shakespeare wrote, "What's in a name? That which we call a rose
+    By any other name would smell as sweet." But in our case, names
+    really do matter - they're how our actors find each other.
+    """
     if site is None:
         site = vat.get().site
     return mint.fresh_uri(site)
 
 
+@dataclass
+class ActorContext:
+    """The existential context of an actor's being.
+
+    Every actor exists within a context - its boss (supervisor), its own
+    identity (addr), and its current incarnation (proc). Like humans,
+    actors are defined both by their relationships and their individuality.
+
+    The 'trap' flag determines whether errors propagate upward - a feature
+    that has caused more philosophical debates than any boolean should.
+    """
+
+    boss: URIRef  # The entity responsible for our existence
+    addr: URIRef  # Our eternal identity
+    proc: URIRef  # Our current incarnation
+    send: trio.MemorySendChannel  # Our voice to the world
+    recv: trio.MemoryReceiveChannel  # Our ear to the world
+    name: str = "anonymous"  # For those who prefer not to be just a URI
+    trap: bool = False  # To trap or not to trap, that is the exception
+
+
+def root_context(site: Namespace, name: str = "root") -> ActorContext:
+    """Create the primordial context, the first mover, the unmoved mover.
+
+    Every actor system needs its root, its alpha and omega. This function
+    creates that blessed context from which all other contexts spring.
+    """
+    uri = fresh_uri(site)
+    chan_send, chan_recv = trio.open_memory_channel(
+        8
+    )  # 8: a number chosen by fair dice roll
+    return ActorContext(uri, uri, uri, chan_send, chan_recv, name=name)
+
+
 def new_context(parent: URIRef, name: str = "unnamed") -> ActorContext:
+    """Birth a new context from a parent, in the eternal cycle of actor creation.
+
+    Note: We use a channel buffer size of 8 messages. Why 8? Why not? The
+    universe seems to favor powers of 2, who are we to argue?
+    """
     chan_send, chan_recv = trio.open_memory_channel(8)
     return ActorContext(
         parent, fresh_uri(), fresh_uri(), chan_send, chan_recv, name=name
     )
 
 
-def root_context(site: Namespace, name: str = "root") -> ActorContext:
-    uri = fresh_uri(site)
-    chan_send, chan_recv = trio.open_memory_channel(8)
-    return ActorContext(uri, uri, uri, chan_send, chan_recv, name=name)
+@contextmanager
+def with_transient_graph(
+    suffix: Optional[str] = None,
+) -> Generator[URIRef, None, None]:
+    """Create a temporary graph that will fade like tears in rain.
 
-
-def get_site() -> Namespace:
-    """Get the site namespace from the current actor system."""
-    return vat.get().site
-
-
-@runtime_checkable
-class SetupableActor(Protocol):
-    async def setup(self, actor_uri: URIRef): ...
+    As ephemeral as a summer breeze, these graphs exist only to serve
+    a momentary purpose before returning to the void. They are the
+    digital equivalent of zen sand mandalas.
+    """
+    g = create_graph(suffix)
+    with here.graph.bind(g):
+        assert isinstance(g.identifier, URIRef)
+        yield g.identifier
 
 
 class Vat:
@@ -354,11 +399,6 @@ class Vat:
 vat = Parameter[Vat]("hub")
 
 
-def get_base() -> URIRef:
-    """Get the base URI from the current actor system."""
-    return vat.get().site[""]
-
-
 async def spawn(
     nursery: trio.Nursery,
     action: Callable,
@@ -377,6 +417,16 @@ def boss() -> URIRef:
     return vat.get().curr.get().boss
 
 
+def get_base() -> URIRef:
+    """Get the base URI from the current actor system."""
+    return vat.get().site[""]
+
+
+def get_site() -> Namespace:
+    """Get the site namespace from the current actor system."""
+    return vat.get().site
+
+
 async def send(actor: URIRef, message: Optional[Graph] = None):
     system = vat.get()
     if message is None:
@@ -388,36 +438,6 @@ async def send(actor: URIRef, message: Optional[Graph] = None):
 async def receive() -> Graph:
     system = vat.get()
     return await system.curr.get().recv.receive()
-
-
-class ServerActor[State]:
-    def __init__(self, state: State):
-        self.state = state
-        self.name = self.__class__.__name__
-        self.stop = False
-
-    async def __call__(self):
-        """Main actor message processing loop with error handling."""
-        async with trio.open_nursery() as nursery:
-            try:
-                await self.init()
-                while not self.stop:
-                    msg = await receive()
-                    logger.info("received message", graph=msg)
-                    response = await self.handle(nursery, msg)
-                    logger.info("sending response", graph=response)
-
-                    for reply_to in msg.objects(msg.identifier, NT.replyTo):
-                        await send(URIRef(reply_to), response)
-            except Exception as e:
-                logger.error("actor message handling error", error=e)
-                raise
-
-    async def init(self):
-        pass
-
-    async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
-        raise NotImplementedError
 
 
 save_lock = trio.Lock()
@@ -477,17 +497,6 @@ def create_graph(
     return g
 
 
-@contextmanager
-def with_transient_graph(
-    suffix: Optional[str] = None,
-) -> Generator[URIRef, None, None]:
-    """Create a temporary graph that won't be persisted."""
-    g = create_graph(suffix)
-    with here.graph.bind(g):
-        assert isinstance(g.identifier, URIRef)
-        yield g.identifier
-
-
 @asynccontextmanager
 async def txgraph(graph: Optional[Graph] = None):
     g = create_graph()
@@ -498,116 +507,3 @@ async def txgraph(graph: Optional[Graph] = None):
         yield g
 
     await persist(g)
-
-
-class SimpleSupervisor:
-    """A simple supervisor that manages named actors."""
-
-    def __init__(self, actors: dict[str, Callable]):
-        """Initialize with a dictionary mapping names to actor constructors.
-
-        Args:
-            actors: Dictionary mapping actor names to their constructor callables
-        """
-        self.actors = actors
-
-    async def __call__(self):
-        async with txgraph():
-            new(NT.Supervisor, {}, this())
-
-        def retry_sleep(retry_state: tenacity.RetryCallState) -> Any:
-            return logger.warning(
-                "supervised actor tree crashed; retrying after exponential backoff",
-                retrying=retry_state,
-            )
-
-        async with trio.open_nursery() as nursery:
-            for name, actor in self.actors.items():
-                # retry = tenacity.AsyncRetrying(
-                #     wait=tenacity.wait_exponential(multiplier=1, max=60),
-                #     retry=tenacity.retry_if_exception_type(
-                #         (trio.Cancelled, BaseExceptionGroup)
-                #     ),
-                #     before_sleep=retry_sleep,
-                # )
-
-                #                async for attempt in retry:
-                #                   with attempt:
-                logger.info(
-                    "starting supervised actor", actor=actor, name=name
-                )
-                child = await spawn(nursery, actor, name=name)
-                add(this(), {NT.supervises: child})
-
-
-async def call(actor: URIRef, payload: Optional[Graph] = None) -> Graph:
-    if payload is None:
-        payload = here.graph.get()
-
-    sendchan, recvchan = trio.open_memory_channel[Graph](1)
-
-    tmp = fresh_uri()
-    vat.get().deck[tmp] = ActorContext(
-        boss=this(),
-        proc=this(),
-        addr=tmp,
-        send=sendchan,
-        recv=recvchan,
-    )
-
-    payload.add((payload.identifier, NT.replyTo, tmp))
-
-    logger.info(
-        "sending request",
-        actor=actor,
-        graph=payload,
-    )
-
-    await send(actor, payload)
-
-    return await recvchan.receive()
-
-
-def record_message(
-    type: str,
-    actor: URIRef,
-    g: Graph,
-    properties: Dict[P, Any] = {},
-):
-    """Record a message in the graph."""
-    assert isinstance(g.identifier, URIRef)
-    new(
-        URIRef(type),
-        {
-            NT.created: Literal(
-                datetime.now(UTC).isoformat(), datatype=XSD.dateTime
-            ),
-            NT.target: actor,
-            **properties,
-        },
-        g.identifier,
-    )
-
-
-class UptimeActor(ServerActor[datetime]):
-    """Actor that tracks and reports uptime since its creation."""
-
-    async def init(self):
-        self.state = datetime.now(UTC)
-        async with txgraph():
-            new(NT.UptimeActor, {}, this())
-
-    async def handle(self, nursery, graph: Graph) -> Graph:
-        request_id = graph.identifier
-        uptime = datetime.now(UTC) - self.state
-
-        g = create_graph()
-        g.add((g.identifier, RDF.type, NT.UptimeResponse))
-        g.add((g.identifier, NT.uptime, Literal(str(uptime))))
-        g.add((g.identifier, NT.isResponseTo, request_id))
-
-        # If there's a replyTo field, add it to response
-        for reply_to in graph.objects(request_id, NT.replyTo):
-            g.add((g.identifier, NT.replyTo, reply_to))
-
-        return g

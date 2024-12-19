@@ -1,13 +1,16 @@
 import os
+
 import rich
 import trio
 import trio_asyncio
+
 from typer import Option
 
-from bubble.cli.app import app, RepoPath
 from swash.mint import fresh_id
-from bubble.repo.repo import Git, Repository, context, from_env
-from bubble.replicate.make import make_image
+from bubble.cli.app import RepoPath, app
+from bubble.repo.git import Git
+from bubble.repo.repo import Repository, context, from_env
+from bubble.apis.replicate import make_image
 
 console = rich.console.Console(width=80)
 
@@ -38,7 +41,7 @@ async def _run_generate_images(
 
                 # Save the image
                 blob = await repo.get_file(
-                    context.graph.get().identifier, name, "image/webp"
+                    context.buffer.get().identifier, name, "image/webp"
                 )
                 await blob.write(img_data)
                 await repo.save_all()

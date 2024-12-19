@@ -13,10 +13,9 @@ from rdflib import PROV, Graph, URIRef, Literal, Namespace
 
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
-from bubble.mesh.mesh import (
+from bubble.mesh.base import this, txgraph
+from bubble.mesh.otp import (
     ServerActor,
-    this,
-    txgraph,
 )
 from bubble.repo.repo import Repository
 

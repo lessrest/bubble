@@ -9,7 +9,8 @@ from swash.util import new
 from bubble.logs import configure_logging
 from bubble.repo.repo import FROTH
 
-from .repo.repo import Git, Repository, context
+from .repo.Git import Git
+from .repo.repo import Repository, context
 
 logger = configure_logging()
 

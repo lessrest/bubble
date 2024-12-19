@@ -1,7 +1,9 @@
-import httpx
-from typing import Optional
 import os
+
+from typing import Optional
 from pathlib import Path
+
+import httpx
 
 
 class RecraftAPI:

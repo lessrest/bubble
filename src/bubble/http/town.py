@@ -1,3 +1,22 @@
+"""Digital Town Square: Where Code Meets Community
+
+In the physical world, towns grow organically around gathering places -
+markets, churches, town halls. In our digital realm, we build structured
+spaces for interaction, where WebSockets replace town criers and
+linked data forms the streets and signposts of our virtual community.
+
+This module implements a digital town square, complete with:
+- Identity management (our digital citizens)
+- Real-time communication (our virtual conversations)
+- Linked data responses (our semantic signposts)
+- Health monitoring (our town's vital signs)
+
+Historical note: The web started as a simple document sharing system,
+but evolved into rich interactive spaces. This town square continues
+that evolution, adding real-time capabilities while staying true to
+the web's linked data heritage.
+"""
+
 import io
 import json
 import uuid
@@ -42,11 +61,11 @@ from fastapi import (
     HTTPException,
     WebSocketDisconnect,
 )
-from starlette.datastructures import UploadFile
 from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.datastructures import UploadFile
 
 from swash import here, mint, rdfa
 from swash.html import (
@@ -76,16 +95,18 @@ from bubble.http.page import (
     base_html,
     base_shell,
 )
-from bubble.mesh.mesh import (
+from bubble.mesh.base import (
     Vat,
-    vat,
-    call,
+    create_graph,
     send,
     this,
     txgraph,
-    create_graph,
-    record_message,
+    vat,
     with_transient_graph,
+)
+from bubble.mesh.call import call
+from bubble.mesh.otp import (
+    record_message,
 )
 from bubble.repo.repo import Repository, context
 
@@ -93,6 +114,14 @@ logger = structlog.get_logger(__name__)
 
 
 class LinkedDataResponse(HypermediaResponse):
+    """A response that speaks the language of linked data.
+
+    Like a town crier who knows multiple languages, this response
+    can present information in both human-readable HTML and
+    machine-readable RDF formats. It's the digital equivalent
+    of posting a notice that both humans and computers can understand.
+    """
+
     def __init__(
         self,
         graph: Optional[Graph] = None,
@@ -179,6 +208,18 @@ def generate_health_status(id: URIRef):
 
 
 class Site:
+    """A digital town square where actors gather and interact.
+
+    Like a well-planned city, this class provides the infrastructure
+    for digital interaction - from WebSocket connections (our streets)
+    to session management (our citizen registry) to error handling
+    (our safety nets).
+
+    Think of it as a virtual municipality where every connection is
+    a citizen, every message a conversation, and every response a
+    carefully crafted piece of our shared digital space.
+    """
+
     def __init__(
         self,
         base_url: str,
