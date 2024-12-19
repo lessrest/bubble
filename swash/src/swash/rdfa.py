@@ -245,6 +245,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_prompt_resource(subject, data)
     elif data["type"] == NT.TextEditor:
         render_text_editor_resource(subject, data)
+    elif data["type"] == NT.ImageUploadForm:
+        render_image_uploader_resource(subject, data)
     else:
         render_default_resource(subject, data)
     visited_resources.get().add(subject)
@@ -266,6 +268,125 @@ def render_upload_capability_resource(subject: S, data: Dict):
         endpoint=url,
     ):
         pass
+    render_properties(data)
+
+
+@html.div("flex flex-col items-start gap-1")
+def render_image_uploader_resource(subject: S, data: Dict):
+    """Render an upload capability with file input."""
+    attr("vocab", "http://www.w3.org/ns/rdfa#")
+    attr("prefix", "rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+
+    # Get properties
+    label = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.label),
+        "Upload File",
+    )
+    target = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.target), None
+    )
+    message_type = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.message),
+        None,
+    )
+    accept = next(
+        (obj for pred, obj in data["predicates"] if pred == NT.accept),
+        "*/*",
+    )
+
+    with tag(
+        "form",
+        hx_post=f"{target}/message",
+        hx_encoding="multipart/form-data",
+        hx_swap="afterend",
+    ):
+        # Hidden field for message type
+        with tag(
+            "input", type="hidden", name="type", value=str(message_type)
+        ):
+            pass
+
+        # File input group
+        with tag(
+            "div", classes="flex flex-col gap-2 p-2 border rounded-sm"
+        ):
+            classes("bg-cyan-100/50 dark:bg-cyan-700/10")
+            classes("border-cyan-300/50 dark:border-cyan-700/40")
+
+            # File input
+            with tag(
+                "input",
+                type="file",
+                name=str(NT.fileData),
+                accept=str(accept),
+                classes="text-sm text-gray-500 dark:text-gray-400",
+            ):
+                pass
+
+            # Background removal option for images
+            if "image/" in str(accept):
+                with tag("div", classes="flex flex-col gap-2 text-sm"):
+                    # Radio group for background options
+                    with tag("div", classes="flex flex-col gap-1"):
+                        text("Background options:")
+
+                        with tag(
+                            "label", classes="flex items-center gap-2"
+                        ):
+                            with tag(
+                                "input",
+                                type="radio",
+                                name=str(NT.backgroundOption),
+                                value="none",
+                                checked="checked",
+                                onchange="this.form.querySelector('.bg-prompt').classList.add('hidden')",
+                            ):
+                                pass
+                            text("Keep original background")
+
+                        with tag(
+                            "label", classes="flex items-center gap-2"
+                        ):
+                            with tag(
+                                "input",
+                                type="radio",
+                                name=str(NT.backgroundOption),
+                                value="remove",
+                                onchange="this.form.querySelector('.bg-prompt').classList.add('hidden')",
+                            ):
+                                pass
+                            text("Remove background")
+
+                        with tag(
+                            "label", classes="flex items-center gap-2"
+                        ):
+                            with tag(
+                                "input",
+                                type="radio",
+                                name=str(NT.backgroundOption),
+                                value="modify",
+                                onchange="this.form.querySelector('.bg-prompt').classList.remove('hidden')",
+                            ):
+                                pass
+                            text("Modify background")
+
+                    # Background prompt input (initially hidden)
+                    with tag(
+                        "div",
+                        classes="hidden bg-prompt",
+                    ):
+                        with tag(
+                            "input",
+                            type="text",
+                            name=str(NT.backgroundPrompt),
+                            placeholder="Describe the new background...",
+                            classes="w-full p-1 text-sm border rounded-sm",
+                        ):
+                            pass
+
+            # Submit button
+            action_button(str(label), "📤")
+
     render_properties(data)
 
 

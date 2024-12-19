@@ -30,6 +30,13 @@ from bubble.mesh.mesh import (
 from bubble.repo.repo import context, timestamp
 from bubble.deepgram.talk import DeepgramClientActor
 from bubble.replicate.make import AsyncReadable, make_image, make_video
+from bubble.apis.recraft import RecraftAPI
+
+import httpx
+from pathlib import Path
+from typing import cast
+import tempfile
+import os
 
 logger = structlog.get_logger()
 
@@ -313,6 +320,126 @@ class VideoGenerator(DispatchingActor):
             return context.graph.get()
 
 
+class ImageUploader(DispatchingActor):
+    async def setup(self, actor_uri: URIRef):
+        """Initialize by creating an ImageUploader with upload affordance."""
+        new(
+            NT.ImageUploader,
+            {
+                NT.affordance: new(
+                    NT.ImageUploadForm,
+                    {
+                        NT.label: Literal("Upload Image", "en"),
+                        NT.message: NT.UploadImage,
+                        NT.target: actor_uri,
+                        NT.accept: Literal("image/*"),
+                    },
+                )
+            },
+            actor_uri,
+        )
+
+    @handler(NT.UploadImage)
+    async def handle_upload_image(self, ctx: DispatchContext):
+        """Handle image upload by saving to repo and optionally modifying the background."""
+        # Get the uploaded file from the message
+        file_node = get_single_object(
+            ctx.request_id, NT.fileData, ctx.graph
+        )
+
+        # Extract file data and mime type from NT.File structure
+        file_data = get_single_object(file_node, NT.data, ctx.graph)
+        mime_type = get_single_object(file_node, NT.mimeType, ctx.graph)
+
+        # Convert file_data to bytes
+        file_bytes = cast(bytes, file_data.toPython())
+
+        # Save the original image to the repository
+        distribution = await context.repo.get().save_blob(
+            file_bytes, mime_type
+        )
+
+        # Add provenance information
+        add(
+            distribution,
+            {
+                PROV.wasGeneratedBy: this(),
+                PROV.generatedAtTime: timestamp(),
+            },
+        )
+
+        # Get background option
+        bg_option = get_single_object(
+            ctx.request_id, NT.backgroundOption, ctx.graph
+        )
+
+        if bg_option and bg_option != Literal("none"):
+            try:
+                # Create temporary file for Recraft API
+                with tempfile.NamedTemporaryFile(
+                    suffix=".png", delete=False
+                ) as tmp:
+                    tmp.write(file_bytes)
+                    tmp_path = tmp.name
+
+                try:
+                    # Process the image using Recraft API
+                    recraft = RecraftAPI()
+
+                    processed_url = None
+                    if bg_option == Literal("remove"):
+                        processed_url = await recraft.remove_background(
+                            tmp_path
+                        )
+                    elif bg_option == Literal("modify"):
+                        bg_prompt = get_single_object(
+                            ctx.request_id, NT.backgroundPrompt, ctx.graph
+                        )
+                        if not bg_prompt:
+                            raise ValueError(
+                                "Background prompt is required for modification"
+                            )
+                        processed_url = await recraft.modify_background(
+                            tmp_path, str(bg_prompt)
+                        )
+
+                    if not processed_url:
+                        raise ValueError(
+                            f"Invalid background option: {bg_option}"
+                        )
+
+                    # Add the processed version
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(processed_url)
+                        response.raise_for_status()
+                        processed_data = response.content
+
+                    processed_dist = await context.repo.get().save_blob(
+                        processed_data, mime_type
+                    )
+                    add(
+                        processed_dist,
+                        {
+                            PROV.wasGeneratedBy: this(),
+                            PROV.generatedAtTime: timestamp(),
+                            NT.backgroundModified: Literal(True),
+                            NT.backgroundOption: bg_option,
+                        },
+                    )
+                    distribution = processed_dist
+                finally:
+                    # Clean up the temporary file
+                    os.unlink(tmp_path)
+
+            except Exception as e:
+                logger.error("Failed to process background", error=e)
+                # Continue with original image if background processing fails
+
+        with with_transient_graph() as graph:
+            add(graph, {PROV.generated: distribution})
+            return context.graph.get()
+
+
 class SheetEditor(DispatchingActor):
     async def setup(self, actor_uri: URIRef):
         """Initialize by creating a SheetEditor with affordances."""
@@ -336,6 +463,12 @@ class SheetEditor(DispatchingActor):
                         "New Image",
                         icon="🖼️",
                         message_type=NT.MakeImage,
+                        target=actor_uri,
+                    ),
+                    create_button(
+                        "Upload Image",
+                        icon="📤",
+                        message_type=NT.AddImageUploader,
                         target=actor_uri,
                     ),
                     create_button(
@@ -383,6 +516,16 @@ class SheetEditor(DispatchingActor):
     async def handle_record_voice(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
             ctx.nursery, DeepgramClientActor, "voice recorder"
+        )
+        await add_affordance_to_sheet(this(), actor_uri)
+        with with_transient_graph() as graph:
+            add(graph, {PROV.generated: actor_uri})
+            return context.graph.get()
+
+    @handler(NT.AddImageUploader)
+    async def handle_add_image_uploader(self, ctx: DispatchContext):
+        actor_uri = await spawn_actor(
+            ctx.nursery, ImageUploader, "image uploader"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:

@@ -1,6 +1,7 @@
 """Utility functions for N3 processing."""
 
 import sys
+import base64
 
 from typing import Any, Optional, Sequence, overload
 
@@ -219,6 +220,28 @@ def blank(
     return build_resource(BNode(), type, properties)
 
 
+def base64_literal(data: bytes) -> Literal:
+    """Create a base64 encoded literal from bytes data."""
+    encoded = base64.b64encode(data).decode("ascii")
+    return Literal(encoded, datatype=XSD.base64Binary)
+
+
+def to_literal(value: Any) -> O:
+    """Convert a Python value to an RDF object.
+
+    Handles conversion of:
+    - bytes to base64 literals
+    - RDF objects (pass through)
+    - Other values to plain literals
+    """
+    if isinstance(value, bytes):
+        return base64_literal(value)
+    elif isinstance(value, O):
+        return value
+    else:
+        return Literal(value)
+
+
 def build_resource[Subject: S](
     subject: Subject,
     type: Optional[S] = None,
@@ -244,10 +267,8 @@ def build_resource[Subject: S](
             if isinstance(object, list) or isinstance(object, set):
                 # TODO: list should mean rdf list
                 for item in object:
-                    o = item if isinstance(item, O) else Literal(item)
-                    graph.add((subject, predicate, o))
+                    graph.add((subject, predicate, to_literal(item)))
             else:
-                o = object if isinstance(object, O) else Literal(object)
-                graph.add((subject, predicate, o))
+                graph.add((subject, predicate, to_literal(object)))
 
     return subject

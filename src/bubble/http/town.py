@@ -42,6 +42,7 @@ from fastapi import (
     HTTPException,
     WebSocketDisconnect,
 )
+from starlette.datastructures import UploadFile
 from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -312,15 +313,41 @@ class Site:
 
     async def actor_message(self, id: str, request: Request):
         async with request.form() as form:
+            logger.info("actor message", id=id, form=form)
             type = form.get("type")
             assert isinstance(type, str)
             actor = self.site[id]
-            properties: Dict[P, Any] = {
-                URIRef(k): Literal(v)
-                for k, v in form.items()
-                if isinstance(v, str) and k != "type"
-            }
+
             with with_transient_graph():
+                properties: Dict[P, Any] = {}
+
+                # Handle each form field
+                for k, v in form.items():
+                    if k == "type":
+                        continue
+
+                    if isinstance(v, UploadFile):
+                        # Handle file upload as a structured NT.File object
+                        file_data = await v.read()
+                        properties[URIRef(k)] = new(
+                            NT.File,
+                            {
+                                NT.data: file_data,
+                                NT.mimeType: Literal(
+                                    v.content_type
+                                    or "application/octet-stream"
+                                ),
+                            },
+                        )
+                        logger.info(
+                            "file upload", file=properties[URIRef(k)]
+                        )
+                    elif isinstance(v, str):
+                        # Handle regular string values
+                        properties[URIRef(k)] = Literal(v)
+                    else:
+                        raise ValueError("Unknown form field type", v)
+
                 g = here.graph.get()
                 record_message(type, actor, g, properties=properties)
                 result = await call(actor, g)
