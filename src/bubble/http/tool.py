@@ -18,44 +18,35 @@ with time. Here we blend it with modern Python's type system and
 async capabilities.
 """
 
-import os
-import tempfile
-
 from typing import (
     Dict,
+    List,
     Self,
     Callable,
     ClassVar,
-    Iterable,
     Optional,
+    Protocol,
     Awaitable,
     AsyncGenerator,
-    Protocol,
-    cast,
-    List,
 )
-from pathlib import Path
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-import httpx
 import structlog
 
 from trio import Nursery
 from rdflib import PROV, Graph, URIRef, Literal
 
 from swash.prfx import NT
-from swash.util import add, new, is_a, get_single_object
-from bubble.mesh.base import (
-    boss,
-    persist,
-    spawn,
-    this,
-    txgraph,
-    with_transient_graph,
-)
+from swash.util import add, new, is_a
 from bubble.mesh.otp import (
     ServerActor,
+)
+from bubble.mesh.base import (
+    this,
+    spawn,
+    persist,
+    txgraph,
 )
 from bubble.repo.repo import context, timestamp
 
@@ -225,7 +216,7 @@ def handler[T](msg_type: URIRef) -> Callable[[T], T]:
     return decorator
 
 
-class DispatchingActor(ServerActor[None]):
+class DispatchingActor(ServerActor):
     """A base actor that provides structured message handling via decorators.
 
     Like a master craftsman who can handle many different types of
@@ -262,9 +253,6 @@ class DispatchingActor(ServerActor[None]):
             **getattr(cls, "_message_handlers", {}),
             **handlers,
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(None)
 
     async def setup(self, actor_uri: URIRef):
         pass

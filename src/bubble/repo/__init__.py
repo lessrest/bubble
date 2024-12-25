@@ -1,5 +1,5 @@
 """Repository management package for Bubble."""
 
-from . import repo, git
+from . import git, repo
 
 __all__ = ["repo", "git"]

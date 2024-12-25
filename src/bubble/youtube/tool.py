@@ -6,26 +6,28 @@ download videos from various platforms.
 
 import os
 import tempfile
-from datetime import UTC, datetime
-from typing import Optional, List, Dict, Tuple
+
+from typing import Dict, List, Tuple, Optional
 from pathlib import Path
+from datetime import UTC, datetime
 
-import structlog
 import trio
-from rdflib import PROV, Graph, Literal, URIRef
+import structlog
 
+from rdflib import PROV, Graph, URIRef, Literal
+
+from swash.prfx import NT
+from swash.util import add, new, is_a, get_single_object
 from bubble.http.tool import (
     AsyncReadable,
-    DispatchingActor,
-    create_prompt,
-    handler,
-    store_generated_assets,
     DispatchContext,
+    DispatchingActor,
+    handler,
+    create_prompt,
+    store_generated_assets,
 )
-from bubble.mesh.base import this, txgraph, boss, with_transient_graph
+from bubble.mesh.base import boss, this, txgraph, with_transient_graph
 from bubble.repo.repo import context
-from swash.prfx import NT
-from swash.util import add, get_single_object, is_a, new
 
 logger = structlog.get_logger()
 

@@ -15,8 +15,7 @@ from swash.mint import fresh_uri
 from swash.prfx import NT
 from swash.util import S, add, new
 from bubble.keys import verify_signed_data
-from bubble.mesh.base import ActorContext, Vat
-from bubble.mesh.base import with_transient_graph
+from bubble.mesh.base import Vat, ActorContext, with_transient_graph
 from bubble.repo.repo import context
 
 logger = structlog.get_logger(__name__)

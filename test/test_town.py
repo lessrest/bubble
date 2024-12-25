@@ -15,19 +15,17 @@ from swash.mint import fresh_uri
 from swash.prfx import NT, RDF
 from swash.util import is_a, bubble, get_single_object
 from bubble.logs import configure_logging
-from bubble.mesh.base import receive, send, spawn, this
-from bubble.mesh.call import call
+from bubble.mesh.otp import (
+    ServerActor,
+)
 from bubble.repo.git import Git
 from bubble.http.town import (
     Site,
     town_app,
 )
-from bubble.mesh.otp import (
-    ServerActor,
-)
+from bubble.mesh.base import send, this, spawn, receive
+from bubble.mesh.call import call
 from bubble.repo.repo import Repository
-
-logger = structlog.get_logger(__name__)
 
 
 @fixture
@@ -83,7 +81,11 @@ async def test_basic_actor_system(
             nursery.cancel_scope.cancel()
 
 
-class CounterActor(ServerActor[int]):
+class CounterActor(ServerActor):
+    def __init__(self, state: int):
+        super().__init__()
+        self.state = state
+
     async def handle(self, nursery: trio.Nursery, graph: Graph) -> Graph:
         if is_a(graph.identifier, EX.Inc, graph=graph):
             self.state += 1

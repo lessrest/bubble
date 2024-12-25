@@ -26,48 +26,47 @@ rudimentary and not feature-complete, it outlines a scalable approach to
 structuring real-time audio transcriptions within a semantic framework.
 """
 
-from collections import defaultdict
-from datetime import UTC, datetime
 import os
 
 from typing import (
-    AsyncContextManager,
     Optional,
+    AsyncContextManager,
 )
+from datetime import UTC, datetime
+from collections import defaultdict
 from urllib.parse import urlencode
 
+import trio
 import structlog
 
-from rdflib import PROV, TIME, XSD, Graph, IdentifiedNode, URIRef, Literal
+from rdflib import XSD, PROV, TIME, Graph, URIRef, Literal, IdentifiedNode
+from trio_websocket import Endpoint, WebSocketConnection, open_websocket_url
 
 from swash import here
 from swash.prfx import NT, TALK, Deepgram
 from swash.time import make_interval
 from swash.util import (
     add,
+    new,
+    is_a,
     blank,
     decimal,
     make_list,
-    new,
-    is_a,
     get_single_object,
-)
-import trio
-from trio_websocket import open_websocket_url, WebSocketConnection, Endpoint
-
-from bubble.deepgram.json import DeepgramMessage, DeepgramParams, Word
-from bubble.mesh.base import (
-    persist,
-    receive,
-    send,
-    spawn,
-    txgraph,
-    with_transient_graph,
 )
 from bubble.mesh.otp import (
     ServerActor,
 )
+from bubble.mesh.base import (
+    send,
+    spawn,
+    persist,
+    receive,
+    txgraph,
+    with_transient_graph,
+)
 from bubble.repo.repo import timestamp
+from bubble.deepgram.json import Word, DeepgramParams, DeepgramMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -231,9 +230,9 @@ async def deepgram_session_actor(results: URIRef):
                     await client.send_message(chunk)
 
 
-class DeepgramClientActor(ServerActor[str]):
+class DeepgramClientActor(ServerActor):
     def __init__(self):
-        super().__init__(os.environ["DEEPGRAM_API_KEY"])
+        self.token = os.environ["DEEPGRAM_API_KEY"]
 
     async def setup(self, actor_uri: URIRef):
         create_affordance_button(actor_uri)

@@ -7,10 +7,8 @@ from rdflib.namespace import PROV
 
 from swash.util import new
 from bubble.logs import configure_logging
-from bubble.repo.repo import FROTH
-
-from .repo.Git import Git
-from .repo.repo import Repository, context
+from bubble.repo.git import Git
+from bubble.repo.repo import FROTH, Repository, context
 
 logger = configure_logging()
 

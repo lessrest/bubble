@@ -9,38 +9,38 @@ Sadly, it took the industry several decades of pain with shared-state concurrenc
 before realizing he was right all along.
 """
 
-from contextlib import asynccontextmanager, contextmanager
-from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
+    Set,
     Dict,
-    Generator,
-    MutableMapping,
+    Callable,
     Optional,
     Protocol,
-    Set,
+    Awaitable,
+    Generator,
+    MutableMapping,
 )
+from datetime import UTC, datetime
+from contextlib import contextmanager, asynccontextmanager
+from collections import defaultdict
+from dataclasses import dataclass
+
+import trio
+import structlog
+
+from rdflib import XSD, PROV, RDFS, Graph, URIRef, Literal, Namespace
 from typing_extensions import runtime_checkable
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+from swash import Parameter, here, mint
+from swash.prfx import NT, DID, DEEPGRAM
+from swash.util import add, new, blank
 from bubble.keys import (
+    generate_keypair,
+    get_public_key_hex,
+    get_public_key_bytes,
     create_identity_graph,
     generate_identity_uri,
-    generate_keypair,
-    get_public_key_bytes,
-    get_public_key_hex,
 )
-
-import structlog
-import trio
-from cryptography.hazmat.primitives.asymmetric import ed25519
-from rdflib import PROV, RDFS, XSD, Graph, Literal, Namespace, URIRef
-from swash import Parameter, here, mint
-from swash.prfx import DEEPGRAM, DID, NT
-from swash.util import add, blank, new
-
-from collections import defaultdict
-from datetime import UTC, datetime
-
 from bubble.repo.repo import context
 
 logger = structlog.get_logger()

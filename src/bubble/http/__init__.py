@@ -1,5 +1,5 @@
 """HTTP package for Bubble."""
 
-from . import town, tool, cert, page, pill, icon
+from . import cert, icon, page, pill, tool, town
 
 __all__ = ["town", "tool", "cert", "page", "pill", "icon"]

@@ -23,7 +23,6 @@ import tenacity
 import structlog
 
 from rdflib import (
-    RDF,
     XSD,
     Graph,
     URIRef,
@@ -38,7 +37,6 @@ from bubble.mesh.base import (
     spawn,
     receive,
     txgraph,
-    create_graph,
 )
 
 logger = structlog.get_logger()
@@ -46,24 +44,11 @@ logger = structlog.get_logger()
 State = TypeVar("State")
 
 
-class ServerActor[State]:
-    """A long-running actor that processes messages, inspired by gen_server.
+class ServerActor:
+    """A long-running actor that processes messages, inspired by gen_server."""
 
-    Like a Buddhist monk maintaining their meditation through distractions,
-    these actors maintain their state through a stream of messages.
-
-    The State type parameter represents the actor's inner peace - or at
-    least its internal state. Choose it wisely.
-    """
-
-    def __init__(self, state: State):
-        """Initialize the actor with its initial state.
-
-        Args:
-            state: The initial state. Like the first thought of the day,
-                  it sets the tone for what follows.
-        """
-        self.state = state
+    def __init__(self):
+        """Initialize the actor with its initial state."""
         self.name = self.__class__.__name__
         self.stop = False
 
@@ -196,38 +181,3 @@ def record_message(
         },
         g.identifier,
     )
-
-
-class UptimeActor(ServerActor[datetime]):
-    """Actor that tracks and reports uptime since its creation.
-
-    The digital equivalent of a monastery's timekeeper, marking the
-    passage of time since its awakening. A reminder that in distributed
-    systems, even time itself is relative.
-    """
-
-    async def init(self):
-        """Mark our birth time in the eternal now."""
-        self.state = datetime.now(UTC)
-        async with txgraph():
-            new(NT.UptimeActor, {}, this())
-
-    async def handle(self, nursery, graph: Graph) -> Graph:
-        """Calculate and report how long we've been contemplating existence.
-
-        Returns a graph containing our uptime - a measurement of our
-        persistence in this ephemeral digital realm.
-        """
-        request_id = graph.identifier
-        uptime = datetime.now(UTC) - self.state
-
-        g = create_graph()
-        g.add((g.identifier, RDF.type, NT.UptimeResponse))
-        g.add((g.identifier, NT.uptime, Literal(str(uptime))))
-        g.add((g.identifier, NT.isResponseTo, request_id))
-
-        # If there's a replyTo field, add it to response
-        for reply_to in graph.objects(request_id, NT.replyTo):
-            g.add((g.identifier, NT.replyTo, reply_to))
-
-        return g

@@ -1,6 +1,7 @@
 import os
+
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import trio
 import typer
@@ -8,8 +9,9 @@ import hypercorn
 import structlog
 import trio_asyncio
 import hypercorn.trio
+
 from typer import Option
-from rdflib import PROV, SKOS, Literal, Namespace, Graph, URIRef
+from rdflib import PROV, SKOS, Graph, URIRef, Literal, Namespace
 from fastapi import FastAPI
 
 import swash.here as here
@@ -17,13 +19,12 @@ import swash.here as here
 from swash.prfx import NT, RDF
 from swash.util import add
 from bubble.cli.app import BaseUrl, RepoPath, app
-from bubble.http.tools import SheetEditor
-from bubble.mesh.base import spawn
 from bubble.repo.git import Git
 from bubble.http.cert import generate_self_signed_cert
 from bubble.http.town import Site
-from bubble.mesh.base import this
+from bubble.mesh.base import this, spawn
 from bubble.repo.repo import Repository
+from bubble.http.tools import SheetEditor
 
 logger = structlog.get_logger()
 CONFIG = Namespace("https://bubble.node.town/vocab/config#")
@@ -213,7 +214,7 @@ async def _serve(
 
                 editor = await spawn(
                     nursery,
-                    SheetEditor(this()),
+                    SheetEditor(),
                     name="sheet editor",
                 )
 

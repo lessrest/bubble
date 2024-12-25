@@ -1,5 +1,5 @@
 """Mesh networking package for Bubble."""
 
-from . import base, call, otp
+from . import otp, base, call
 
 __all__ = ["base", "call", "otp"]

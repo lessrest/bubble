@@ -11,10 +11,9 @@ from rdflib import URIRef, Literal, Namespace
 from swash.prfx import NT
 from swash.util import add
 from bubble.logs import configure_logging
-from bubble.mesh.base import send, spawn
 from bubble.repo.git import Git
 from bubble.http.town import Site
-from bubble.mesh.base import with_transient_graph
+from bubble.mesh.base import send, spawn, with_transient_graph
 from bubble.repo.repo import Repository
 from bubble.deepgram.json import (
     Word,

@@ -1,17 +1,20 @@
 """Initialize a new Bubble configuration."""
 
 import os
+
+from typing import Optional
+from pathlib import Path
+
 import trio
 import typer
 import structlog
-from pathlib import Path
-from typing import Optional
+
+from rdflib import Graph, URIRef, Literal, Namespace
 from rich.prompt import Prompt, Confirm
 from rich.console import Console
-from rdflib import Graph, Namespace, Literal, URIRef
 from rdflib.namespace import RDF, XSD
 
-from bubble.cli.app import app, RepoPath
+from bubble.cli.app import RepoPath, app
 from bubble.http.cert import generate_self_signed_cert
 
 # Define our configuration namespace

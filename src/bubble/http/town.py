@@ -17,7 +17,6 @@ that evolution, adding real-time capabilities while staying true to
 the web's linked data heritage.
 """
 
-import io
 import json
 import uuid
 import pathlib
@@ -27,16 +26,12 @@ from base64 import b64encode
 from typing import (
     Any,
     Dict,
-    List,
     Optional,
     AsyncGenerator,
 )
 from contextlib import (
     contextmanager,
-    redirect_stderr,
-    redirect_stdout,
 )
-from collections import defaultdict
 
 import trio
 import structlog
@@ -47,7 +42,6 @@ from rdflib import (
     DCTERMS,
     Graph,
     URIRef,
-    Dataset,
     Literal,
     Namespace,
 )
@@ -61,7 +55,6 @@ from fastapi import (
     HTTPException,
     WebSocketDisconnect,
 )
-from rdflib.graph import QuotedGraph
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,34 +74,35 @@ from swash.rdfa import (
     rdf_resource,
     autoexpanding,
     get_subject_data,
-    visited_resources,
     render_affordance_resource,
 )
-from swash.util import P, S, new
-from swash.word import describe_word
+from swash.util import P, new
 from bubble.keys import (
     build_did_document,
     parse_public_key_hex,
 )
+from bubble.mesh.otp import (
+    record_message,
+)
+from bubble.http.eval import eval_code, eval_form
 from bubble.http.icon import favicon
 from bubble.http.page import (
     base_html,
     base_shell,
 )
+from bubble.http.word import word_lookup, word_lookup_form
 from bubble.mesh.base import (
     Vat,
-    create_graph,
+    vat,
     send,
     this,
     txgraph,
-    vat,
+    create_graph,
     with_transient_graph,
 )
 from bubble.mesh.call import call
-from bubble.mesh.otp import (
-    record_message,
-)
 from bubble.repo.repo import Repository, context
+from bubble.http.render import render_graph_view, render_graphs_overview
 
 logger = structlog.get_logger(__name__)
 
@@ -735,165 +729,21 @@ class Site:
 
     async def eval_form(self):
         """Render the Python code evaluation form."""
-        with base_shell("Python Evaluator"):
-            with tag("div", classes="p-4"):
-                with tag("h1", classes="text-2xl font-bold mb-4"):
-                    text("Python Code Evaluator")
-
-                self.render_exec_form()
-
-        return HypermediaResponse()
-
-    def render_exec_form(self, code: str = ""):
-        with tag(
-            "form",
-            hx_post="/eval",
-            hx_target="this",
-            classes="space-y-4",
-        ):
-            with tag("div"):
-                with tag(
-                    "textarea",
-                    name="code",
-                    placeholder="Enter Python code here...",
-                    classes=[
-                        "w-full h-48 p-2 border font-mono",
-                        "dark:bg-gray-800 dark:text-white",
-                        "dark:border-gray-700 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:outline-none",
-                    ],
-                ):
-                    text(code)
-
-            with tag(
-                "button",
-                type="submit",
-                classes=[
-                    "px-4 py-2 bg-blue-500 text-white hover:bg-blue-600",
-                    "dark:bg-blue-600 dark:hover:bg-blue-700",
-                    "dark:text-white",
-                    "dark:focus:outline-none dark:focus:ring-2 dark:focus:ring-blue-500 dark:focus:ring-offset-2",
-                    "dark:border-blue-500",
-                ],
-            ):
-                text("Run")
+        return await eval_form()
 
     async def eval_code(self, code: str = Form(...)):
         """Evaluate Python code and return the results."""
-        # Capture stdout and stderr
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-
-        try:
-            # Redirect output
-            with redirect_stdout(stdout), redirect_stderr(stderr):
-                # Execute the code in a restricted environment
-                exec_globals = {"print": print}
-                exec(code, exec_globals, {"town": self})
-
-            output = stdout.getvalue()
-            errors = stderr.getvalue()
-
-            # Format the input form again
-            self.render_exec_form(code)
-
-            # Format the response
-            with tag(
-                "div", classes="font-mono whitespace-pre-wrap p-4 rounded"
-            ):
-                if output:
-                    with tag("div", classes="bg-gray-100 p-2 rounded"):
-                        with tag(
-                            "div", classes="text-sm text-gray-600 mb-1"
-                        ):
-                            text("Output:")
-                        text(output)
-
-                if errors:
-                    with tag("div", classes="bg-red-100 p-2 rounded mt-2"):
-                        with tag(
-                            "div", classes="text-sm text-red-600 mb-1"
-                        ):
-                            text("Errors:")
-                        text(errors)
-
-                if not output and not errors:
-                    with tag("div", classes="text-gray-500 italic"):
-                        text("No output")
-
-            # Render the next form
-            self.render_exec_form()
-
-        except Exception as e:
-            with tag("div", classes="bg-red-100 p-2 rounded"):
-                with tag("div", classes="text-sm text-red-600 mb-1"):
-                    text("Error:")
-                text(str(e))
-
-        return HypermediaResponse()
+        return await eval_code(code, town=self)
 
     async def word_lookup_form(
         self, word: Optional[str] = None, error: Optional[str] = None
     ):
         """Render the word lookup form and results if any."""
-        with base_shell("Word Lookup"):
-            with tag("div", classes="p-4"):
-                with tag("h1", classes="text-2xl font-bold mb-4"):
-                    text("WordNet Lookup")
-
-                # Form
-                with tag(
-                    "form",
-                    hx_get="/word",
-                    hx_target="this",
-                    hx_params="*",
-                    classes="mb-6",
-                ):
-                    with tag("div", classes="flex gap-2"):
-                        with tag(
-                            "input",
-                            type="text",
-                            name="word",
-                            value=word or "",
-                            placeholder="Enter a word...",
-                            classes=[
-                                "flex-grow p-2 border rounded",
-                                "dark:bg-gray-800 dark:text-white",
-                                "dark:border-gray-700 focus:border-blue-500",
-                                "focus:ring-blue-500 focus:outline-none",
-                            ],
-                        ):
-                            pass
-
-                        with tag(
-                            "button",
-                            type="submit",
-                            classes=[
-                                "px-4 py-2 bg-blue-500 text-white rounded",
-                                "hover:bg-blue-600",
-                                "dark:bg-blue-600 dark:hover:bg-blue-700",
-                                "focus:outline-none focus:ring-2",
-                                "focus:ring-blue-500 focus:ring-offset-2",
-                            ],
-                        ):
-                            text("Look up")
-
-        return HypermediaResponse()
+        return await word_lookup_form(word, error)
 
     async def word_lookup(self, word: str, pos: Optional[str] = None):
         """Handle word lookup form submission."""
-        if not word.strip():
-            return await self.word_lookup_form(error="Please enter a word")
-
-        pos = pos if pos and pos.strip() else None
-
-        with here.graph.bind(create_graph()):
-            for word_node in describe_word(word, pos):
-                pass
-
-            render_graph_view(here.graph.get())
-            logger.info("word lookup", graph=here.graph.get())
-
-            return HypermediaResponse()
+        return await word_lookup(word, pos)
 
 
 @contextmanager
@@ -908,185 +758,6 @@ def town_app(
     """Create and return a FastAPI app for the town."""
     app = Site(base_url, bind, repo)
     return app.get_fastapi_app()
-
-
-def count_outbound_links(graph: Graph, node: S) -> int:
-    """Count outbound links from a node, excluding rdf:type."""
-    return len(list(graph.triples((node, None, None))))
-
-
-def count_inbound_links(graph: Graph, node: S) -> int:
-    """Count inbound links to a node."""
-    return len(list(graph.subjects(None, node)))
-
-
-def get_traversal_order(graph: Graph) -> List[S]:
-    """Get nodes in traversal order - prioritizing resources with fewer inbound links and more outbound links."""
-    # Count inbound and outbound links for each subject
-    link_scores = {}
-    for subject in graph.subjects():
-        inbound = count_inbound_links(graph, subject)
-        outbound = count_outbound_links(graph, subject)
-        link_scores[subject] = outbound / 2 - inbound * 2
-
-    # Group nodes by type (URIRef vs BNode)
-    typed_nodes = defaultdict(list)
-    for node in link_scores:
-        if isinstance(node, URIRef):
-            typed_nodes["uri"].append(node)
-        else:
-            typed_nodes["bnode"].append(node)
-
-    # Sort each group by score (descending)
-    sorted_nodes = []
-
-    # URIRefs first, sorted by score
-    sorted_nodes.extend(
-        sorted(
-            typed_nodes["uri"], key=lambda x: link_scores[x], reverse=True
-        )
-    )
-
-    # Then BNodes, sorted by score
-    sorted_nodes.extend(
-        sorted(
-            typed_nodes["bnode"], key=lambda x: link_scores[x], reverse=True
-        )
-    )
-
-    return sorted_nodes
-
-
-def is_did_key(graph: Graph, node: S) -> bool:
-    """Check if a node is a DID key."""
-    return node in Namespace("did:")
-
-
-def is_current_identity(node: S) -> bool:
-    """Check if a node is the current town's identity."""
-    try:
-        return node == vat.get().get_identity_uri()
-    except Exception:
-        return False
-
-
-def get_node_classes(graph: Graph, node: S) -> str:
-    """Get the CSS classes for a node based on its type and identity status."""
-    is_key = is_did_key(graph, node)
-    is_current = is_current_identity(node)
-
-    classes = "pl-2 "
-    if is_key:
-        if not is_current:
-            classes += "opacity-50 hidden"
-
-    return classes
-
-
-def render_node(graph: Graph, node: S) -> None:
-    """Render a single node with appropriate styling."""
-    visited = visited_resources.get()
-    if node in visited:
-        return
-
-    with here.in_graph(graph):
-        with tag("div", classes=get_node_classes(graph, node)):
-            dataset = here.dataset.get()
-            dataset.add_graph(graph)
-            data = get_subject_data(dataset, node, context=graph)
-            rdf_resource(node, data)
-
-
-def render_graph_view(graph: Graph) -> None:
-    """Render a complete view of a graph with smart traversal ordering."""
-    nodes = get_traversal_order(graph)
-    typed_nodes = []
-
-    for node in nodes:
-        if list(graph.objects(node, RDF.type)):
-            typed_nodes.append(node)
-
-    logger.info("rendering graph", graph=graph, typed_nodes=typed_nodes)
-
-    with autoexpanding(3):
-        with tag("div", classes="flex flex-col gap-4"):
-            for node in typed_nodes:
-                render_node(graph, node)
-
-
-def render_graphs_overview(dataset: Dataset) -> None:
-    """Render an overview of all graphs in the dataset."""
-    with tag("div", classes="p-4 flex flex-col gap-6"):
-        with tag(
-            "h2",
-            classes="text-2xl font-bold text-gray-800 dark:text-gray-200",
-        ):
-            text("Available Graphs")
-
-        with tag("div", classes="grid gap-4"):
-            # Get all non-formula graphs and sort by triple count (largest first)
-            graphs = [
-                g
-                for g in dataset.graphs()
-                if not isinstance(g, QuotedGraph)
-            ]
-
-            for graph in sorted(graphs, key=len, reverse=True):
-                render_graph_summary(graph)
-
-
-def render_graph_summary(graph: Graph) -> None:
-    """Render a summary card for a single graph."""
-    subject_count = len(set(graph.subjects()))
-    triple_count = len(graph)
-
-    with tag(
-        "div",
-        classes="border rounded-lg p-4 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow",
-    ):
-        # Header with graph ID and stats
-        with tag("div", classes="flex justify-between items-start mb-4"):
-            # Graph ID as link
-            with tag(
-                "a",
-                href=f"/graph?graph={str(graph.identifier)}",
-                classes="text-lg font-medium text-blue-600 dark:text-blue-400 hover:underline",
-            ):
-                text(str(graph.identifier))
-
-            # Stats
-            with tag(
-                "div", classes="text-sm text-gray-500 dark:text-gray-400"
-            ):
-                text(f"{subject_count} subjects, {triple_count} triples")
-
-        # Preview of typed resources
-        typed_subjects = {s for s in graph.subjects(RDF.type, None)}
-        if typed_subjects:
-            with tag("div", classes="mt-2"):
-                with tag(
-                    "h4",
-                    classes="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2",
-                ):
-                    text("Resource Types")
-
-                type_counts = defaultdict(int)
-                for s in typed_subjects:
-                    for t in graph.objects(s, RDF.type):
-                        type_counts[t] += 1
-
-                with tag("div", classes="flex flex-wrap gap-2"):
-                    for rdf_type, count in sorted(
-                        type_counts.items(),
-                        key=lambda x: (-x[1], str(x[0])),
-                    ):
-                        with tag(
-                            "span",
-                            classes="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
-                        ):
-                            text(
-                                f"{str(rdf_type).split('#')[-1].split('/')[-1]} ({count})"
-                            )
 
 
 @html.div("min-h-screen bg-gray-50 dark:bg-gray-900")

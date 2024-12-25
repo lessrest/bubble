@@ -13,10 +13,10 @@ from rdflib import PROV, Graph, URIRef, Literal, Namespace
 
 from swash.prfx import NT
 from swash.util import add, new, is_a, get_single_object
-from bubble.mesh.base import this, txgraph
 from bubble.mesh.otp import (
     ServerActor,
 )
+from bubble.mesh.base import this, txgraph
 from bubble.repo.repo import Repository
 
 logger = structlog.get_logger(__name__)
@@ -67,13 +67,14 @@ async def make_video(prompt: str) -> list[AsyncReadable]:
         return [result]
 
 
-class ReplicateClientActor(ServerActor[str]):
+class ReplicateClientActor(ServerActor):
     """Actor that manages image generation requests"""
 
     store: Repository
 
     def __init__(self, store: Repository):
-        super().__init__(os.environ["REPLICATE_API_TOKEN"])
+        super().__init__()
+        self.state = os.environ["REPLICATE_API_TOKEN"]
         self.store = store
 
     async def init(self):

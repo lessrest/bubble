@@ -12,13 +12,14 @@ building synchronous RPC on top of asynchronous messaging.
 
 from typing import Optional
 
-from bubble.mesh.base import ActorContext, fresh_uri, send, this, vat
-
-import structlog
 import trio
+import structlog
+
 from rdflib import Graph, URIRef
+
 from swash import here
 from swash.prfx import NT
+from bubble.mesh.base import ActorContext, vat, send, this, fresh_uri
 
 logger = structlog.get_logger()
 

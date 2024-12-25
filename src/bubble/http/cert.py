@@ -16,14 +16,15 @@ import tempfile
 from datetime import datetime, timedelta
 
 import structlog
+
 from cryptography.x509 import (
     Name,
-    NameAttribute,
-    CertificateBuilder,
-    random_serial_number,
-    SubjectAlternativeName,
-    ExtendedKeyUsage,
     DNSName,
+    NameAttribute,
+    ExtendedKeyUsage,
+    CertificateBuilder,
+    SubjectAlternativeName,
+    random_serial_number,
 )
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
 from cryptography.hazmat.primitives import hashes, serialization
