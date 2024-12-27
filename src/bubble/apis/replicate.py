@@ -33,14 +33,14 @@ class AsyncReadable(Protocol):
 async def make_image(prompt: str) -> list[AsyncReadable]:
     f = functools.partial(
         replicate.async_run,
-        # "recraft-ai/recraft-v3",
-        "black-forest-labs/flux-dev",
+        "recraft-ai/recraft-v3",
+        # "black-forest-labs/flux-dev",
         input={
             "prompt": prompt,
             "size": "2048x1024",
             #    "style": "realistic_image",
-            "num_outputs": 2,
-            "disable_safety_checker": True,
+            #   "num_outputs": 2,
+            #            "disable_safety_checker": True,
         },
     )
     result = await trio_asyncio.aio_as_trio(f)()

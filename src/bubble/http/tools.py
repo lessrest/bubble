@@ -249,19 +249,19 @@ class SheetEditor(DispatchingActor):
             {
                 NT.affordance: {
                     create_button(
-                        "New Note",
+                        "Write Note",
                         icon="✏️",
                         message_type=NT.AddNote,
                         target=actor_uri,
                     ),
                     create_button(
-                        "New Speech",
+                        "Record Speech",
                         icon="🎤",
                         message_type=NT.RecordVoice,
                         target=actor_uri,
                     ),
                     create_button(
-                        "New Image",
+                        "Make Image",
                         icon="🖼️",
                         message_type=NT.MakeImage,
                         target=actor_uri,
@@ -273,13 +273,13 @@ class SheetEditor(DispatchingActor):
                         target=actor_uri,
                     ),
                     create_button(
-                        "New Video",
+                        "Make Video",
                         icon="🎥",
                         message_type=NT.MakeVideo,
                         target=actor_uri,
                     ),
                     create_button(
-                        "Download Video",
+                        "Fetch Video",
                         icon="⬇️",
                         message_type=NT.AddYouTubeDownloader,
                         target=actor_uri,

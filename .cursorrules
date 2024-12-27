@@ -1,1 +1,7 @@
-keep git commit messages concise and even slightly stupid
+keep git commit messages very concise and even slightly stupid
+
+use list comprehensions when possible
+
+when code is getting repetitive, let me know so we can refactor
+
+use the `new`/`add`/`blank` functions from `swash.util` to create RDF data
