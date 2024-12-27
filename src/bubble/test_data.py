@@ -13,7 +13,7 @@ from bubble.repo.repo import FROTH, Repository, context
 logger = configure_logging()
 
 # Define namespace at module level
-EX = Namespace("http://example.org/")
+EX = Namespace("https://example.org/")
 
 
 async def test_graph_repo_basics():
