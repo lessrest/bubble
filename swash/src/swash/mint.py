@@ -69,7 +69,9 @@ def fresh_uri(namespace: Namespace | Graph) -> URIRef:
         if namespace.base is None:
             namespace = Namespace(str(namespace.identifier))
         namespace = Namespace(str(namespace.base))
-    return mintvar.get().fresh_secure_iri(namespace)
+    new_iri = mintvar.get().fresh_secure_iri(namespace)
+    assert "/" in new_iri
+    return new_iri
 
 
 def fresh_iri() -> URIRef:

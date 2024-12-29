@@ -6,7 +6,7 @@ from pathlib import Path
 from rdflib import RDFS, Graph, Dataset, Literal, Namespace
 
 from swash import here as swash_vars
-from swash.html import Fragment, root, document
+from swash.html import Fragment, root, document, tag, text
 from swash.rdfa import rdf_resource, autoexpanding
 from swash.util import new
 from bubble.repo.repo import context
@@ -18,6 +18,7 @@ def test_rdfa_roundtrip():
     # Create a simple test graph
     dataset = Dataset()
     g = dataset.default_context
+    g.base = str(EX)
     with context.buffer.bind(g):
         subject = new(
             EX.TestType,
@@ -29,19 +30,27 @@ def test_rdfa_roundtrip():
 
         # Render the graph to HTML with RDFa
         with document():
-            with swash_vars.dataset.bind(dataset):
-                with autoexpanding(0):
-                    rdf_resource(subject)
+            with tag("html"):
+                with tag("head"):
+                    with tag("title"):
+                        text("Test Title")
+                with tag("body"):
+                    with swash_vars.dataset.bind(dataset):
+                        with autoexpanding(0):
+                            rdf_resource(subject)
 
             # Get the rendered HTML
             doc = root.get()
             assert isinstance(doc, Fragment)
-            html = doc.to_html(compact=False)
+            html = doc.to_html(compact=True)
 
             print(html)
 
             # Parse HTML with RDFa parser
             result = parse_rdfa_to_nquads(html)
+            print("RDFa parser result:")
+            print(result.stdout)
+            print(result.stderr)
 
             # Parse the N-Quads output
             parsed = Graph()
@@ -73,28 +82,8 @@ def parse_rdfa_to_nquads(html):
         return subprocess.run(
             [
                 "node",
-                "-e",
-                f"""
-                const fs = require('fs');
-                const RdfaParser = require('rdfa-streaming-parser').RdfaParser;
-                const N3 = require('n3');
-                const parser = new RdfaParser({{
-                    baseIRI: 'http://example.org/',
-                    contentType: 'text/html'
-                }});
-                const writer = new N3.Writer({{format: 'N-Quads'}});
-                parser.on('data', quad => {{
-                    writer.addQuad(quad);
-                }});
-                parser.on('error', console.error);
-                const html = fs.readFileSync('{html_path}', 'utf8');
-                parser.write(html);
-                parser.end();
-                writer.end((error, result) => {{
-                    if (error) throw error;
-                    console.log(result);
-                }});
-                """,
+                str(Path(__file__).parent / "js" / "rdfa_parser.js"),
+                str(html_path),
             ],
             capture_output=True,
             text=True,
