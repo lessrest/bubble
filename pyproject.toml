@@ -92,6 +92,7 @@ dependencies = [
     "sphinx-rtd-theme>=3.0.2",
     # YouTube video downloader
     "yt-dlp>=2023.12.30",
+    "nats-py>=2.9.0",
 ]
 
 [tool.uv.sources]

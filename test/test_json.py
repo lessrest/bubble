@@ -19,7 +19,7 @@ from swash.util import new, is_a, select_rows
 @pytest.fixture
 def graph():
     """Create a test graph with JSON data"""
-    with here.graph.bind(Graph()) as g:
+    with here.graph.bind(Graph(base="https://example.com/")) as g:
         g.bind("json", JSON)
         yield g
 
@@ -70,7 +70,7 @@ def test_convert_json_value_invalid():
         json_from_rdf(Variable("test"))
 
 
-def test_json_to_n3_simple(graph):
+def test_json_to_n3_simple(graph: Graph):
     """Test converting simple Python dict to RDF"""
     root = rdf_from_json({"key": "value"})
     rows = select_rows(
@@ -83,7 +83,7 @@ def test_json_to_n3_simple(graph):
     assert rows == [(Literal("key"), Literal("value"))]
 
 
-def test_json_to_n3_nested():
+def test_json_to_n3_nested(graph: Graph):
     """Test converting nested dict structures"""
     root = rdf_from_json({"outer": {"inner": "value"}})
     rows = select_rows(
@@ -109,7 +109,7 @@ def test_json_to_n3_nested():
     )
 
 
-def test_json_to_n3_null():
+def test_json_to_n3_null(graph: Graph):
     """Test handling null values"""
     root = rdf_from_json({"key": None})
     rows = select_rows(
@@ -132,20 +132,23 @@ json = st.recursive(
 @given(json)
 def test_json_to_rdf_roundtrip(json_data):
     """Test converting JSON to RDF and back"""
-    rdf_data = rdf_from_json(json_data)
-    if isinstance(json_data, float) and math.isnan(json_data):
-        x = json_from_rdf(rdf_data)
-        assert isinstance(x, float)
-        assert math.isnan(x)
-    else:
-        assert json_from_rdf(rdf_data) == json_data
+    with here.graph.bind(Graph(base="https://example.com/")) as g:
+        rdf_data = rdf_from_json(json_data)
+        if isinstance(json_data, float) and math.isnan(json_data):
+            x = json_from_rdf(rdf_data)
+            assert isinstance(x, float)
+            assert math.isnan(x)
+        else:
+            assert json_from_rdf(rdf_data) == json_data
 
 
 @given(st.integers())
 def test_integer_typing(integer: int):
-    assert is_a(rdf_from_json(integer), XSD.integer)
+    with here.graph.bind(Graph(base="https://example.com/")) as g:
+        assert is_a(rdf_from_json(integer), XSD.integer)
 
 
 @given(st.floats())
 def test_float_typing(float: float):
-    assert is_a(rdf_from_json(float), XSD.double)
+    with here.graph.bind(Graph(base="https://example.com/")) as g:
+        assert is_a(rdf_from_json(float), XSD.double)

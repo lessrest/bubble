@@ -56,9 +56,6 @@ def json_from_rdf(
         }
 
 
-logger = structlog.get_logger()
-
-
 def rdf_from_json(
     value: dict | None | str | bool | int | float | list,
 ) -> S:

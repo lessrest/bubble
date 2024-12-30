@@ -5,3 +5,5 @@ use list comprehensions when possible
 when code is getting repetitive, let me know so we can refactor
 
 use the `new`/`add`/`blank` functions from `swash.util` to create RDF data
+
+don't use underscores for "private" variables or functions

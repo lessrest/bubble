@@ -6,7 +6,7 @@ from swash import here
 
 def test_graph_context():
     """Test that binding properly manages graph context"""
-    test_graph = Graph()
+    test_graph = Graph(base="https://example.com/")
     test_graph.add((URIRef("s"), URIRef("p"), URIRef("o")))
     assert here.graph.get() != test_graph
 
@@ -31,7 +31,7 @@ def test_nested_graph_context():
 
 def test_quote():
     """Test quoting triples in the current graph"""
-    test_graph = Graph()
+    test_graph = Graph(base="https://example.com/")
     test_triple = (URIRef("s"), URIRef("p"), URIRef("o"))
 
     with here.graph.bind(test_graph):
@@ -42,7 +42,7 @@ def test_quote():
 
 def test_langstr():
     """Test creating language-tagged literals"""
-    test_graph = Graph()
+    test_graph = Graph(base="https://example.com/")
 
     with here.graph.bind(test_graph):
         lit = here.langstr("hello")

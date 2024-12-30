@@ -246,7 +246,6 @@ class Repository:
 
         # Parse base URL template
         parsed = urlparse(base_url_template)
-        assert parsed.scheme == "https", "Base URL must start with https://"
 
         if "{repo}" in parsed.netloc:
             hostname = parsed.netloc.format(repo=self.repo_id)

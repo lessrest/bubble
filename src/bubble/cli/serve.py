@@ -1,5 +1,6 @@
-import os
+"""Serve the bubble web interface."""
 
+import os
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -9,21 +10,20 @@ import hypercorn
 import structlog
 import trio_asyncio
 import hypercorn.trio
-
-from typer import Option
+from typing import Any, Optional
 from rdflib import PROV, SKOS, Graph, URIRef, Literal, Namespace
-from fastapi import FastAPI
 
 import swash.here as here
-
 from swash.prfx import NT, RDF
 from swash.util import add
+
+from typer import Option
 from bubble.cli.app import BaseUrl, RepoPath, app
+from bubble.repo.repo import Repository
 from bubble.repo.git import Git
 from bubble.http.cert import generate_self_signed_cert
 from bubble.http.town import Site
 from bubble.mesh.base import this, spawn
-from bubble.repo.repo import Repository
 from bubble.http.tools import SheetEditor
 
 logger = structlog.get_logger()
@@ -31,12 +31,9 @@ CONFIG = Namespace("https://bubble.node.town/vocab/config#")
 app_dir = Path(typer.get_app_dir("bubble"))
 
 
-async def serve_fastapi_app(config: hypercorn.Config, app: FastAPI):
-    await hypercorn.trio.serve(
-        app,  # type: ignore
-        config,
-        mode="asgi",
-    )
+async def run_server(app: Any, config: hypercorn.Config) -> None:
+    """Run the server using hypercorn."""
+    await hypercorn.trio.serve(app, config, mode="asgi")
 
 
 def load_config(
@@ -93,9 +90,11 @@ def serve(
         "--self-signed",
         help="Generate and use a self-signed certificate",
     ),
+    nats_url: Optional[str] = Option(
+        None, "--nats-url", help="NATS server URL"
+    ),
 ) -> None:
-    """Serve the Node.Town web interface."""
-
+    """Serve the bubble web interface."""
     # Try to load config.ttl first
     (
         config_bind,
@@ -134,6 +133,7 @@ def serve(
         cert_file,
         key_file,
         self_signed,
+        nats_url,
     )
 
 
@@ -145,7 +145,8 @@ async def _serve(
     cert_file: str | None = None,
     key_file: str | None = None,
     self_signed: bool = False,
-):
+    nats_url: Optional[str] = None,
+) -> None:
     async def start_bash_shell():
         await trio.run_process(
             ["bash", "-i"],
@@ -162,7 +163,7 @@ async def _serve(
 
     config = hypercorn.Config()
     config.bind = [bind]
-    config.log.error_logger = logger.bind(name="hypercorn.error")  # type: ignore
+    config.log.error_logger = logger.bind(name="hypercorn.error")
 
     git = Git(trio.Path(repo_path))
     repo = await Repository.create(git, base_url)
@@ -180,23 +181,25 @@ async def _serve(
         config.certfile = cert_file
         config.keyfile = key_file
     else:
-        # Use HTTP when no certificates are provided
         logger.info(
             "Running in HTTP mode - ensure HTTPS termination is handled by your reverse proxy"
         )
 
-    async with trio.open_nursery() as nursery:
-        logger.info(
-            "starting Node.Town",
-            repo_path=repo_path,
-            base_url=base_url,
-            ssl_enabled=config.ssl_enabled,
-        )
-        here.site.set(Namespace(base_url))
+    logger.info(
+        "starting Node.Town",
+        repo_path=repo_path,
+        base_url=base_url,
+        ssl_enabled=config.ssl_enabled,
+    )
 
+    town = Site(base_url, bind, repo)
+    # if nats_url:
+    #     town.vat.setup_nats(nats_url)
+
+    async with trio.open_nursery() as nursery:
+        here.site.set(Namespace(base_url))
         await repo.load_all()
 
-        town = Site(base_url, bind, repo)
         with town.install_context():
             with repo.using_new_buffer():
                 town.vat.create_identity_graph()
@@ -222,7 +225,7 @@ async def _serve(
                 town.vat.link_actor_to_identity(editor)
 
                 nursery.start_soon(
-                    serve_fastapi_app, config, town.get_fastapi_app()
+                    run_server, town.get_fastapi_app(), config
                 )
 
                 if shell:

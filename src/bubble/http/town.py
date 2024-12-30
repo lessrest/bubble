@@ -23,28 +23,13 @@ import pathlib
 
 from io import BytesIO
 from base64 import b64encode
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    AsyncGenerator,
-)
-from contextlib import (
-    contextmanager,
-)
+from typing import Dict, Optional, AsyncGenerator, Any
+from contextlib import contextmanager
 
 import trio
 import structlog
 
-from rdflib import (
-    RDF,
-    XSD,
-    DCTERMS,
-    Graph,
-    URIRef,
-    Literal,
-    Namespace,
-)
+from rdflib import RDF, XSD, DCTERMS, Graph, URIRef, Literal, Namespace
 from fastapi import (
     Body,
     Form,
@@ -61,13 +46,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.datastructures import UploadFile
 
 from swash import here, mint, rdfa
-from swash.html import (
-    HypermediaResponse,
-    tag,
-    html,
-    text,
-    document,
-)
+from swash.html import HypermediaResponse, tag, html, text, document
 from swash.json import pyld
 from swash.prfx import NT, DID
 from swash.rdfa import (
@@ -77,30 +56,23 @@ from swash.rdfa import (
     render_affordance_resource,
 )
 from swash.util import P, new
-from bubble.keys import (
-    build_did_document,
-    parse_public_key_hex,
-)
-from bubble.mesh.otp import (
-    record_message,
-)
-from bubble.http.eval import eval_code, eval_form
-from bubble.http.icon import favicon
-from bubble.http.page import (
-    base_html,
-    base_shell,
-)
-from bubble.http.word import word_lookup, word_lookup_form
+from bubble.keys import build_did_document, parse_public_key_hex
+
 from bubble.mesh.base import (
     Vat,
-    vat,
     send,
     this,
     txgraph,
-    create_graph,
     with_transient_graph,
+    create_graph,
+    vat,
 )
+from bubble.mesh.otp import record_message
 from bubble.mesh.call import call
+from bubble.http.eval import eval_code, eval_form
+from bubble.http.icon import favicon
+from bubble.http.page import base_html, base_shell
+from bubble.http.word import word_lookup, word_lookup_form
 from bubble.repo.repo import Repository, context
 from bubble.http.render import render_graph_view, render_graphs_overview
 
@@ -219,6 +191,7 @@ class Site:
         base_url: str,
         bind: str,
         repo: Repository,
+        nats_url: str = "nats://localhost:4222",
     ):
         self.base_url = base_url
         self.base = URIRef(base_url)
@@ -233,7 +206,6 @@ class Site:
         self._setup_routes()
 
         self.vat = Vat(str(self.site), self.yell)
-        vat.set(self.vat)
 
         # Add session tracking
         self.websocket_sessions: Dict[str, WebSocket] = {}
@@ -299,7 +271,6 @@ class Site:
 
         self.app.websocket("/join/{key}")(self.ws_actor_join)
         self.app.websocket("/join")(self.ws_anonymous_join)
-        self.app.websocket("/vat/{key}")(self.ws_vat_join)
 
         self.app.get("/word")(self.word_lookup)
         self.app.get("/words")(self.word_lookup_form)
@@ -634,20 +605,6 @@ class Site:
 
         await handle_anonymous_join(websocket, self.vat)
 
-    async def ws_vat_join(self, websocket: WebSocket, key: str):
-        """Handle a remote VAT joining the town.
-        
-        Args:
-            websocket: The WebSocket connection
-            key: The hex-encoded public key of the remote VAT
-        """
-        from bubble.keys import parse_public_key_hex
-        from bubble.mesh.vat import handle_vat_join
-
-        # Parse the hex key string into public key bytes
-        public_key = parse_public_key_hex(key)
-        await handle_vat_join(websocket, self.vat, public_key)
-
     @contextmanager
     def install_context(self):
         """Install the actor system and bubble context for request handling."""
@@ -759,6 +716,10 @@ class Site:
     async def word_lookup(self, word: str, pos: Optional[str] = None):
         """Handle word lookup form submission."""
         return await word_lookup(word, pos)
+
+    async def start(self):
+        """Start the site and connect to NATS."""
+        pass
 
 
 @contextmanager

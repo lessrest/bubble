@@ -158,10 +158,6 @@ class Vat:
         root = root_context(self.site)
         self.curr = Parameter("current_actor", root)
         self.deck = {root.addr: root}
-        
-        # VAT-level connection management
-        self.remote_vats: Dict[URIRef, trio.MemorySendChannel] = {}
-        self.vat_routes: Dict[URIRef, URIRef] = {}  # actor -> vat mapping
 
     def get_base_url(self) -> str:
         return self.base_url
@@ -351,41 +347,8 @@ class Vat:
         if actor in self.deck:
             # Local actor
             await self.deck[actor].send.send(message)
-        elif actor in self.vat_routes:
-            # Remote actor - route through appropriate VAT
-            remote_vat = self.vat_routes[actor]
-            if remote_vat in self.remote_vats:
-                self.yell.info("routing message to remote VAT", 
-                             actor=actor, vat=remote_vat)
-                await self.remote_vats[remote_vat].send(message)
-            else:
-                raise ValueError(f"Remote VAT {remote_vat} not connected")
         else:
             raise ValueError(f"No route found for actor {actor}")
-
-    def register_remote_vat(
-        self, 
-        vat_uri: URIRef, 
-        send_channel: trio.MemorySendChannel,
-        actor_uris: Set[URIRef]
-    ):
-        """Register a remote VAT and its actors"""
-        self.remote_vats[vat_uri] = send_channel
-        for actor in actor_uris:
-            self.vat_routes[actor] = vat_uri
-        self.yell.info("registered remote VAT", 
-                      vat=vat_uri, actors=actor_uris)
-
-    def unregister_remote_vat(self, vat_uri: URIRef):
-        """Remove a remote VAT and its routing entries"""
-        if vat_uri in self.remote_vats:
-            del self.remote_vats[vat_uri]
-            # Remove all routes pointing to this VAT
-            self.vat_routes = {
-                actor: v for actor, v in self.vat_routes.items() 
-                if v != vat_uri
-            }
-            self.yell.info("unregistered remote VAT", vat=vat_uri)
 
     def get_actor_hierarchy(self) -> Dict[URIRef, Set[URIRef]]:
         """Get the parent-child relationships between actors."""
