@@ -299,6 +299,7 @@ class Site:
 
         self.app.websocket("/join/{key}")(self.ws_actor_join)
         self.app.websocket("/join")(self.ws_anonymous_join)
+        self.app.websocket("/vat/{key}")(self.ws_vat_join)
 
         self.app.get("/word")(self.word_lookup)
         self.app.get("/words")(self.word_lookup_form)
@@ -632,6 +633,20 @@ class Site:
         from bubble.sock.peer import handle_anonymous_join
 
         await handle_anonymous_join(websocket, self.vat)
+
+    async def ws_vat_join(self, websocket: WebSocket, key: str):
+        """Handle a remote VAT joining the town.
+        
+        Args:
+            websocket: The WebSocket connection
+            key: The hex-encoded public key of the remote VAT
+        """
+        from bubble.keys import parse_public_key_hex
+        from bubble.mesh.vat import handle_vat_join
+
+        # Parse the hex key string into public key bytes
+        public_key = parse_public_key_hex(key)
+        await handle_vat_join(websocket, self.vat, public_key)
 
     @contextmanager
     def install_context(self):
