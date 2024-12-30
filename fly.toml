@@ -12,6 +12,8 @@ dockerfile = 'Dockerfile'
 [env]
 BUBBLE_BASE = "https://swa.sh"
 BUBBLE_REPO = "/data/repo"
+BUBBLE_BIND = "0.0.0.0:2026"
+NATS_URL = "nats://swash-nats.internal:4222"
 
 [http_service]
 internal_port = 2026

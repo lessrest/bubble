@@ -149,6 +149,7 @@ class Vat:
         self.site = Namespace(site)
         self.base_url = str(self.site[""])
         self.yell = yell.bind(site=site)
+        self.nats = None
 
         # Generate Ed25519 keypair
         self.private_key, self.public_key = generate_keypair()
@@ -158,6 +159,50 @@ class Vat:
         root = root_context(self.site)
         self.curr = Parameter("current_actor", root)
         self.deck = {root.addr: root}
+
+    async def setup_nats(self, nats_url: str):
+        """Set up NATS for mesh networking."""
+        from bubble.mesh.nats import TrioNatsClient
+
+        self.nats = TrioNatsClient(nats_url)
+        await self.nats.connect()
+
+        async def handle_remote_actor_message(
+            actor_uri: str, message: bytes
+        ):
+            """Handle messages received from other nodes in the cluster."""
+            actor = URIRef(actor_uri)
+            if actor not in self.deck:
+                # Message is not for an actor on this node
+                return
+
+            # Parse the message into a graph
+            g = Graph()
+            g.parse(data=message.decode(), format="trig")
+
+            # Send to local actor
+            await self.deck[actor].send.send(g)
+
+        await self.nats.subscribe_to_actor_messages(
+            handle_remote_actor_message
+        )
+
+    async def send(self, actor: URIRef, message: Optional[Graph] = None):
+        if message is None:
+            message = here.graph.get()
+
+        if actor in self.deck:
+            # Local actor
+            await self.deck[actor].send.send(message)
+        elif self.nats and self.nats.connected:
+            # Try broadcasting via NATS if actor not found locally
+            message_data = message.serialize(format="trig").encode()
+            await self.nats.broadcast_actor_message(
+                str(actor), message_data
+            )
+            self.yell.info("broadcasted message via NATS", actor=actor)
+        else:
+            raise ValueError(f"No route found for actor {actor}")
 
     def get_base_url(self) -> str:
         return self.base_url
@@ -339,16 +384,6 @@ class Vat:
             )
 
             await self.send(parent)
-
-    async def send(self, actor: URIRef, message: Optional[Graph] = None):
-        if message is None:
-            message = here.graph.get()
-
-        if actor in self.deck:
-            # Local actor
-            await self.deck[actor].send.send(message)
-        else:
-            raise ValueError(f"No route found for actor {actor}")
 
     def get_actor_hierarchy(self) -> Dict[URIRef, Set[URIRef]]:
         """Get the parent-child relationships between actors."""

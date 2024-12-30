@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     swi-prolog \
     nodejs npm \
+    nats-server \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /src && \

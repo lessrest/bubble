@@ -717,9 +717,9 @@ class Site:
         """Handle word lookup form submission."""
         return await word_lookup(word, pos)
 
-    async def start(self):
-        """Start the site and connect to NATS."""
-        pass
+    async def setup_nats(self, nats_url: str):
+        """Set up NATS clustering."""
+        await self.vat.setup_nats(nats_url)
 
 
 @contextmanager

@@ -38,7 +38,9 @@ async def run_server(app: Any, config: hypercorn.Config) -> None:
 
 def load_config(
     repo_path: str,
-) -> tuple[str | None, str | None, str | None, str | None, bool]:
+) -> tuple[
+    str | None, str | None, str | None, str | None, str | None, bool
+]:
     """Load configuration from config.ttl if it exists."""
     config_path = app_dir / "config.ttl"
 
@@ -47,7 +49,7 @@ def load_config(
             "No config.ttl found. Run 'bubble init' to create one, "
             "or provide configuration through environment variables or command line options."
         )
-        return None, None, None, None, False
+        return None, None, None, None, None, False
 
     g = Graph()
     g.parse(config_path, format="turtle")
@@ -55,6 +57,10 @@ def load_config(
     config = URIRef("bubble:config")
     server_type = str(g.value(config, CONFIG.serverType))
     base_url = str(g.value(config, CONFIG.baseUrl))
+
+    nats_url = g.value(config, CONFIG.natsUrl)
+    if nats_url:
+        nats_url = str(nats_url)
 
     if server_type == "self-signed":
         bind = f"{g.value(config, CONFIG.hostname)}:{g.value(config, CONFIG.port)}"
@@ -72,7 +78,7 @@ def load_config(
         key_file = None
         self_signed = False
 
-    return bind, base_url, cert_file, key_file, self_signed
+    return bind, base_url, cert_file, key_file, nats_url, self_signed
 
 
 @app.command()
@@ -101,6 +107,7 @@ def serve(
         config_base_url,
         config_cert,
         config_key,
+        config_nats_url,
         config_self_signed,
     ) = load_config(repo_path)
 
@@ -117,6 +124,8 @@ def serve(
         key_file = config_key or os.environ.get("BUBBLE_KEY")
     if not self_signed:
         self_signed = config_self_signed
+    if nats_url is None:
+        nats_url = config_nats_url or os.environ.get("NATS_URL")
 
     if not any([cert_file, key_file, self_signed]):
         logger.info(
@@ -193,8 +202,9 @@ async def _serve(
     )
 
     town = Site(base_url, bind, repo)
-    # if nats_url:
-    #     town.vat.setup_nats(nats_url)
+    if nats_url:
+        logger.info("Setting up NATS clustering", nats_url=nats_url)
+        await town.setup_nats(nats_url)
 
     async with trio.open_nursery() as nursery:
         here.site.set(Namespace(base_url))
@@ -210,7 +220,7 @@ async def _serve(
                         RDF.type: NT.TownProcess,
                         PROV.generated: town.vat.identity_uri,
                         SKOS.prefLabel: Literal(
-                            "root town process", lang="en"
+                            "server session", lang="en"
                         ),
                     },
                 )

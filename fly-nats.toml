@@ -1,0 +1,14 @@
+app = 'swash-nats'
+primary_region = 'ams'
+
+[build]
+image = "nats:latest"
+
+[[vm]]
+cpu_kind = "shared"
+cpus = 1
+memory_mb = 256
+
+[[restart]]
+policy = "always"
+retries = 10
