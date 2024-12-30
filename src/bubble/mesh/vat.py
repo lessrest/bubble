@@ -12,6 +12,7 @@ import structlog
 from fastapi import WebSocket
 from rdflib import RDF, XSD, PROV, Graph, URIRef, Literal
 
+from swash import here
 from swash.mint import fresh_uri
 from swash.prfx import NT
 from swash.util import new
