@@ -198,7 +198,7 @@ async def _serve(
 
         town = Site(base_url, bind, repo)
         with town.install_context():
-            with repo.new_graph():
+            with repo.using_new_buffer():
                 town.vat.create_identity_graph()
 
                 add(

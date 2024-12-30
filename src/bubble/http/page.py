@@ -115,11 +115,10 @@ link_styles = [
 
 @contextmanager
 def base_shell(title: str):
-    """Base shell layout with status bar showing town info like public key."""
     with base_html(title):
-        with tag("div", classes="min-h-screen flex flex-col"):
+        with tag.div(classes="min-h-screen flex flex-col"):
             render_status_bar()
-            with tag("main", id="main", classes="flex-1 p-4 flex"):
+            with tag.main(id="main", classes="flex-1 p-4 flex"):
                 yield
 
 

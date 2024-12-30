@@ -415,7 +415,7 @@ class Repository:
         file_uri = URIRef(f"file://{await file_path.absolute()}")
 
         # Record file metadata in the graph itself
-        with self.using_graph(identifier):
+        with self.using_buffer(identifier):
             # Link the file distribution to the graph
             add(
                 identifier,
@@ -576,7 +576,7 @@ class Repository:
             yield self.metadata
 
     @contextmanager
-    def using_graph(
+    def using_buffer(
         self, identifier: URIRef
     ) -> Generator[Graph, None, None]:
         """Bind the specified graph as the current graph.
@@ -590,8 +590,8 @@ class Repository:
             yield graph
 
     @contextmanager
-    def new_graph(self) -> Generator[URIRef, None, None]:
-        """Create a new graph with a fresh URI and set it as the current graph.
+    def using_new_buffer(self) -> Generator[URIRef, None, None]:
+        """Create a new graph with a fresh URI and set it as the current buffer.
 
         Like (with-temp-buffer) in Emacs, this creates a new space and makes
         it our current location. The URI is our address in the semantic web,
@@ -599,11 +599,11 @@ class Repository:
         ready for new ideas.
         """
         graph_id = fresh_uri(self.namespace)
-        with self.using_graph(graph_id):
+        with self.using_buffer(graph_id):
             yield graph_id
 
     @contextmanager
-    def new_activity(
+    def using_new_activity(
         self, activity_type: URIRef, props: dict[P, Any] = {}
     ) -> Generator[URIRef, None, None]:
         """Create a new activity and set it as the current activity.
@@ -651,7 +651,7 @@ class Repository:
             )
 
     @contextmanager
-    def new_agent(
+    def using_new_agent(
         self,
         agent_type: URIRef,
         props: Optional[dict[P, Any]] = None,
@@ -761,9 +761,9 @@ class Repository:
         return self.base_url
 
     @contextmanager
-    def new_derived_graph(
+    def using_derived_buffer(
         self,
-        source_graph: Optional[URIRef] = None,
+        origin: Optional[URIRef] = None,
         activity: Optional[URIRef] = None,
     ) -> Generator[URIRef, None, None]:
         """Create a new graph derived from an existing graph.
@@ -774,15 +774,13 @@ class Repository:
         major-mode.
 
         Args:
-            source_graph: The graph this is derived from. Defaults to current_graph.
-            activity: Optional activity that caused this derivation. Defaults to current_activity.
+            origin: The graph this is derived from.
+              Defaults to the current buffer.
+            activity: Optional activity that caused this derivation.
+              Defaults to the current activity.
         """
         graph_id = fresh_uri(self.namespace)
-        source = (
-            source_graph
-            if source_graph is not None
-            else context.buffer.get()
-        )
+        source = origin if origin is not None else context.buffer.get()
         if source is None:
             raise ValueError(
                 "No source graph specified and no current graph set"
@@ -827,7 +825,7 @@ async def from_env() -> AsyncIterator[Repository]:
     """Load repository and context from environment variables.
 
     Requires the following environment variables:
-    - BUBBLE: Path to the repository
+    - BUBBLE_REPO: Path to the repository
     - BUBBLE_BASE: Base URL for the repository
     - BUBBLE_GRAPH: Current graph URI
     - BUBBLE_ACTIVITY: Current activity URI
@@ -839,7 +837,7 @@ async def from_env() -> AsyncIterator[Repository]:
     Raises:
         ValueError: If required environment variables are missing
     """
-    bubble_path = os.environ.get("BUBBLE")
+    bubble_path = os.environ.get("BUBBLE_REPO")
     bubble_base = os.environ.get("BUBBLE_BASE")
     bubble_graph = os.environ.get("BUBBLE_GRAPH")
     bubble_activity = os.environ.get("BUBBLE_ACTIVITY")

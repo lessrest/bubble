@@ -22,7 +22,7 @@ async def test_graph_repo_basics():
         repo = await Repository.create(git, base_url_template=EX)
 
         # Create initial graph and add data
-        with repo.new_graph() as graph_id:
+        with repo.using_new_buffer() as graph_id:
             subject = new(EX.Type, {EX.label: Literal("Test")})
             assert graph_id in repo.list_graphs()
             await repo.save_all()
@@ -51,12 +51,12 @@ async def test_graph_repo_new_derived_graph():
         repo = await Repository.create(git, base_url_template=EX)
 
         # Create source graph
-        with repo.new_graph() as source_graph_id:
+        with repo.using_new_buffer() as source_graph_id:
             new(EX.Type, {EX.label: Literal("Test")})
 
         # Test explicit derivation
         activity = EX.activity1
-        with repo.new_derived_graph(
+        with repo.using_derived_buffer(
             source_graph_id, activity=activity
         ) as derived_graph_id:
             x = new(EX.Type, {EX.label: Literal("Derived")})
@@ -78,7 +78,7 @@ async def test_graph_repo_new_derived_graph():
         with context.bind_graph(source_graph_id, repo):
             current_act = EX.currentActivity
             with context.activity.bind(current_act):
-                with repo.new_derived_graph() as derived_graph_id2:
+                with repo.using_derived_buffer() as derived_graph_id2:
                     new(EX.Type, {EX.label: Literal("Derived2")})
 
                 # Verify provenance with current context
@@ -99,7 +99,7 @@ async def test_graph_repo_new_graph():
         repo = await Repository.create(git, base_url_template=EX)
 
         # Create new graph and add data
-        with repo.new_graph() as graph_id:
+        with repo.using_new_buffer() as graph_id:
             new(EX.Type, {EX.label: Literal("Test")})
 
             # Verify graph contents
@@ -120,7 +120,7 @@ async def test_graph_repo_add_with_current_graph():
         repo = await Repository.create(git, base_url_template=EX)
 
         # Test adding with current graph
-        with repo.new_graph() as graph_id:
+        with repo.using_new_buffer() as graph_id:
             new(EX.Type, {EX.label: Literal("Test")})
 
             # Verify immediate state

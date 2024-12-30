@@ -3,16 +3,15 @@ import sys
 
 import trio
 import structlog
-import rdflib.collection
 
 from typer import Option
-from rdflib import PROV, BNode, Literal
+from rdflib import PROV, Literal
 
 from swash.prfx import NT
-from swash.util import new
+from swash.util import make_list, new
 from bubble.cli.app import RepoPath, app
 from bubble.repo.git import Git
-from bubble.repo.repo import Repository, context
+from bubble.repo.repo import Repository
 from bubble.stat.stat import gather_system_info
 
 
@@ -40,34 +39,30 @@ async def _bubble_shell(repo_path: str, base_url: str) -> None:
     system_info = await gather_system_info()
     user = system_info["user_info"]
 
-    with repo.new_graph():
-        with repo.new_agent(
+    with repo.using_new_buffer():
+        # XXX: should reuse an agent entity
+        with repo.using_new_agent(
             NT.Account,
             {
                 NT.owner: user.pw_gecos,
             },
         ) as agent:
-            arguments = BNode()
-            rdflib.collection.Collection(
-                context.buffer.get(),
-                arguments,
-                [Literal(arg) for arg in sys.argv[1:]],
-            )
-            # Start a new shell session activity
-            with repo.new_activity(
+            with repo.using_new_activity(
                 NT.InteractiveShellSession,
                 {
                     PROV.wasStartedBy: new(
                         NT.Command,
                         {
                             NT.programPath: Literal(sys.argv[0]),
-                            NT.arguments: arguments,
+                            NT.arguments: make_list(
+                                [Literal(arg) for arg in sys.argv[1:]]
+                            ),
                         },
                     )
                 },
             ) as activity:
                 # Create a derived graph for the shell session
-                with repo.new_derived_graph(
+                with repo.using_derived_buffer(
                     source_graph=repo.metadata_id
                 ) as derived_id:
                     # Get the directory path for this graph
