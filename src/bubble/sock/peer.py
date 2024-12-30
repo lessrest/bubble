@@ -75,7 +75,7 @@ async def handle_anonymous_join(websocket: WebSocket, vat: Vat):
 
         # Create and register the actor context
         remote_actor_context = ActorContext(
-            boss=vat.get_identity_uri(),
+            boss=vat.identity_uri(),
             addr=remote_actor_uri,
             proc=proc,
             send=send,
@@ -257,7 +257,7 @@ def _setup_remote_actor_context(vat: Vat, key: Ed25519PublicKey):
 
     # Create and register the actor context
     remote_actor_context = ActorContext(
-        boss=vat.get_identity_uri(),
+        boss=vat.identity_uri(),
         addr=remote_actor_uri,
         proc=proc,
         send=send,

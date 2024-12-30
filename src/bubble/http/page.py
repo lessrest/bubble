@@ -16,8 +16,9 @@ from contextlib import contextmanager
 from urllib.parse import quote
 
 
+from rdflib import URIRef
 from swash.html import tag, text, html
-from bubble.mesh.base import vat
+from bubble.mesh.base import vat as current_vat
 from bubble.repo.repo import context
 
 # The scripts that power our interface - a carefully curated collection
@@ -122,32 +123,21 @@ def base_shell(title: str):
                 yield
 
 
+@html.div(classes="flex flex-col")
+def render_entry(label: str, value: str, href: str | URIRef):
+    with tag.span(classes="text-gray-500 dark:text-gray-400 text-sm"):
+        text(label)
+    with tag.a(href=str(href), classes=link_styles):
+        text(value)
+
+
 @html.div(classes=status_bar_style)
 def render_status_bar():
     with tag.div(classes="flex items-center"):
         pass  # todo: add some content here
 
     with tag.div(classes="flex items-center gap-6"):
-        render_node_id()
-        render_site_name()
-
-
-@html.span(classes="text-gray-500 dark:text-gray-400 text-sm")
-def render_label(label):
-    text(label)
-
-
-@html.div(classes="flex flex-col")
-def render_site_name():
-    render_label("Site")
-    with tag.a(href=vat.get().site, classes=link_styles):
-        text(vat.get().get_base_url())
-
-
-def render_node_id():
-    identity_uri = vat.get().get_identity_uri()
-    repo_id = context.repo.get().get_repo_id()
-    with tag.div(classes="flex flex-col"):
-        render_label("Node ID")
-        with tag.a(href=str(identity_uri), classes=link_styles):
-            text(repo_id)
+        vat = current_vat.get()
+        repo = context.repo.get()
+        render_entry("Node ID", repo.repo_id, vat.identity_uri)
+        render_entry("Site", vat.base_url, vat.site)

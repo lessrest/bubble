@@ -139,6 +139,7 @@ class Vat:
     private_key: ed25519.Ed25519PrivateKey
     public_key: ed25519.Ed25519PublicKey
     identity_uri: URIRef
+    base_url: str
 
     def __init__(
         self,
@@ -146,6 +147,7 @@ class Vat:
         yell: structlog.stdlib.BoundLogger,
     ):
         self.site = Namespace(site)
+        self.base_url = str(self.site[""])
         self.yell = yell.bind(site=site)
 
         # Generate Ed25519 keypair
@@ -158,7 +160,7 @@ class Vat:
         self.deck = {root.addr: root}
 
     def get_base_url(self) -> str:
-        return str(self.site[""])
+        return self.base_url
 
     def get_public_key_bytes(self) -> bytes:
         """Get the raw bytes of the public key."""
@@ -167,10 +169,6 @@ class Vat:
     def get_public_key_hex(self) -> str:
         """Get the hex representation of the public key."""
         return get_public_key_hex(self.public_key)
-
-    def get_identity_uri(self) -> URIRef:
-        """Get the URI of this town's cryptographic identity."""
-        return self.identity_uri
 
     def create_identity_graph(self):
         """Create a graph representing this town's cryptographic identity."""

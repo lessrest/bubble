@@ -205,7 +205,7 @@ async def _serve(
                     this(),
                     {
                         RDF.type: NT.TownProcess,
-                        PROV.generated: town.vat.get_identity_uri(),
+                        PROV.generated: town.vat.identity_uri(),
                         SKOS.prefLabel: Literal(
                             "root town process", lang="en"
                         ),

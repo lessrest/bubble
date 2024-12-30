@@ -12,7 +12,7 @@ def is_did_key(graph: Graph, node: S) -> bool:
 def is_current_identity(node: S) -> bool:
     """Check if a node is the current town's identity."""
     try:
-        return node == vat.get().get_identity_uri()
+        return node == vat.get().identity_uri()
     except Exception:
         return False
 
