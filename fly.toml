@@ -1,0 +1,31 @@
+# fly.toml app configuration file generated for swash on 2024-12-29T22:39:45+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'swash'
+primary_region = 'ams'
+
+[build]
+dockerfile = 'Dockerfile'
+
+[env]
+BUBBLE_BASE = "https://swa.sh"
+BUBBLE_REPO = "/data/repo"
+
+[http_service]
+internal_port = 2026
+force_https = true
+auto_stop_machines = 'stop'
+auto_start_machines = true
+min_machines_running = 0
+processes = ['app']
+
+[[vm]]
+memory = '2gb'
+cpu_kind = 'shared'
+cpus = 2
+
+[mounts]
+source = "swash_data"
+destination = "/data"

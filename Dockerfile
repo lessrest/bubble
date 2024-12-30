@@ -43,3 +43,7 @@ COPY . .
 
 # do the full sync including installing the project etc
 RUN uv sync --frozen
+
+# Run the server on port 2026, configured for HTTP behind Fly.io's SSL termination
+CMD ["bubble", "serve", "--bind", "0.0.0.0:2026"]
+
