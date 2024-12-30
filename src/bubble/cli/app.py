@@ -19,7 +19,7 @@ app_dir = pathlib.Path(typer.get_app_dir("bubble"))
 
 # Use environment variables if set, otherwise use defaults
 RepoPath = Option(
-    os.environ.get("BUBBLE", str(app_dir / "repo")),
+    os.environ.get("BUBBLE_REPO", str(app_dir / "repo")),
     "--repo",
     help="Repository path",
 )

@@ -27,24 +27,6 @@ from fastapi.responses import HTMLResponse
 logger = structlog.get_logger()
 
 
-class HTMLDecorators:
-    """
-    Provides a convenient API for creating HTML elements as decorators.
-    Usage: @html.div(class="container") or @html("div", class="container")
-    """
-
-    def __getattr__(self, name: str) -> Callable[..., Any]:
-        return lambda *args, **kwargs: element(name, *args, **kwargs)
-
-    def __call__(
-        self, name: str, *klasses: str, **kwargs: Any
-    ) -> Callable[[Any], Any]:
-        return element(name, *klasses, **kwargs)
-
-
-html = HTMLDecorators()
-
-
 def element(tag_name: str, *klasses: str, **kwargs):
     def decorator(func):
         @functools.wraps(func)
@@ -136,31 +118,59 @@ def strs(value: str | list[str]) -> str:
     return value
 
 
-def tag(tagname: str, **kwargs):
+class HTMLTagBuilder:
     """
-    Creates a new HTML/XML element with the given tag name and attributes.
-    Returns a context manager for adding child elements.
+    Provides a convenient API for creating HTML elements.
+    Usage: with tag.div(...): or with tag("div", ...):
     """
-    element = ET.Element(
-        tagname,
-        attrib={
-            attr_name_to_xml(k): "" if v is True else strs(v)
-            for k, v in kwargs.items()
-            if v
-        },
-    )
-    parent = node.get()
-    parent.append(element)
 
-    @contextmanager
-    def context():
-        token = node.set(element)
-        try:
-            yield element
-        finally:
-            node.reset(token)
+    def __getattr__(self, name: str) -> Callable[..., Any]:
+        return lambda **kwargs: self.__call__(name, **kwargs)
 
-    return context()
+    def __call__(self, tagname: str, **kwargs):
+        """
+        Creates a new HTML/XML element with the given tag name and attributes.
+        Returns a context manager for adding child elements.
+        """
+        element = ET.Element(
+            tagname,
+            attrib={
+                attr_name_to_xml(k): "" if v is True else strs(v)
+                for k, v in kwargs.items()
+                if v
+            },
+        )
+        parent = node.get()
+        parent.append(element)
+
+        @contextmanager
+        def context():
+            token = node.set(element)
+            try:
+                yield element
+            finally:
+                node.reset(token)
+
+        return context()
+
+
+class HTMLDecorators:
+    """
+    Provides a convenient API for creating HTML elements as decorators.
+    Usage: @html.div(class="container") or @html("div", class="container")
+    """
+
+    def __getattr__(self, name: str) -> Callable[..., Any]:
+        return lambda *args, **kwargs: element(name, *args, **kwargs)
+
+    def __call__(
+        self, name: str, *klasses: str, **kwargs: Any
+    ) -> Callable[[Any], Any]:
+        return element(name, *klasses, **kwargs)
+
+
+html = HTMLDecorators()
+tag = HTMLTagBuilder()
 
 
 def text(content: str):

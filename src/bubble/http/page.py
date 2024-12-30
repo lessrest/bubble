@@ -12,16 +12,11 @@ unified read-write vision of the web ever since.
 
 import json
 
-from base64 import b64encode
 from contextlib import contextmanager
 from urllib.parse import quote
 
-from rdflib import PROV
 
-from swash import here
-from swash.html import tag, text
-from swash.prfx import NT
-from swash.rdfa import rdf_resource
+from swash.html import tag, text, html
 from bubble.mesh.base import vat
 from bubble.repo.repo import context
 
@@ -101,81 +96,58 @@ def urlquote(id: str):
     return quote(id, safe="")
 
 
+status_bar_style = [
+    "bg-white dark:bg-cyan-900/30",
+    "text-gray-900 dark:text-white",
+    "px-4 py-2",
+    "flex items-center justify-between",
+    "border-b border-cyan-200 dark:border-cyan-800/40",
+]
+
+link_styles = [
+    "font-mono text-sm",
+    "text-emerald-600 dark:text-emerald-400",
+    "hover:text-emerald-500 dark:hover:text-emerald-300",
+    "transition-colors",
+]
+
+
 @contextmanager
 def base_shell(title: str):
-    """Base shell layout with status bar showing town info like public key.
-
-    This is our main stage layout - a responsive, modern interface that
-    would make a Windows 95 user's jaw drop. The status bar is our
-    digital equivalent of a theater's marquee, showing who we are and
-    where we're located in the vast space of the web.
-    """
+    """Base shell layout with status bar showing town info like public key."""
     with base_html(title):
         with tag("div", classes="min-h-screen flex flex-col"):
-            # Status bar - our digital marquee
-            with tag(
-                "div",
-                classes=[
-                    "bg-white dark:bg-cyan-900/30",
-                    "text-gray-900 dark:text-white",
-                    "px-4 py-2",
-                    "flex items-center justify-between",
-                    "border-b border-cyan-200 dark:border-cyan-800/40",
-                ],
-            ):
-                with tag("div", classes="flex items-center"):
-                    # Find the editor actor - our stage director
-                    editors = here.dataset.get().objects(
-                        vat.get().get_identity_uri(), PROV.started
-                    )
-                    for editor in editors:
-                        affordances = here.dataset.get().objects(
-                            editor, NT.affordance
-                        )
-                        for affordance in affordances:
-                            rdf_resource(affordance)
-
-                # Right section - our digital business card
-                with tag("div", classes="flex items-center gap-6"):
-                    # Node ID - our unique identifier in the network
-                    with tag("div", classes="flex flex-col"):
-                        with tag(
-                            "span",
-                            classes="text-gray-500 dark:text-gray-400 text-sm",
-                        ):
-                            text("Node ID")
-                        identity_uri = vat.get().get_identity_uri()
-                        with tag(
-                            "a",
-                            href=str(identity_uri),
-                            classes=[
-                                "font-mono text-sm",
-                                "text-emerald-600 dark:text-emerald-400",
-                                "hover:text-emerald-500 dark:hover:text-emerald-300",
-                                "transition-colors",
-                            ],
-                        ):
-                            text(context.repo.get().get_repo_id())
-
-                    # Site URL - our address in cyberspace
-                    with tag("div", classes="flex flex-col"):
-                        with tag(
-                            "span",
-                            classes="text-gray-500 dark:text-gray-400 text-sm",
-                        ):
-                            text("Site")
-                        with tag(
-                            "a",
-                            href=vat.get().site,
-                            classes=[
-                                "font-mono text-sm",
-                                "text-emerald-600 dark:text-emerald-400",
-                                "hover:text-emerald-500 dark:hover:text-emerald-300",
-                                "transition-colors",
-                            ],
-                        ):
-                            text(vat.get().get_base_url())
-
-            # Main content area - where the magic happens
+            render_status_bar()
             with tag("main", id="main", classes="flex-1 p-4 flex"):
                 yield
+
+
+@html.div(classes=status_bar_style)
+def render_status_bar():
+    with tag.div(classes="flex items-center"):
+        pass  # todo: add some content here
+
+    with tag.div(classes="flex items-center gap-6"):
+        render_node_id()
+        render_site_name()
+
+
+@html.span(classes="text-gray-500 dark:text-gray-400 text-sm")
+def render_label(label):
+    text(label)
+
+
+@html.div(classes="flex flex-col")
+def render_site_name():
+    render_label("Site")
+    with tag.a(href=vat.get().site, classes=link_styles):
+        text(vat.get().get_base_url())
+
+
+def render_node_id():
+    identity_uri = vat.get().get_identity_uri()
+    repo_id = context.repo.get().get_repo_id()
+    with tag.div(classes="flex flex-col"):
+        render_label("Node ID")
+        with tag.a(href=str(identity_uri), classes=link_styles):
+            text(repo_id)

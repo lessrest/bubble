@@ -6,7 +6,7 @@ import structlog
 import rdflib.collection
 
 from typer import Option
-from rdflib import PROV, BNode, Literal, Namespace
+from rdflib import PROV, BNode, Literal
 
 from swash.prfx import NT
 from swash.util import new
@@ -91,7 +91,7 @@ async def _bubble_shell(repo_path: str, base_url: str) -> None:
                         check=False,
                         cwd=str(graph_dir),
                         env={
-                            "BUBBLE": repo_path,
+                            "BUBBLE_REPO": repo_path,
                             "BUBBLE_BASE": repo.get_base_url(),
                             "BUBBLE_GRAPH": str(derived_id),
                             "BUBBLE_GRAPH_DIR": str(graph_dir),
