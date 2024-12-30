@@ -63,7 +63,7 @@ async def _bubble_shell(repo_path: str, base_url: str) -> None:
             ) as activity:
                 # Create a derived graph for the shell session
                 with repo.using_derived_buffer(
-                    source_graph=repo.metadata_id
+                    origin=repo.metadata_id
                 ) as derived_id:
                     # Get the directory path for this graph
                     graph_dir = repo.graph_dir(derived_id)
