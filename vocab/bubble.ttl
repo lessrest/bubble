@@ -1,0 +1,69 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix bubble: <https://node.town/2025/bubble#> .
+
+bubble:ServerConfiguration a owl:Class ;
+    rdfs:label "Server Configuration"@en ;
+    rdfs:comment "A Bubble server configuration."@en .
+
+bubble:serverType a owl:DatatypeProperty ;
+    rdfs:label "server type"@en ;
+    rdfs:comment "Type of server configuration (self-signed, ssl, or http)"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:baseUrl a owl:DatatypeProperty ;
+    rdfs:label "base URL"@en ;
+    rdfs:comment "Base URL for the Bubble server"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:certFile a owl:DatatypeProperty ;
+    rdfs:label "certificate file"@en ;
+    rdfs:comment "Path to SSL certificate file"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:keyFile a owl:DatatypeProperty ;
+    rdfs:label "key file"@en ;
+    rdfs:comment "Path to SSL private key file"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:hostname a owl:DatatypeProperty ;
+    rdfs:label "hostname"@en ;
+    rdfs:comment "Server hostname"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:port a owl:DatatypeProperty ;
+    rdfs:label "port"@en ;
+    rdfs:comment "Server port number"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:integer .
+
+bubble:repoPath a owl:DatatypeProperty ;
+    rdfs:label "repository path"@en ;
+    rdfs:comment "Path to the Bubble repository"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:bindHost a owl:DatatypeProperty ;
+    rdfs:label "bind host"@en ;
+    rdfs:comment "Host address to bind to (for HTTP mode)"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .
+
+bubble:bindPort a owl:DatatypeProperty ;
+    rdfs:label "bind port"@en ;
+    rdfs:comment "Port to bind to (for HTTP mode)"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:integer .
+
+bubble:natsUrl a owl:DatatypeProperty ;
+    rdfs:label "NATS URL"@en ;
+    rdfs:comment "URL for NATS server connection"@en ;
+    rdfs:domain bubble:ServerConfiguration ;
+    rdfs:range xsd:string .

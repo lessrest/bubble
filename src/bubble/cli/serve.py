@@ -11,11 +11,11 @@ import structlog
 import trio_asyncio
 import hypercorn.trio
 from typing import Any, Optional
-from rdflib import PROV, SKOS, Graph, URIRef, Literal, Namespace
+from rdflib import PROV, SKOS, Graph, URIRef, Literal, Namespace, Dataset
 
 import swash.here as here
 from swash.prfx import NT, RDF
-from swash.util import add
+from swash.util import add, get_single_subject
 
 from typer import Option
 from bubble.cli.app import BaseUrl, RepoPath, app
@@ -25,10 +25,14 @@ from bubble.http.cert import generate_self_signed_cert
 from bubble.http.town import Site
 from bubble.mesh.base import this, spawn
 from bubble.http.tools import ChatCreator, SheetEditor
+from rich.syntax import Syntax
+from rich.console import Console
 
 logger = structlog.get_logger()
-CONFIG = Namespace("https://bubble.node.town/vocab/config#")
+BUBBLE = Namespace("https://node.town/2025/bubble#")
 app_dir = Path(typer.get_app_dir("bubble"))
+config_dir = app_dir / "config"
+console = Console()
 
 
 async def run_server(app: Any, config: hypercorn.Config) -> None:
@@ -41,39 +45,39 @@ def load_config(
 ) -> tuple[
     str | None, str | None, str | None, str | None, str | None, bool
 ]:
-    """Load configuration from config.ttl if it exists."""
-    config_path = app_dir / "config.ttl"
+    """Load configuration from config/*.ttl files if they exist."""
+    server_config = config_dir / "server.ttl"
 
-    if not config_path.exists():
+    if not server_config.exists():
         logger.warning(
-            "No config.ttl found. Run 'bubble init' to create one, "
+            "No server.ttl found in config directory. Run 'bubble init' to create one, "
             "or provide configuration through environment variables or command line options."
         )
         return None, None, None, None, None, False
 
     g = Graph()
-    g.parse(config_path, format="turtle")
+    g.parse(server_config, format="turtle")
 
-    config = URIRef("bubble:config")
-    server_type = str(g.value(config, CONFIG.serverType))
-    base_url = str(g.value(config, CONFIG.baseUrl))
+    config = get_single_subject(RDF.type, BUBBLE.ServerConfiguration, g)
+    server_type = str(g.value(config, BUBBLE.serverType))
+    base_url = str(g.value(config, BUBBLE.baseUrl))
 
-    nats_url = g.value(config, CONFIG.natsUrl)
+    nats_url = g.value(config, BUBBLE.natsUrl)
     if nats_url:
         nats_url = str(nats_url)
 
     if server_type == "self-signed":
-        bind = f"{g.value(config, CONFIG.hostname)}:{g.value(config, CONFIG.port)}"
-        cert_file = str(g.value(config, CONFIG.certFile))
-        key_file = str(g.value(config, CONFIG.keyFile))
+        bind = f"{g.value(config, BUBBLE.hostname)}:{g.value(config, BUBBLE.port)}"
+        cert_file = str(g.value(config, BUBBLE.certFile))
+        key_file = str(g.value(config, BUBBLE.keyFile))
         self_signed = True
     elif server_type == "ssl":
-        bind = f"{g.value(config, CONFIG.hostname)}:{g.value(config, CONFIG.port)}"
-        cert_file = str(g.value(config, CONFIG.certFile))
-        key_file = str(g.value(config, CONFIG.keyFile))
+        bind = f"{g.value(config, BUBBLE.hostname)}:{g.value(config, BUBBLE.port)}"
+        cert_file = str(g.value(config, BUBBLE.certFile))
+        key_file = str(g.value(config, BUBBLE.keyFile))
         self_signed = False
     else:  # http
-        bind = f"{g.value(config, CONFIG.bindHost)}:{g.value(config, CONFIG.bindPort)}"
+        bind = f"{g.value(config, BUBBLE.bindHost)}:{g.value(config, BUBBLE.bindPort)}"
         cert_file = None
         key_file = None
         self_signed = False
@@ -134,6 +138,18 @@ def serve(
             "No SSL configuration found. Run 'bubble init' to configure SSL, "
             "or ensure HTTPS termination is handled by your reverse proxy."
         )
+
+    logger.info(
+        "server configuration",
+        bind=bind,
+        base_url=base_url,
+        repo_path=repo_path,
+        shell=shell,
+        cert_file=cert_file,
+        key_file=key_file,
+        self_signed=self_signed,
+        nats_url=nats_url,
+    )
 
     trio_asyncio.run(
         _serve,
@@ -249,3 +265,31 @@ async def _serve(
                 else:
                     while True:
                         await trio.sleep(1)
+
+
+@app.command()
+def config():
+    """Print the current configuration RDF."""
+    if not config_dir.exists():
+        logger.warning(
+            "No config directory found. Run 'bubble init' to create one, "
+            "or provide configuration through environment variables or command line options."
+        )
+        return
+
+    ds = Dataset()
+
+    # Load vocab into its own graph
+    vocab_graph = ds.graph(URIRef("https://node.town/2025/bubble#vocab"))
+    vocab_graph.parse("vocab/bubble.ttl", format="turtle")
+
+    # Load all config files into their own graphs
+    for config_file in config_dir.glob("*.ttl"):
+        #        graph_name = URIRef(f"bubble:")
+        config_graph = ds.graph(None)
+        config_graph.bind("bubble", BUBBLE)
+        config_graph.parse(config_file, format="turtle")
+
+    trig = ds.serialize(format="trig")
+    syntax = Syntax(trig, "turtle", theme="monokai", line_numbers=True)
+    console.print(syntax)
