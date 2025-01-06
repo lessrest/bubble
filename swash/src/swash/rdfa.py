@@ -1246,6 +1246,7 @@ def action_button(
         "dark:text-stone-100",
         "dark:border-stone-600/40",
         "dark:shadow-stone-900/50",
+        "dark:hover:bg-stone-600/40",
         # Interactions & Animation
         "hover:bg-stone-100",
         "hover:translate-y-px",
