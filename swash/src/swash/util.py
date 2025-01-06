@@ -14,6 +14,9 @@ from rdflib import (
     Literal,
     Namespace,
     IdentifiedNode,
+    Dataset,
+    RDFS,
+    SKOS,
 )
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow
@@ -272,3 +275,44 @@ def build_resource[Subject: S](
                 graph.add((subject, predicate, to_literal(object)))
 
     return subject
+
+
+def get_label(dataset: Dataset, uri: URIRef) -> Optional[S]:
+    """Get the best label for a URI based on language preferences."""
+    # Get all labels with their languages
+    labels = []
+
+    # First try SKOS prefLabel
+    for s, p, o, c in dataset.quads((uri, SKOS.prefLabel, None, None)):
+        if isinstance(o, Literal):
+            labels.append(
+                (o, o.language or "", 1)
+            )  # Priority 1 for prefLabel
+        else:
+            labels.append((o, "", 1))
+
+    # Fall back to RDFS label if no prefLabel found
+    if not labels:
+        for s, p, o, c in dataset.quads((uri, RDFS.label, None, None)):
+            if isinstance(o, Literal):
+                labels.append(
+                    (o, o.language or "", 2)
+                )  # Priority 2 for label
+            else:
+                labels.append((o, "", 2))
+
+    if not labels:
+        return None
+
+    # Sort labels by language preference
+    prefs = ["en", "sv", "lv"]  # Default preferences
+
+    def lang_key(label_tuple):
+        label, lang, priority = label_tuple
+        try:
+            return (priority, prefs.index(lang))
+        except ValueError:
+            return (priority, len(prefs) if lang else len(prefs) + 1)
+
+    sorted_labels = sorted(labels, key=lang_key)
+    return sorted_labels[0][0] if sorted_labels else None

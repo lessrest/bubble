@@ -13,6 +13,7 @@ unified read-write vision of the web ever since.
 import json
 
 from contextlib import contextmanager
+from random import choice
 from urllib.parse import quote
 
 
@@ -48,43 +49,34 @@ def json_assignment_script(variable_name: str, value: dict):
 
 @contextmanager
 def base_html(title: str):
-    """Create the base HTML structure for our pages.
-
-    Like a theater stage, we set up the basic structure where our
-    content will perform. The head section is our backstage area,
-    where we prepare all the scripts and styles that make the show
-    possible.
-    """
-    with tag("html"):
-        with tag("head"):
-            with tag("title"):
+    with tag.html(lang="en"):
+        with tag.head():
+            with tag.title():
                 text(title)
-            # Our costume department - where we dress up our content
-            tag("link", rel="stylesheet", href="/static/css/output.css")
-            tag("link", rel="stylesheet", href="/static/audio-player.css")
-            # The stage machinery - scripts that make things move
+
+            tag.link(rel="stylesheet", href="/static/css/output.css")
+            tag.link(rel="stylesheet", href="/static/audio-player.css")
+
             for script in cdn_scripts:
-                tag("script", src=script)
-            tag("script", type="module", src="/static/type-writer.js")
-            tag("script", type="module", src="/static/voice-writer.js")
-            tag("script", type="module", src="/static/audio-recorder.js")
-            tag("script", type="module", src="/static/live.js")
+                tag.script(src=script)
+
+            tag.script(type="module", src="/static/type-writer.js")
+            tag.script(type="module", src="/static/voice-writer.js")
+            tag.script(type="module", src="/static/audio-recorder.js")
+            tag.script(type="module", src="/static/live.js")
             json_assignment_script("htmx.config", htmx_config)
 
-        # The stage itself - where the content performs
-        with tag(
-            "body",
+        with tag.body(
             classes="bg-white dark:bg-slate-950 text-gray-900 dark:text-stone-50",
         ):
             yield
-            # The encore - scripts that run after the main content
-            tag("script", type="module", src="/static/audio-player.js")
-            tag(
-                "script",
+
+            tag.script(type="module", src="/static/audio-player.js")
+            tag.script(
                 type="module",
                 src="/static/voice-recorder-writer.js",
             )
-            tag("script", type="module", src="/static/jsonld-socket.js")
+            tag.script(type="module", src="/static/jsonld-socket.js")
 
 
 def urlquote(id: str):
@@ -132,8 +124,46 @@ def render_entry(label: str, value: str, href: str | URIRef):
 
 @html.div(classes=status_bar_style)
 def render_status_bar():
+    advice_texts = [
+        "Do not take notes on criminal conspiracies.",
+        "Every system is broken but you can still try.",
+        "Your file naming conventions are very interesting.",
+        "Write it down—if it's bad, delete it later.",
+        "The cloud is just someone else's computer.",
+        "You have permission to start poorly. ❤️",
+        "All good ideas look bad in the beginning. 😭",
+        "This app has no opinions about your life choices.",
+        "Make a backup right now. Trust me.",
+        "Complexity is very, very seductive. Are you up for it, playboy?",
+        "You are not legally obligated to finish everything you start.",
+        "This app will remember for you. Do not stress today.",
+        "Most thoughts do not deserve a post-it note.",
+        "The best version of your idea is the one that exists right now.",
+        "No one is grading your to-do list.",
+        "Just because it's a draft doesn't mean it's bad in ANY way.",
+        "Not every project needs a name. Call this one Freckles.",
+        "Begin. The rest is easier.",
+        "If you use this app to explain your feelings, use also a napkin.",
+        "Your 17th idea today will likely be the good one!.",
+        "Being busy is a thing. That happens. I think.",
+        "This app is your therapist. Just kidding. Double jinx.",
+        "Genius is forgetting bad ideas quickly.",
+        "Despite the widespread enthusiasm, we have not yet implemented writer's block.",
+        "Congratulations. You're overthinking it.",
+        "Perfectionism is not always just a fancy word for procrastination.",
+        "Spend more time naming than working.",
+        "Write as though you realize that you will not even remember this tomorrow.",
+        "Progress doesn't happen according to a plan. Unless you have a pretty good plan.",
+        "Your creative process is what I call my existential crisis.",
+        "This app contains a roadmap for your life.",
+        "There are no rules. Especially syntax ones.",
+    ]
+
     with tag.div(classes="flex items-center"):
-        pass  # todo: add some content here
+        with tag.span(
+            classes="text-sm text-gray-500 dark:text-gray-400 pl-4"
+        ):
+            text(choice(advice_texts))
 
     with tag.div(classes="flex items-center gap-6"):
         vat = current_vat.get()

@@ -29,7 +29,7 @@ from contextlib import contextmanager
 import trio
 import structlog
 
-from rdflib import RDF, XSD, DCTERMS, Graph, URIRef, Literal, Namespace
+from rdflib import RDF, XSD, Graph, URIRef, Literal, Namespace
 from fastapi import (
     Body,
     Form,
@@ -240,6 +240,26 @@ class Site:
         self.app.middleware("http")(self.bind_actor_system)
         self.app.middleware("http")(self.bind_bubble)
 
+    # Middleware
+    async def bind_document(self, request, call_next):
+        with document():
+            return await call_next(request)
+
+    async def bind_actor_system(self, request, call_next):
+        with vat.bind(self.vat):
+            return await call_next(request)
+
+    async def bind_bubble(self, request, call_next):
+        with context.repo.bind(self.repo):
+            return await call_next(request)
+
+    async def all_exception_handler(self, request: Request, exc: Exception):
+        self.yell.error("Unhandled exception", error=exc)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "details": str(exc)},
+        )
+
     def _setup_routes(self):
         self.app.include_router(rdfa.router)
         self.app.mount(
@@ -249,18 +269,16 @@ class Site:
             ),
         )
 
-        self.app.get("/favicon.ico")(self.favicon)
+        self.app.get("/")(self.root)
         self.app.get("/health")(self.health_check)
+        self.app.get("/favicon.ico")(self.favicon)
         self.app.get("/.well-known/did.json")(self.get_did_document)
         self.app.get("/.well-known/did.html")(self.get_did_document_html)
         self.app.get("/graphs")(graphs_view)
         self.app.get("/graph")(graph_view)
+
         self.app.get("/eval")(self.eval_form)
         self.app.post("/eval")(self.eval_code)
-        self.app.get("/")(self.root)
-        self.app.get("/sheets")(self.sheets)
-
-        self.app.get("/timeline")(self.get_timeline)
 
         self.app.post("/{id}/message")(self.actor_message)
         self.app.post("/{id}")(self.actor_post)
@@ -279,7 +297,29 @@ class Site:
         self.app.get("/blobs/{sha256}")(self.blob_get)
 
         # this is at the bottom because it matches too broadly
-        self.app.get("/{path:path}")(self.actor_get)
+        self.app.get("/{id:path}")(self.resource_get)
+
+    async def root(self):
+        with base_shell("Bubble"):
+            with tag("div", classes="p-4"):
+                graph = here.graph.get()
+
+                resources_with_affordances = set(
+                    graph.subjects(NT.affordance, None)
+                )
+
+                with autoexpanding(depth=2):
+                    if resources_with_affordances:
+                        with tag("div", classes="flex flex-col gap-4"):
+                            for subject in resources_with_affordances:
+                                data = get_subject_data(
+                                    here.dataset.get(), subject
+                                )
+                                render_affordance_resource(subject, data)
+                    else:
+                        render_graph_view(graph)
+
+        return HypermediaResponse()
 
     async def file_get(self, path: str):
         file = self.repo.open_existing_file(URIRef(path))
@@ -312,10 +352,11 @@ class Site:
         with with_transient_graph(".well-known/did.html") as id:
             build_did_document(did_uri, id, self.vat.public_key)
             with base_shell("DID Document"):
-                with tag("div", classes="p-4"):
-                    with tag("h1", classes="text-2xl font-bold mb-4"):
+                with tag.div(classes="p-4"):
+                    with tag.h1(classes="text-2xl font-bold mb-4"):
                         text("DID Document")
                     render_graph_view(here.graph.get())
+
         return HypermediaResponse()
 
     async def actor_message(self, id: str, request: Request):
@@ -359,27 +400,6 @@ class Site:
                 record_message(type, actor, g, properties=properties)
                 result = await call(actor, g)
                 return LinkedDataResponse(result)
-
-    # Middleware
-    async def bind_document(self, request, call_next):
-        with document():
-            return await call_next(request)
-
-    async def bind_actor_system(self, request, call_next):
-        with vat.bind(self.vat):
-            return await call_next(request)
-
-    async def bind_bubble(self, request, call_next):
-        with context.repo.bind(self.repo):
-            return await call_next(request)
-
-    # Route handlers
-    async def all_exception_handler(self, request: Request, exc: Exception):
-        self.yell.error("Unhandled exception", error=exc)
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal Server Error", "details": str(exc)},
-        )
 
     async def favicon(self):
         img = await favicon()
@@ -440,6 +460,15 @@ class Site:
         finally:
             await websocket.close()
 
+    async def resource_get(self, id: str):
+        with base_shell("Resource"):
+            with autoexpanding(depth=2):
+                render_affordance_resource(
+                    URIRef(id),
+                    get_subject_data(here.dataset.get(), URIRef(id)),
+                )
+        return HypermediaResponse()
+
     async def actor_get(self, id: str):
         actor = vat.get().deck[self.site[id]]
 
@@ -462,54 +491,6 @@ class Site:
         return StreamingResponse(
             stream_messages(), media_type="text/event-stream"
         )
-
-    # Add uptime actor URI to the HTML template
-    async def root(self):
-        with base_shell("Bubble"):
-            with tag("div", classes="p-4"):
-                # Find resources with affordances
-                graph = here.graph.get()
-                resources_with_affordances = set(
-                    graph.subjects(NT.affordance, None)
-                )
-
-                with autoexpanding(depth=2):
-                    if resources_with_affordances:
-                        with tag("div", classes="flex flex-col gap-4"):
-                            for subject in resources_with_affordances:
-                                data = get_subject_data(
-                                    here.dataset.get(), subject
-                                )
-                                render_affordance_resource(subject, data)
-                    else:
-                        # Fall back to default graph view if no affordances found
-                        render_graph_view(graph)
-
-        return HypermediaResponse()
-
-    async def sheets(self):
-        with base_shell("Sheets"):
-            with tag("div", classes="p-4"):
-                for sheet in here.dataset.get().subjects(
-                    RDF.type, NT.Sheet
-                ):
-                    render_graph_view(here.dataset.get().graph(sheet))
-        return HypermediaResponse()
-
-    async def get_timeline(self):
-        with base_shell("Timeline"):
-            with tag("div", classes="p-4 flex flex-col gap-4"):
-                entries = here.dataset.get().subjects(DCTERMS.created, None)
-                times = {}
-                for entry in entries:
-                    times[entry] = here.dataset.get().value(
-                        entry, DCTERMS.created
-                    )
-                sorted_times = sorted(times.items(), key=lambda x: x[1])
-                for entry, time in sorted_times:
-                    with rdfa.frameless.bind(True):
-                        rdf_resource(entry)
-        return HypermediaResponse()
 
     def get_websocket_base(self):
         return self.base_url.replace("https://", "wss://")

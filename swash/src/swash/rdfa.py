@@ -37,6 +37,8 @@ from swash.html import (
 )
 from swash.prfx import NT, Schema
 from swash.util import P, S
+from swash import feed
+
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 
@@ -168,6 +170,19 @@ def group_triples(
     return sorted(grouped_triples.items())
 
 
+@router.get("/resource/{subject:path}")
+def get_rdf_resource(subject: str) -> None:
+    subject = (
+        BNode(subject.removeprefix("_:"))
+        if subject.startswith("_")
+        else URIRef(subject)
+    )
+    rdf_resource(subject)
+
+
+frameless = here.Parameter("frameless", default=False)
+
+
 @html.dd("flex flex-col")
 def render_subresource(subject: S, predicate: Optional[P] = None) -> None:
     dataset = here.dataset.get()
@@ -203,19 +218,6 @@ def render_expander(obj, predicate):
             render_value(obj, predicate)
 
 
-@router.get("/resource/{subject:path}")
-def get_rdf_resource(subject: str) -> None:
-    subject = (
-        BNode(subject.removeprefix("_:"))
-        if subject.startswith("_")
-        else URIRef(subject)
-    )
-    rdf_resource(subject)
-
-
-frameless = here.Parameter("frameless", default=False)
-
-
 def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
     if data is None:
         data = get_subject_data(here.dataset.get(), subject)
@@ -247,6 +249,8 @@ def rdf_resource(subject: S, data: Optional[Dict] = None) -> None:
         render_text_editor_resource(subject, data)
     elif data["type"] == NT.ImageUploadForm:
         render_image_uploader_resource(subject, data)
+    elif data["type"] == NT.Timeline:
+        feed.render_timeline_resource(subject, data)
     else:
         render_default_resource(subject, data)
     visited_resources.get().add(subject)
@@ -294,28 +298,25 @@ def render_image_uploader_resource(subject: S, data: Dict):
         "*/*",
     )
 
-    with tag(
-        "form",
+    with tag.form(
         hx_post=f"{target}/message",
         hx_encoding="multipart/form-data",
         hx_swap="afterend",
     ):
         # Hidden field for message type
-        with tag(
-            "input", type="hidden", name="type", value=str(message_type)
-        ):
+        with tag.input(type="hidden", name="type", value=str(message_type)):
             pass
 
         # File input group
-        with tag(
-            "div", classes="flex flex-col gap-2 p-2 border rounded-sm"
+        with tag.div(
+            classes=[
+                "flex flex-col gap-2 p-2 border rounded-sm",
+                "bg-cyan-100/50 dark:bg-cyan-700/10",
+                "border-cyan-300/50 dark:border-cyan-700/40",
+            ]
         ):
-            classes("bg-cyan-100/50 dark:bg-cyan-700/10")
-            classes("border-cyan-300/50 dark:border-cyan-700/40")
-
             # File input
-            with tag(
-                "input",
+            with tag.input(
                 type="file",
                 name=str(NT.fileData),
                 accept=str(accept),
@@ -325,16 +326,13 @@ def render_image_uploader_resource(subject: S, data: Dict):
 
             # Background removal option for images
             if "image/" in str(accept):
-                with tag("div", classes="flex flex-col gap-2 text-sm"):
+                with tag.div(classes="flex flex-col gap-2 text-sm"):
                     # Radio group for background options
-                    with tag("div", classes="flex flex-col gap-1"):
+                    with tag.div(classes="flex flex-col gap-1"):
                         text("Background options:")
 
-                        with tag(
-                            "label", classes="flex items-center gap-2"
-                        ):
-                            with tag(
-                                "input",
+                        with tag.label(classes="flex items-center gap-2"):
+                            with tag.input(
                                 type="radio",
                                 name=str(NT.backgroundOption),
                                 value="none",
@@ -344,11 +342,8 @@ def render_image_uploader_resource(subject: S, data: Dict):
                                 pass
                             text("Keep original background")
 
-                        with tag(
-                            "label", classes="flex items-center gap-2"
-                        ):
-                            with tag(
-                                "input",
+                        with tag.label(classes="flex items-center gap-2"):
+                            with tag.input(
                                 type="radio",
                                 name=str(NT.backgroundOption),
                                 value="remove",
@@ -357,11 +352,8 @@ def render_image_uploader_resource(subject: S, data: Dict):
                                 pass
                             text("Remove background")
 
-                        with tag(
-                            "label", classes="flex items-center gap-2"
-                        ):
-                            with tag(
-                                "input",
+                        with tag.label(classes="flex items-center gap-2"):
+                            with tag.input(
                                 type="radio",
                                 name=str(NT.backgroundOption),
                                 value="modify",
@@ -371,10 +363,7 @@ def render_image_uploader_resource(subject: S, data: Dict):
                             text("Modify background")
 
                     # Background prompt input (initially hidden)
-                    with tag(
-                        "div",
-                        classes="hidden bg-prompt",
-                    ):
+                    with tag.div(classes="hidden bg-prompt"):
                         with tag(
                             "input",
                             type="text",
@@ -406,7 +395,12 @@ def render_default_resource(subject: S, data: Optional[Dict] = None):
         attr("resource", str(subject))
     if data and data["type"]:
         attr("typeof", str(data["type"]))
-    with tag("details", open=False):
+
+    opened = (
+        expansion_depth.get() > 0 and subject not in visited_resources.get()
+    )
+
+    with tag("details", open=opened):
         with tag("summary"):
             classes(
                 "pl-2",
@@ -776,6 +770,10 @@ def render_resource_header(subject, data):
             type_label = get_label(dataset, data["type"])
             with inside_property_label.bind(True):
                 render_value(type_label or data["type"])
+    # render a href link to the resource as a # icon
+
+    with tag("a", href=here.site.get()[subject]):
+        text("#")
 
 
 @html.ul(
@@ -1232,13 +1230,30 @@ def action_button(
 ):
     """Create a styled action button with consistent Tailwind classes"""
     default_classes = [
-        "relative inline-flex flex-row gap-2 justify-center items-center align-middle",
+        # Layout & Sizing
+        "relative",
+        "flex flex-row gap-2",
+        "justify-center items-center align-middle",
+        "min-w-48",
         "px-4 py-1",
-        "bg-cyan-900 rounded-sm border border-cyan-600",
-        "hover:bg-cyan-600 dark:hover:bg-cyan-700/80",
-        "text-white font-bold",
-        "dark:border-cyan-700/60 dark:bg-cyan-700/40",
-        "transition-colors duration-150 ease-in-out",
+        # Light Mode
+        "bg-stone-50",
+        "text-stone-900",
+        "border border-stone-400",
+        "shadow-md shadow-stone-400/40",
+        # Dark Mode
+        "dark:bg-stone-700/40",
+        "dark:text-stone-100",
+        "dark:border-stone-600/40",
+        "dark:shadow-stone-900/50",
+        # Interactions & Animation
+        "hover:bg-stone-100",
+        "hover:translate-y-px",
+        "hover:shadow-md",
+        "active:bg-stone-200",
+        "active:translate-y-0.5",
+        "active:shadow-none",
+        "transition-all duration-75",
     ]
 
     # Merge provided classes with default classes if any
@@ -1252,8 +1267,37 @@ def action_button(
 
     with tag("button", **attrs):
         if icon:
-            with tag("span"):
+            with tag(
+                "span", classes="flex items-center justify-center w-4 h-4"
+            ):
                 text(icon)
         if label:
-            with tag("span", classes="font-medium"):
+            with tag("span"):
                 text(label)
+
+
+def get_avatar_emoji(actor: Optional[URIRef]) -> str:
+    """Get a consistent avatar emoji for an actor based on their URI hash."""
+    # List of distinct emoji avatars
+    avatars = [
+        "🌀",
+        "🦊",
+        "🐼",
+        "🦉",
+        "🦋",
+        "🐙",
+        "🦜",
+        "🦝",
+        "🐢",
+        "🦡",
+        "🦦",
+        "🦥",
+    ]
+
+    if not actor:
+        return "👤"  # Default for unknown actors
+
+    # Get consistent index from hash
+    hash_bytes = hashlib.sha256(str(actor).encode()).digest()
+    index = int.from_bytes(hash_bytes[:4], byteorder="big") % len(avatars)
+    return avatars[index]

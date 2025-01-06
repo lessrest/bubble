@@ -93,6 +93,7 @@ dependencies = [
     # YouTube video downloader
     "yt-dlp>=2023.12.30",
     "nats-py>=2.9.0",
+    "watchfiles>=0.21.0",
 ]
 
 [tool.uv.sources]

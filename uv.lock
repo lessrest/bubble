@@ -286,6 +286,7 @@ dependencies = [
     { name = "trio-asyncio" },
     { name = "trio-websocket" },
     { name = "typer" },
+    { name = "watchfiles" },
     { name = "wn" },
     { name = "yt-dlp" },
 ]
@@ -360,6 +361,7 @@ requires-dist = [
     { name = "trio-asyncio", specifier = ">=0.15.0" },
     { name = "trio-websocket", specifier = ">=0.11.1" },
     { name = "typer", specifier = "==0.*" },
+    { name = "watchfiles", specifier = ">=0.21.0" },
     { name = "wn", specifier = ">=0.11.0" },
     { name = "yt-dlp", specifier = ">=2023.12.30" },
 ]

@@ -375,6 +375,7 @@ class Vat:
 
             child_ctx = self.deck.get(child)
             child_name = child_ctx.name if child_ctx else "unknown"
+
             self.yell.info(
                 "sending exit signal",
                 to=parent,

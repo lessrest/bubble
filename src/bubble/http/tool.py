@@ -150,9 +150,11 @@ async def add_affordance_to_sheet(graph_id: URIRef, affordance: URIRef):
         add(graph_id, {NT.affordance: affordance})
 
 
-async def spawn_actor(nursery, actor_class, name: str) -> URIRef:
+async def spawn_actor(
+    nursery, actor_class, *args, name: Optional[str] = None
+) -> URIRef:
     """Spawn a new actor and return the actor's URIRef."""
-    actor = actor_class()
+    actor = actor_class(*args)
     actor_uri = await spawn(nursery, actor, name=name)
     return actor_uri
 

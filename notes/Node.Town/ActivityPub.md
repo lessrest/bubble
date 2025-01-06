@@ -1,11 +1,8 @@
 # Integration
 
-ActivityPub is a decentralized social networking protocol that enables
-different systems to communicate and share activities in a standardized way.
-It's particularly relevant for Bubble because:
+ActivityPub is a decentralized social networking protocol that enables different systems to communicate and share activities in a standardized way. It's particularly relevant for Bubble because:
 
-1. It aligns with our distributed "froth" architecture where bubbles need to
-   interact
+1. It aligns with our distributed "froth" architecture where bubbles need to interact
 2. It provides a standard way to handle actor identities and capabilities
 3. It fits naturally with our existing RDF/semantic foundation
 
@@ -40,9 +37,7 @@ First of all, we need some notion of [[User Identity]] and [[Authentication]].
 
 # [[ActivityStreams]] Ontology
 
-ActivityStreams 2.0 defines a structured, RDF-compatible JSON-LD vocabulary
-for describing social activities, actors, and objects. Core classes and
-properties include:
+ActivityStreams 2.0 defines a structured, RDF-compatible JSON-LD vocabulary for describing social activities, actors, and objects. Core classes and properties include:
 
 ## Classes
 

@@ -14,7 +14,7 @@ import structlog
 
 from rdflib import PROV, URIRef, Literal
 
-from swash.prfx import NT
+from swash.prfx import AS, NT
 from swash.util import add, new, get_single_object
 from bubble.http.tool import (
     AsyncReadable,
@@ -292,7 +292,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.AddNote)
     async def handle_add_note(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, NoteEditor, "note editor"
+            ctx.nursery, NoteEditor, name="note editor"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -302,7 +302,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.MakeImage)
     async def handle_make_image(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, ImageGenerator, "image generator"
+            ctx.nursery, ImageGenerator, name="image generator"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -312,7 +312,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.MakeVideo)
     async def handle_make_video(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, VideoGenerator, "video generator"
+            ctx.nursery, VideoGenerator, name="video generator"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -322,7 +322,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.RecordVoice)
     async def handle_record_voice(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, DeepgramClientActor, "voice recorder"
+            ctx.nursery, DeepgramClientActor, name="voice recorder"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -332,7 +332,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.AddImageUploader)
     async def handle_add_image_uploader(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, ImageUploader, "image uploader"
+            ctx.nursery, ImageUploader, name="image uploader"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -342,7 +342,7 @@ class SheetEditor(DispatchingActor):
     @handler(NT.AddYouTubeDownloader)
     async def handle_add_youtube_downloader(self, ctx: DispatchContext):
         actor_uri = await spawn_actor(
-            ctx.nursery, YouTubeDownloader, "youtube downloader"
+            ctx.nursery, YouTubeDownloader, name="youtube downloader"
         )
         await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:
@@ -350,31 +350,119 @@ class SheetEditor(DispatchingActor):
             return context.buffer.get()
 
 
-class SheetCreator(DispatchingActor):
+class ChatCreator(DispatchingActor):
     async def setup(self, actor_uri: URIRef):
-        """Initialize by creating a SheetCreator with a 'New Sheet' button."""
+        """Initialize by creating a ChatCreator with a 'New Chat' button."""
         new(
             NT.SheetCreator,
             {
                 NT.affordance: create_button(
-                    "New Sheet",
-                    icon="📝",
-                    message_type=NT.CreateSheet,
+                    "New Chat",
+                    icon="💬",
+                    message_type=NT.CreateChat,
                     target=actor_uri,
                 )
             },
             actor_uri,
         )
 
-    @handler(NT.CreateSheet)
-    async def handle_create_sheet(self, ctx: DispatchContext):
+    @handler(NT.CreateChat)
+    async def handle_create_chat(self, ctx: DispatchContext):
         async with new_persistent_graph():
             editor_uri = await spawn_actor(
                 ctx.nursery,
-                SheetEditor,
-                name="sheet editor",
+                ChatSession,
+                name="chat session",
             )
 
         with with_transient_graph() as graph:
             add(graph, {PROV.generated: editor_uri})
+            return context.buffer.get()
+
+
+class DiscussionParticipant(DispatchingActor):
+    def __init__(self, name: str, chat: URIRef):
+        super().__init__()
+        self.name = name
+        self.chat = chat
+
+    async def setup(self, actor_uri: URIRef):
+        """Initialize by creating a DiscussionParticipation with message prompt."""
+        new(
+            NT.Participant,
+            {
+                NT.name: self.name,
+                NT.affordance: [
+                    new(
+                        NT.Prompt,
+                        {
+                            NT.placeholder: Literal(
+                                "Type a message...", "en"
+                            ),
+                            NT.message: NT.AddMessage,
+                            NT.target: actor_uri,
+                            NT.label: Literal("Send", "en"),
+                        },
+                    ),
+                ],
+            },
+            actor_uri,
+        )
+
+    @handler(NT.AddMessage)
+    async def handle_add_message(self, ctx: DispatchContext):
+        message = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
+        async with persist_graph_changes(this()):
+            add(
+                self.chat,
+                {
+                    NT.hasPart: new(
+                        AS.Note,
+                        {
+                            AS.content: Literal(message, lang="en"),
+                            AS.published: timestamp(),
+                            AS.actor: this(),
+                        },
+                    )
+                },
+            )
+        with with_transient_graph() as graph:
+            add(graph, {PROV.revisedEntity: this()})
+            return context.buffer.get()
+
+
+class ChatSession(DispatchingActor):
+    def __init__(self):
+        super().__init__()
+        self.timeline = new(NT.Timeline)
+
+    async def setup(self, actor_uri: URIRef):
+        new(
+            NT.Discussion,
+            {
+                NT.affordance: [
+                    new(
+                        NT.Prompt,
+                        {
+                            NT.placeholder: Literal("Type a name...", "en"),
+                            NT.message: NT.AddParticipant,
+                            NT.target: actor_uri,
+                            NT.label: Literal("Add Participant", "en"),
+                        },
+                    ),
+                    self.timeline,
+                ]
+            },
+            actor_uri,
+        )
+
+    @handler(NT.AddParticipant)
+    async def handle_add_participant(self, ctx: DispatchContext):
+        name = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
+        actor_uri = await spawn_actor(
+            ctx.nursery, DiscussionParticipant, name, self.timeline
+        )
+        # await add_affordance_to_sheet(this(), actor_uri)
+        with with_transient_graph() as graph:
+            add(graph, {PROV.generated: actor_uri})
             return context.buffer.get()

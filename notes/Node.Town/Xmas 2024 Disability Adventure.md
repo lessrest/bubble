@@ -17,3 +17,13 @@ When it comes to implementing the actor mesh cluster, there are some interesting
 The actor management system raises some interesting questions too. Currently, when we start the server, it launches several actors with specific capabilities. We need to carefully consider whether to duplicate these across all instances or have certain specialized nodes. While redundancy is important - if one server goes down, you want others to pick up the slack - there might be cases where you want certain services to run on specific nodes only.
 
 For the clustering implementation, I'm considering using a [[Message Bus]] approach, possibly MQTT or NATS. Since we're working within a trusted cluster on an internal network, we can be a bit more relaxed about security (no need for certificates and TLS). One machine could run as a hub, or perhaps one per region, which might be simpler than managing peer-to-peer connections. This needs to tie into our handling of names, permanence, and [[Actor Identity]], possibly through a multiplexed actor system.
+
+## ugh field report
+
+I wonder what it is about the system that makes me so reluctant to do real time stuff you know with Web sockets and live updating HTML stuff it just feels like somehow horrible and I'm not exactly sure why.
+
+Some of it is just injury that it's hard to do anything so I'm reluctant to get into the weeds maybe I should have a little nap.
+
+## simple chat session
+
+So I started implementing some kind of simple chat session avoidance thingy and I'm wondering how to do it like OK I click chat and I get a thing with a text box but now I want to invite somebody like I wanna invite my brother to chat with me that means I want to be able to maybe like type his name into a form and then click create participant or invite participant or maybe there should not be ascend prompt and the chat itself that should be something you get when you join and you join as a user name you join as

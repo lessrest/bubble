@@ -24,7 +24,7 @@ from bubble.repo.git import Git
 from bubble.http.cert import generate_self_signed_cert
 from bubble.http.town import Site
 from bubble.mesh.base import this, spawn
-from bubble.http.tools import SheetEditor
+from bubble.http.tools import ChatCreator, SheetEditor
 
 logger = structlog.get_logger()
 CONFIG = Namespace("https://bubble.node.town/vocab/config#")
@@ -83,14 +83,16 @@ def load_config(
 
 @app.command()
 def serve(
-    bind: str = Option(None, "--bind", help="Bind address"),
-    base_url: str = BaseUrl,
+    bind: Optional[str] = Option(None, "--bind", help="Bind address"),
+    base_url: Optional[str] = BaseUrl,
     repo_path: str = RepoPath,
     shell: bool = Option(False, "--shell", help="Start a bash subshell"),
-    cert_file: str = Option(
+    cert_file: Optional[str] = Option(
         None, "--cert", help="SSL certificate file path"
     ),
-    key_file: str = Option(None, "--key", help="SSL private key file path"),
+    key_file: Optional[str] = Option(
+        None, "--key", help="SSL private key file path"
+    ),
     self_signed: bool = Option(
         False,
         "--self-signed",
@@ -189,10 +191,6 @@ async def _serve(
     elif cert_file and key_file:
         config.certfile = cert_file
         config.keyfile = key_file
-    else:
-        logger.info(
-            "Running in HTTP mode - ensure HTTPS termination is handled by your reverse proxy"
-        )
 
     logger.info(
         "starting Node.Town",
@@ -202,6 +200,7 @@ async def _serve(
     )
 
     town = Site(base_url, bind, repo)
+
     if nats_url:
         logger.info("Setting up NATS clustering", nats_url=nats_url)
         await town.setup_nats(nats_url)
@@ -225,14 +224,21 @@ async def _serve(
                     },
                 )
 
-                editor = await spawn(
-                    nursery,
-                    SheetEditor(),
-                    name="sheet editor",
+                town.vat.link_actor_to_identity(
+                    await spawn(
+                        nursery,
+                        SheetEditor(),
+                        name="sheet editor",
+                    )
                 )
 
-                # Link supervisor to the town's identity
-                town.vat.link_actor_to_identity(editor)
+                town.vat.link_actor_to_identity(
+                    await spawn(
+                        nursery,
+                        ChatCreator(),
+                        name="chat creator",
+                    )
+                )
 
                 nursery.start_soon(
                     run_server, town.get_fastapi_app(), config
