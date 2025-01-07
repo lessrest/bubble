@@ -1,6 +1,7 @@
 """Initialize a new Bubble configuration."""
 
 import os
+
 from pathlib import Path
 
 import trio
@@ -12,10 +13,10 @@ from rich.prompt import Prompt, Confirm
 from rich.console import Console
 from rdflib.namespace import RDF, XSD
 
+from swash.mint import fresh_uri
+from swash.prfx import BUBBLE
 from bubble.cli.app import RepoPath, app
 from bubble.http.cert import generate_self_signed_cert
-from swash.prfx import BUBBLE
-from swash.mint import fresh_uri
 
 logger = structlog.get_logger()
 console = Console()

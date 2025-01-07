@@ -23,7 +23,7 @@ import pathlib
 
 from io import BytesIO
 from base64 import b64encode
-from typing import Dict, Optional, AsyncGenerator, Any
+from typing import Any, Dict, Optional, AsyncGenerator
 from contextlib import contextmanager
 
 import trio
@@ -57,22 +57,21 @@ from swash.rdfa import (
 )
 from swash.util import P, new
 from bubble.keys import build_did_document, parse_public_key_hex
-
-from bubble.mesh.base import (
-    Vat,
-    send,
-    this,
-    txgraph,
-    with_transient_graph,
-    create_graph,
-    vat,
-)
 from bubble.mesh.otp import record_message
-from bubble.mesh.call import call
 from bubble.http.eval import eval_code, eval_form
 from bubble.http.icon import favicon
 from bubble.http.page import base_html, base_shell
 from bubble.http.word import word_lookup, word_lookup_form
+from bubble.mesh.base import (
+    Vat,
+    vat,
+    send,
+    this,
+    txgraph,
+    create_graph,
+    with_transient_graph,
+)
+from bubble.mesh.call import call
 from bubble.repo.repo import Repository, context
 from bubble.http.render import render_graph_view, render_graphs_overview
 

@@ -1,11 +1,13 @@
 """NATS-based VAT-to-VAT communication for mesh networking."""
 
-from typing import Any, Callable, Awaitable
 import functools
+
+from typing import Any, Callable, Awaitable
+
 import structlog
 import trio_asyncio
-from nats.aio.client import Client as NATS
 
+from nats.aio.client import Client as NATS
 
 logger = structlog.get_logger(__name__)
 

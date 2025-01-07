@@ -281,3 +281,13 @@ class DispatchingActor(ServerActor):
     def current_graph(self) -> Graph:
         """Convenience to return the current context graph."""
         return context.buffer.get()
+
+
+class BytesReadable(AsyncReadable):
+    """A simple AsyncReadable that reads from bytes in memory."""
+
+    def __init__(self, data: bytes):
+        self.data = data
+
+    async def aread(self) -> bytes:
+        return self.data

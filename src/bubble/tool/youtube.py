@@ -4,20 +4,18 @@ This module implements a YouTube downloader actor that uses yt-dlp to
 download videos from various platforms.
 """
 
-import os
 import tempfile
 
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from pathlib import Path
-from datetime import UTC, datetime
 
 import trio
 import structlog
 
-from rdflib import PROV, Graph, URIRef, Literal
+from rdflib import PROV, URIRef
 
 from swash.prfx import NT
-from swash.util import add, new, is_a, get_single_object
+from swash.util import add, new, get_single_object
 from bubble.http.tool import (
     AsyncReadable,
     DispatchContext,
@@ -26,7 +24,7 @@ from bubble.http.tool import (
     create_prompt,
     store_generated_assets,
 )
-from bubble.mesh.base import boss, this, txgraph, with_transient_graph
+from bubble.mesh.base import boss, with_transient_graph
 from bubble.repo.repo import context
 
 logger = structlog.get_logger()

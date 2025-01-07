@@ -783,6 +783,10 @@ select {
   }
 }
 
+.invisible {
+  visibility: hidden;
+}
+
 .static {
   position: static;
 }
@@ -979,6 +983,10 @@ select {
 }
 
 .flex-shrink {
+  flex-shrink: 1;
+}
+
+.shrink {
   flex-shrink: 1;
 }
 

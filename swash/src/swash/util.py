@@ -8,15 +8,15 @@ from typing import Any, Optional, Sequence, overload
 from rdflib import (
     RDF,
     XSD,
+    RDFS,
+    SKOS,
     BNode,
     Graph,
     URIRef,
+    Dataset,
     Literal,
     Namespace,
     IdentifiedNode,
-    Dataset,
-    RDFS,
-    SKOS,
 )
 from rdflib.graph import _ObjectType, _SubjectType, _PredicateType
 from rdflib.query import ResultRow

@@ -6,7 +6,7 @@ from pathlib import Path
 from rdflib import RDFS, Graph, Dataset, Literal, Namespace
 
 from swash import here as swash_vars
-from swash.html import Fragment, root, document, tag, text
+from swash.html import Fragment, tag, root, text, document
 from swash.rdfa import rdf_resource, autoexpanding
 from swash.util import new
 from bubble.repo.repo import context

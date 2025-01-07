@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException
 from rdflib.graph import QuotedGraph
 from rdflib.collection import Collection
 
-from swash import here
+from swash import feed, here
 from swash.html import (
     HypermediaResponse,
     tag,
@@ -37,8 +37,6 @@ from swash.html import (
 )
 from swash.prfx import NT, Schema
 from swash.util import P, S
-from swash import feed
-
 
 router = APIRouter(prefix="/rdf", default_response_class=HypermediaResponse)
 

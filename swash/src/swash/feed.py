@@ -1,9 +1,11 @@
 import hashlib
+
 from typing import Dict, Optional
+
+import arrow
 
 from rdflib import URIRef
 
-import arrow
 from swash import here
 from swash.html import tag, html, text
 from swash.prfx import AS, NT

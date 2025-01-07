@@ -8,7 +8,7 @@ from typer import Option
 from rdflib import PROV, Literal
 
 from swash.prfx import NT
-from swash.util import make_list, new
+from swash.util import new, make_list
 from bubble.cli.app import RepoPath, app
 from bubble.repo.git import Git
 from bubble.repo.repo import Repository

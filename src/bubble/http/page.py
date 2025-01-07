@@ -12,25 +12,18 @@ unified read-write vision of the web ever since.
 
 import json
 
-from contextlib import contextmanager
 from random import choice
+from contextlib import contextmanager
 from urllib.parse import quote
 
-
 from rdflib import URIRef
-from swash.html import tag, text, html
+
+from swash.html import tag, html, text
 from bubble.mesh.base import vat as current_vat
 from bubble.repo.repo import context
 
-# The scripts that power our interface - a carefully curated collection
-# of modern web technologies that would make a 90s webmaster's head spin
-cdn_scripts = [
-    "https://unpkg.com/htmx.org@2",  # HTMX: Because sometimes JavaScript is too much
-]
-
-# Configuration for HTMX - teaching new tricks to old browsers
 htmx_config = {
-    "globalViewTransitions": True,  # Smooth transitions, like butter
+    "globalViewTransitions": True,
 }
 
 
@@ -57,14 +50,10 @@ def base_html(title: str):
             tag.link(rel="stylesheet", href="/static/css/output.css")
             tag.link(rel="stylesheet", href="/static/audio-player.css")
 
-            for script in cdn_scripts:
-                tag.script(src=script)
-
             tag.script(type="module", src="/static/type-writer.js")
             tag.script(type="module", src="/static/voice-writer.js")
             tag.script(type="module", src="/static/audio-recorder.js")
             tag.script(type="module", src="/static/live.js")
-            json_assignment_script("htmx.config", htmx_config)
 
         with tag.body(
             classes="bg-white dark:bg-slate-950 text-gray-900 dark:text-stone-50",
@@ -77,6 +66,8 @@ def base_html(title: str):
                 src="/static/voice-recorder-writer.js",
             )
             tag.script(type="module", src="/static/jsonld-socket.js")
+            tag.script(src="/static/htmx-2.0.4.js")
+            json_assignment_script("htmx.config", htmx_config)
 
 
 def urlquote(id: str):
