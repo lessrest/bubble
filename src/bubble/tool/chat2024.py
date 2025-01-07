@@ -95,7 +95,11 @@ class ChatSession(DispatchingActor):
     async def handle_add_participant(self, ctx: DispatchContext):
         name = get_single_object(ctx.request_id, NT.prompt, ctx.buffer)
         actor_uri = await spawn_actor(
-            ctx.nursery, DiscussionParticipant, name, self.timeline
+            ctx.nursery,
+            DiscussionParticipant,
+            name,
+            self.timeline,
+            name=name,
         )
         # await add_affordance_to_sheet(this(), actor_uri)
         with with_transient_graph() as graph:

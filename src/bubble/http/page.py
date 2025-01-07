@@ -66,7 +66,10 @@ def base_html(title: str):
                 src="/static/voice-recorder-writer.js",
             )
             tag.script(type="module", src="/static/jsonld-socket.js")
+
             tag.script(src="/static/htmx-2.0.4.js")
+            tag.script(src="/static/hyperscript-0.9.13.js")
+
             json_assignment_script("htmx.config", htmx_config)
 
 
