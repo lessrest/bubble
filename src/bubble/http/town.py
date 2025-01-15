@@ -56,6 +56,10 @@ from swash.rdfa import (
     render_affordance_resource,
 )
 from swash.util import P, new
+from bubble.audio.whisper import (
+    create_whisper_actor,
+    whisper_transcribe_actor,
+)
 from bubble.keys import build_did_document, parse_public_key_hex
 from bubble.mesh.otp import record_message
 from bubble.http.eval import eval_code, eval_form
@@ -706,6 +710,14 @@ class Site:
 def in_request_graph(g: Graph):
     with here.graph.bind(g):
         yield g
+
+
+async def register_whisper_actor(app: Site, nursery: trio.Nursery):
+    """Register the Whisper transcription actor with the app."""
+    whisper_actor, whisper_graph = create_whisper_actor()
+    app.repo.dataset.add_graph(whisper_graph)
+    nursery.start_soon(whisper_transcribe_actor, whisper_actor)
+    return whisper_actor
 
 
 def town_app(

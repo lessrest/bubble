@@ -1,0 +1,62 @@
+@prefix audio: <https://swa.sh/2024/audio#> .
+@prefix nt: <https://swa.sh/2024/nt#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Classes
+audio:AudioFile a owl:Class ;
+   rdfs:label "audio file"@en ;
+   skos:definition "A file containing audio data"@en .
+audio:Transcription a owl:Class ;
+   rdfs:label "transcription"@en ;
+   skos:definition "A text representation of spoken content in an audio file"@en .
+audio:Segment a owl:Class ;
+   rdfs:label "segment"@en ;
+   skos:definition "A segment of transcribed audio with timing information"@en .
+
+# Properties
+audio:text a owl:DatatypeProperty ;
+   rdfs:label "text"@en ;
+   skos:definition "The transcribed text content"@en ;
+   rdfs:range xsd:string .
+audio:sourceFile a owl:ObjectProperty ;
+   rdfs:label "source file"@en ;
+   skos:definition "The audio file that was transcribed"@en ;
+   rdfs:domain audio:Transcription ;
+   rdfs:range audio:AudioFile .
+audio:model a owl:DatatypeProperty ;
+   rdfs:label "model"@en ;
+   skos:definition "The model used for transcription"@en ;
+   rdfs:range xsd:string .
+audio:timestamp a owl:DatatypeProperty ;
+   rdfs:label "timestamp"@en ;
+   skos:definition "When the transcription was created"@en ;
+   rdfs:range xsd:dateTime .
+audio:hasSegment a owl:ObjectProperty ;
+   rdfs:label "has segment"@en ;
+   skos:definition "Links a transcription to its segments"@en ;
+   rdfs:domain audio:Transcription ;
+   rdfs:range audio:Segment .
+audio:start a owl:DatatypeProperty ;
+   rdfs:label "start time"@en ;
+   skos:definition "Start time of a segment in seconds"@en ;
+   rdfs:domain audio:Segment ;
+   rdfs:range xsd:decimal .
+audio:end a owl:DatatypeProperty ;
+   rdfs:label "end time"@en ;
+   skos:definition "End time of a segment in seconds"@en ;
+   rdfs:domain audio:Segment ;
+   rdfs:range xsd:decimal .
+audio:confidence a owl:DatatypeProperty ;
+   rdfs:label "confidence"@en ;
+   skos:definition "Confidence score for the transcription"@en ;
+   rdfs:range xsd:decimal .
+audio:index a owl:DatatypeProperty ;
+   rdfs:label "index"@en ;
+   skos:definition "Sequential index of a segment"@en ;
+   rdfs:domain audio:Segment ;
+   rdfs:range xsd:integer .
